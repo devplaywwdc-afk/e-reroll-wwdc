@@ -1,0 +1,7 @@
+frida>=17
+# CLI package version tracks separately from frida core (latest on PyPI is 14.x, pulls frida 17+)
+frida-tools>=14.10
+fastapi>=0.110
+uvicorn>=0.27
+hpack>=4.0
+cryptography>=42

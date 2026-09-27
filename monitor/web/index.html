@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>eFootball Traffic Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ===== Top bar ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-logo">EFB</span>
+      <span class="brand-title">eFootball Traffic Monitor</span>
+    </div>
+
+    <div class="ws-status" id="wsStatus" title="WebSocket connection">
+      <span class="ws-dot" id="wsDot"></span>
+      <span class="ws-label" id="wsLabel">connecting…</span>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-actions">
+      <div class="menu-wrap" id="exportWrap">
+        <button class="btn" id="btnExport" title="Export flows ที่แสดงอยู่ (เคารพ filter) — เขียนลง exports/ ให้ agent อ่านได้ด้วย">
+          <span class="btn-ico">&#8681;</span> Export
+        </button>
+        <div class="menu" id="exportMenu" hidden>
+          <button class="menu-item" data-fmt="md">
+            <span class="mi-title">Markdown <code>.md</code></span>
+            <span class="mi-sub">อ่านง่าย · ให้ agent อ่านต่อ</span>
+          </button>
+          <button class="menu-item" data-fmt="json">
+            <span class="mi-title">JSON <code>.json</code></span>
+            <span class="mi-sub">โครงสร้างเต็ม · machine-parse</span>
+          </button>
+          <button class="menu-item" data-fmt="jsonl">
+            <span class="mi-title">JSON Lines <code>.jsonl</code></span>
+            <span class="mi-sub">1 flow / บรรทัด · stream</span>
+          </button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" data-fmt="all">
+            <span class="mi-title">ทั้งหมด → <code>exports/</code></span>
+            <span class="mi-sub">เขียนครบ md+json+jsonl · ให้ agent ดึง</span>
+          </button>
+        </div>
+      </div>
+      <button class="btn" id="btnClear" title="Clear all flows">
+        <span class="btn-ico">&#10005;</span> Clear
+      </button>
+      <button class="btn" id="btnPause" title="Pause / resume live append">
+        <span class="btn-ico" id="pauseIco">&#10073;&#10073;</span>
+        <span id="pauseLabel">Pause</span>
+      </button>
+      <button class="btn btn-toggle is-on" id="btnAutoscroll" title="Auto-scroll to newest">
+        <span class="btn-ico">&#8615;</span> Auto-scroll
+      </button>
+      <span class="counter" id="counter">0 flows</span>
+    </div>
+  </header>
+
+  <!-- ===== Filter bar ===== -->
+  <div class="filterbar">
+    <div class="filter-input-wrap">
+      <span class="filter-ico">&#128269;</span>
+      <input type="text" id="filterText" class="filter-input"
+             placeholder="Filter by host / path / command / rpc…" spellcheck="false" autocomplete="off" />
+      <button class="filter-clear" id="filterClear" title="Clear filter">&#10005;</button>
+    </div>
+    <div class="proto-toggles" id="protoToggles">
+      <button class="proto-toggle is-on" data-proto="grpc"><span class="dot proto-grpc"></span>grpc</button>
+      <button class="proto-toggle is-on" data-proto="http"><span class="dot proto-http"></span>http</button>
+      <button class="proto-toggle is-on" data-proto="raw"><span class="dot proto-raw"></span>raw</button>
+    </div>
+    <div class="filter-count" id="filterCount"></div>
+  </div>
+
+  <!-- ===== Main split ===== -->
+  <main class="main" id="main">
+    <!-- Left: flow list -->
+    <section class="pane pane-left" id="paneLeft">
+      <div class="tablewrap" id="tablewrap">
+        <table class="flowtable">
+          <thead>
+            <tr>
+              <th class="col-id">#</th>
+              <th class="col-time">time</th>
+              <th class="col-proto">proto</th>
+              <th class="col-host">host</th>
+              <th class="col-name">command / path</th>
+              <th class="col-method">method</th>
+              <th class="col-status">status</th>
+              <th class="col-size">size</th>
+              <th class="col-dur">dur</th>
+            </tr>
+          </thead>
+          <tbody id="flowBody"></tbody>
+        </table>
+        <div class="empty-list" id="emptyList">No traffic captured yet.</div>
+      </div>
+    </section>
+
+    <!-- Drag handle -->
+    <div class="divider" id="divider" title="Drag to resize"></div>
+
+    <!-- Right: detail -->
+    <section class="pane pane-right" id="paneRight">
+      <div class="detail-placeholder" id="detailPlaceholder">
+        <div class="ph-icon">&#8644;</div>
+        <div class="ph-text">Select a flow to inspect its request &amp; response.</div>
+      </div>
+
+      <div class="detail" id="detail" hidden>
+        <div class="detail-tabs" id="detailTabs">
+          <button class="tab is-active" data-tab="overview">Overview</button>
+          <button class="tab" data-tab="request">Request</button>
+          <button class="tab" data-tab="response">Response</button>
+        </div>
+        <div class="detail-body" id="detailBody"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

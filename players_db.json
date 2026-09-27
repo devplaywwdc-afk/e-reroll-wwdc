@@ -1,0 +1,228 @@
+{
+  "last_updated": "2026-09-23",
+  "version": "1.0",
+  "description": "eFootball Target Player Database for Reroll Bot",
+  "featured_boxes": [
+    {
+      "box_name": "Advertisement Reward",
+      "box_type": "Daily Free / Ad",
+      "box_category": "Epic",
+      "cost": "Free (1st pull) / Ad (2nd-3rd)",
+      "top_players": [
+        {
+          "name": "Patrick Kluivert",
+          "aliases": ["Patrick Kluivert", "Kluivert", "P. Kluivert"],
+          "card_type": "Epic",
+          "position": "CF",
+          "base_rating": 85,
+          "max_rating": 98,
+          "team": "FC Barcelona",
+          "booster": "จบสกอร์เหนือชั้น"
+        },
+        {
+          "name": "John O'Shea",
+          "aliases": ["John O'Shea", "O'Shea", "John O Shea", "J. O'Shea", "J0hn O'Shea"],
+          "card_type": "Epic",
+          "position": "DMF",
+          "base_rating": 85,
+          "max_rating": 98,
+          "team": "Manchester United",
+          "booster": "ป้อมปราการ"
+        },
+        {
+          "name": "Daniele Massaro",
+          "aliases": ["Daniele Massaro", "Massaro", "D. Massaro"],
+          "card_type": "Epic",
+          "position": "CF",
+          "base_rating": 85,
+          "max_rating": 98,
+          "team": "AC Milan",
+          "booster": "ลูกโหม่งหัวกระสุน"
+        }
+      ]
+    },
+    {
+      "box_name": "National All-Stars",
+      "box_type": "Coins Special",
+      "box_category": "Big Time & Epic",
+      "cost": "100 Coins",
+      "top_players": [
+        {
+          "name": "Gareth Bale",
+          "aliases": ["Gareth Bale", "Bale", "G. Bale", "ret Bale"],
+          "card_type": "Big Time & Epic",
+          "position": "RWF",
+          "base_rating": 87,
+          "max_rating": 103,
+          "team": "Wales",
+          "booster": "ระเบิดเร่งความเร็ว / ลูกยิงต่ำผีจับยัด"
+        },
+        {
+          "name": "Alessandro Del Piero",
+          "aliases": ["Alessandro Del Piero", "Del Piero", "A. Del Piero", "Piero"],
+          "card_type": "Epic",
+          "position": "CF",
+          "base_rating": 87,
+          "max_rating": 103,
+          "team": "Italy",
+          "booster": "ลูกปั่นโค้งสายฟ้า / เจตจำนงไม่สั่นคลอน"
+        },
+        {
+          "name": "George Best",
+          "aliases": ["George Best", "Best", "G. Best", "Georg"],
+          "card_type": "Epic",
+          "position": "RWF",
+          "base_rating": 89,
+          "max_rating": 103,
+          "team": "Northern Ireland"
+        },
+        {
+          "name": "Edwin van der Sar",
+          "aliases": ["Edwin van der Sar", "Van der Sar", "van der Sar", "Edwlnvan der"],
+          "card_type": "Epic",
+          "position": "GK",
+          "base_rating": 87,
+          "max_rating": 102,
+          "team": "Netherlands"
+        },
+        {
+          "name": "Tomáš Rosický",
+          "aliases": ["Tomáš Rosický", "Rosicky", "Rosický", "T. Rosicky"],
+          "card_type": "Epic",
+          "position": "AMF",
+          "base_rating": 86,
+          "max_rating": 101,
+          "team": "Czech Republic"
+        },
+        {
+          "name": "Carles Puyol",
+          "aliases": ["Carles Puyol", "Puyol", "C. Puyol"],
+          "card_type": "Epic",
+          "position": "CB",
+          "base_rating": 86,
+          "max_rating": 102,
+          "team": "Spain"
+        }
+      ]
+    },
+    {
+      "box_name": "Anticipated Standouts 26-27",
+      "box_type": "Coins Special",
+      "box_category": "Show Time",
+      "cost": "100 Coins",
+      "top_players": [
+        {
+          "name": "Florian Wirtz",
+          "aliases": ["Florian Wirtz", "Wirtz", "F. Wirtz"],
+          "card_type": "Show Time",
+          "position": "AMF",
+          "base_rating": 89,
+          "max_rating": 102,
+          "team": "Bayer Leverkusen",
+          "booster": "เลี้ยวทะลวงลื่นไหล / จ่ายบอลเหนือชั้น"
+        },
+        {
+          "name": "João Pedro",
+          "aliases": ["João Pedro", "Joao Pedro", "Pedro", "J. Pedro"],
+          "card_type": "Show Time",
+          "position": "CF",
+          "base_rating": 88,
+          "max_rating": 102,
+          "team": "Brighton",
+          "booster": "เร่งเครื่องบุก / ยิ่งล้อมยิ่งหนึบ"
+        },
+        {
+          "name": "Jan Paul van Hecke",
+          "aliases": ["Jan Paul van Hecke", "Van Hecke", "van Hecke", "J. van Hecke"],
+          "card_type": "Show Time",
+          "position": "CB",
+          "base_rating": 87,
+          "max_rating": 101,
+          "team": "Brighton",
+          "booster": "ป้อมปราการ / ป้อมกลางอากาศ"
+        }
+      ]
+    },
+    {
+      "box_name": "J.LEAGUE",
+      "box_type": "Coins Special",
+      "box_category": "Epic",
+      "cost": "100 Coins",
+      "top_players": [
+        {
+          "name": "Takashi Inui",
+          "aliases": ["Takashi Inui", "Inui", "T. Inui"],
+          "card_type": "Epic",
+          "position": "LWF",
+          "base_rating": 86,
+          "max_rating": 99,
+          "team": "Shimizu S-Pulse",
+          "booster": "เลี้ยวทะลวงลื่นไหล / ยิ่งล้อมยิ่งหนึบ"
+        },
+        {
+          "name": "Eiji Kawashima",
+          "aliases": ["Eiji Kawashima", "Kawashima", "E. Kawashima"],
+          "card_type": "Epic",
+          "position": "GK",
+          "base_rating": 87,
+          "max_rating": 100,
+          "team": "Júbilo Iwata",
+          "booster": "GK กำกับการตั้งรับ"
+        }
+      ]
+    },
+    {
+      "box_name": "Hall of Fame Legends",
+      "box_type": "Campaign / All Time",
+      "box_category": "Epic",
+      "cost": "Chance Deal",
+      "top_players": [
+        {
+          "name": "Eric Cantona",
+          "aliases": ["Eric Cantona", "Cantona", "E. Cantona"],
+          "card_type": "Epic",
+          "position": "CF",
+          "base_rating": 90,
+          "max_rating": 103,
+          "team": "Manchester United"
+        },
+        {
+          "name": "Ronaldinho Gaúcho",
+          "aliases": ["Ronaldinho", "Ronaldinho Gaúcho", "Ronaldinho Gaucho"],
+          "card_type": "Epic",
+          "position": "AMF",
+          "base_rating": 90,
+          "max_rating": 103,
+          "team": "FC Barcelona"
+        },
+        {
+          "name": "Ruud Gullit",
+          "aliases": ["Ruud Gullit", "Gullit", "R. Gullit"],
+          "card_type": "Epic",
+          "position": "AMF / CF",
+          "base_rating": 90,
+          "max_rating": 103,
+          "team": "AC Milan"
+        },
+        {
+          "name": "Patrick Vieira",
+          "aliases": ["Patrick Vieira", "Vieira", "P. Vieira"],
+          "card_type": "Epic",
+          "position": "DMF",
+          "base_rating": 90,
+          "max_rating": 103,
+          "team": "Arsenal"
+        },
+        {
+          "name": "Paolo Maldini",
+          "aliases": ["Paolo Maldini", "Maldini", "P. Maldini"],
+          "card_type": "Epic",
+          "position": "CB",
+          "base_rating": 90,
+          "max_rating": 103,
+          "team": "AC Milan"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+# ---- large binaries / build artifacts (regenerable, or pulled from device) ----
+backup_clean/
+*.apk
+*.so
+*.i64
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+
+# ---- caches / runtime output ----
+__pycache__/
+*.pyc
+reroll_toolkit/wire/
+reroll_toolkit/*.log
+scratch/*.log
+scratch/*_live.log
+scratch/create_dump.json
+scratch/wire/
+
+# ---- secrets / per-run account data (keep local) ----
+auth_new.dat
+accounts/
+saved_accounts/
+*.keystore
+
+# ---- captured traffic dumps (contain live session tokens / auth codes) ----
+monitor/exports/
+all_flows_clean.json
+exported_flows.json
+scratch/*.json
+*.dat

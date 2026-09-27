@@ -1,0 +1,45 @@
+{
+  "comment": "eFootball Reroll Filter Configuration",
+  "reroll_settings": {
+    "max_attempts": 0,
+    "delay_between_steps_sec": 1.5,
+    "emulator_id": "emulator-5556",
+    "package_name": "jp.konami.pesam"
+  },
+  "filter_rules": {
+    "accept_any_epic": true,
+    "accept_any_showtime": true,
+    "target_card_types": [
+      "Epic",
+      "Show Time",
+      "Big Time & Epic"
+    ],
+    "target_player_whitelist": [
+      "Patrick Kluivert",
+      "John O'Shea",
+      "Daniele Massaro",
+      "Gareth Bale",
+      "Alessandro Del Piero",
+      "George Best",
+      "Edwin van der Sar",
+      "Tomáš Rosický",
+      "Carles Puyol",
+      "Florian Wirtz",
+      "João Pedro",
+      "Jan Paul van Hecke",
+      "Takashi Inui",
+      "Eiji Kawashima",
+      "Eric Cantona"
+    ],
+    "min_overall_rating": 85,
+    "condition_mode": "OR"
+  },
+  "save_actions": {
+    "save_account_on_match": true,
+    "backup_destination": "saved_accounts",
+    "prefix": "WIN",
+    "take_screenshot_on_win": true,
+    "stop_reroll_on_win": true,
+    "play_sound_on_win": true
+  }
+}
