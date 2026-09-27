@@ -28,6 +28,17 @@ saved_accounts/
 # ---- captured traffic dumps (contain live session tokens / auth codes) ----
 monitor/exports/
 all_flows_clean.json
+all_flows.json
 exported_flows.json
+flows_summary.json
+saved_accounts_pre_reset.json
 scratch/*.json
 *.dat
+
+# ---- debug artifacts: screenshots, memory/state dumps, UI dumps (noise) ----
+*.png
+*.bin
+maps.txt
+proc_maps.txt
+temp_screen.png
+ui_dump.xml
