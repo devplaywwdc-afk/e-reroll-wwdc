@@ -94,6 +94,12 @@ var base=null, W=null, R=null, dW=false, dR=false, dC=false, n=0;
 var iv=setInterval(function(){
     n++;
     if(!base) base=moduleBase();
+    // offsets 0x7FFA9B4 / 0x7FFA780 CONFIRMED present in the 11.0.1 libUE4.so
+    // (SIG_W/SIG_R match byte-for-byte at these RVAs), so hook by base+RVA
+    // directly — deterministic, avoids scanSync stalling on the 100MB r-x seg.
+    if(!W && base) W=base.add(OFF_SSL_WRITE);
+    if(!R && base) R=base.add(OFF_SSL_READ);
+    // fallback if a future update shifts them: signature scan
     if(!W) W=scanSig(SIG_W);
     if(!R) R=scanSig(SIG_R);
     if(W&&!dW){ try{ hookW(W); dW=true; log('SSL_write hooked @'+W); }catch(e){} }
