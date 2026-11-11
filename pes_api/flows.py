@@ -193,6 +193,44 @@ def get_mailbox(client, user_id, session_id):
                        _commons("CMD_GET_MAILBOX_INFO", user_id, session_id, LOGIN_HASH))
 
 
+def get_mainmenu(client, user_id, session_id):
+    return client.send("CMD_GET_MAINMENU_INFO",
+                       _commons("CMD_GET_MAINMENU_INFO", user_id, session_id, LOGIN_HASH))
+
+
+# currency names: GP (Game Points), eFootball Coins, eFootball Points (EFP)
+def account_status(client, user_id, session_id, mailbox=None):
+    """Live balances from the real game: gp, coins, efp (+ present count)."""
+    mm = get_mainmenu(client, user_id, session_id)
+    mb = mailbox if mailbox is not None else get_mailbox(client, user_id, session_id)
+    gp = mm.get("gp", 0) if isinstance(mm, dict) else 0
+    coins = (mm.get("coin_info") or {}).get("coin", 0) if isinstance(mm, dict) else 0
+    efp = mb.get("total_efootballpoint_num", 0) if isinstance(mb, dict) else 0
+    return {"gp": gp, "coins": coins, "efp": efp,
+            "mailbox": len(mb.get("present_list", [])) if isinstance(mb, dict) else 0}
+
+
+def claim_daily(client, user_id, session_id):
+    """Claim everything in the mailbox (daily login bonus goes here). Returns the
+    claimed items (type/name/count) + whether any LOGIN_BONUS was among them."""
+    mb = get_mailbox(client, user_id, session_id)
+    pres = mb.get("present_list", []) if isinstance(mb, dict) else []
+    ids = [p["present_id"] for p in pres]
+    claimed = []
+    had_login_bonus = any(p.get("reason") == "LOGIN_BONUS" for p in pres)
+    if ids:
+        rr = recv_present(client, user_id, session_id, ids)
+        if rr.get("result") == "NOERR":
+            for it in rr.get("receive_result_list", []):
+                i = it.get("item", {})
+                claimed.append({"type": i.get("present_type"), "name": i.get("name"),
+                                "count": i.get("count"), "title": i.get("title"),
+                                "reason": i.get("reason")})
+        else:
+            return {"result": rr.get("result"), "claimed": [], "had_login_bonus": had_login_bonus}
+    return {"result": "NOERR", "claimed": claimed, "had_login_bonus": had_login_bonus}
+
+
 def get_login_bonus(client, user_id, session_id):
     return client.send("CMD_GET_LOGIN_BONUS_INFO",
                        _commons("CMD_GET_LOGIN_BONUS_INFO", user_id, session_id, LOGIN_HASH))

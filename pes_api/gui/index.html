@@ -145,8 +145,9 @@
       <span class="kbd">Ctrl K</span>
     </div>
     <nav class="nav" id="nav">
-      <div class="nav-label">ฟังก์ชัน <span class="cnt">3</span></div>
+      <div class="nav-label">ฟังก์ชัน <span class="cnt">4</span></div>
       <button class="navitem on" data-tab="reroll" data-name="Reroll Farm" onclick="switchTab('reroll',this)"><span class="em">🎲</span><span>Reroll Farm</span></button>
+      <button class="navitem" data-tab="daily" data-name="Daily Login" onclick="switchTab('daily',this)"><span class="em">📅</span><span>Daily Login</span></button>
       <button class="navitem" data-tab="link" data-name="KONAMI Link" onclick="switchTab('link',this)"><span class="em">🔗</span><span>KONAMI Link</span></button>
       <button class="navitem" data-tab="gen" data-name="Gen Link" onclick="switchTab('gen',this)"><span class="em">📄</span><span>Gen Link (batch)</span></button>
     </nav>
@@ -206,6 +207,46 @@
         </div>
       </section>
 
+      <!-- ===== DAILY LOGIN ===== -->
+      <section id="panel-daily" class="panel">
+        <div class="reroll-body">
+          <div class="card">
+            <div class="card-head"><div class="l"><span class="dot"></span>Daily Login &amp; Claim</div></div>
+            <div class="card-body">
+              <div class="field"><label>แหล่งไอดี</label>
+                <select id="d_src"><option value="folder">จากโฟลเดอร์ (accounts/)</option><option value="upload">อัปโหลด .txt</option></select>
+              </div>
+              <div class="field" id="d_upwrap" style="display:none"><label>เลือกไฟล์ .txt (หลายไฟล์ได้)</label><input id="d_files" type="file" accept=".txt" multiple style="padding:6px"><span id="d_cnt" class="hint"></span></div>
+              <div class="grid2">
+                <div class="field"><label>Workers</label><input id="d_workers" type="number" value="10" min="1" max="40"></div>
+                <div class="field"><label>Retry สูงสุด</label><input id="d_retry" type="number" value="3" min="1" max="10"></div>
+              </div>
+              <label style="font-size:12px;color:var(--txt2)"><input id="d_sched" type="checkbox" style="width:auto;vertical-align:-1px"> เปิดค้าง รับอัตโนมัติทุก <b style="color:var(--g)">09:00</b> ไทย</label>
+              <div class="hint">ปิดไว้ = รับ ณ ตอนนี้ครั้งเดียว · เปิดค้าง = รับให้ทุกวันเมื่อถึง 09:00 (reset ตาม 09:00 ไทย ไม่ใช่ 24 ชม.) · fail จะต่อคิวรันใหม่</div>
+              <div style="flex:1"></div>
+              <button class="btn btn-primary" id="d_start" style="width:100%">▶ เริ่ม Daily Login</button>
+              <button class="btn btn-danger" id="d_stop" style="width:100%" disabled>■ หยุด</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="l"><span class="dot"></span>ผลการรับ Daily</div>
+              <span id="d_sum" style="color:var(--txt3);text-transform:none;letter-spacing:0">—</span></div>
+            <div class="card-body" style="gap:10px">
+              <div class="stat-cards">
+                <div class="stat-card ok"><b id="d_done">0</b><small>รับสำเร็จ</small></div>
+                <div class="stat-card err"><b id="d_fail">0</b><small>fail</small></div>
+                <div class="stat-card p"><b id="d_total">0</b><small>ทั้งหมด</small></div>
+              </div>
+              <div id="d_failbar" style="display:none" class="row">
+                <span style="color:var(--r)">มีไอดี fail <b id="d_failn">0</b> ตัว (ครบ retry แล้ว)</span>
+                <button class="btn btn-danger btn-sm" id="d_del">🗑 ลบ id ที่ fail ออกจากโฟลเดอร์</button>
+              </div>
+              <div style="flex:1;overflow:auto;min-height:0"><div id="d_tbl"></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== KONAMI LINK ===== -->
       <section id="panel-link" class="panel">
         <div class="wrap"><div class="card">
@@ -246,6 +287,7 @@
 <script>
 const $=id=>document.getElementById(id);
 const PGINFO={reroll:['🎲','Reroll Farm','— spray สร้างไอดี, เข้า MyClub, กระจาย device'],
+  daily:['📅','Daily Login','— login + รับ daily reward ทุก 09:00 ไทย + ดู currency'],
   link:['🔗','KONAMI Link','— ขอ account-link URL ทีละไอดี'],
   gen:['📄','Gen Link','— อัปโหลด .txt หลายไฟล์ ดึง link ทั้งหมด']};
 function switchTab(name,btn){
@@ -277,10 +319,62 @@ function connect(){if(es)es.close();es=new EventSource('/events');
     else if(m.type==='stats'){$('s_ok').textContent=m.ok;$('s_fail').textContent=m.fail;$('s_time').textContent=m.elapsed+'s';
       $('ratetxt').textContent=`${m.rate}/วิ · ${m.perday.toLocaleString()}/วัน`;setLive(m.running);}
     else if(m.type==='started'){buildGrid(m.workers);setLive(true);}
-    else if(m.type==='stopped'){setLive(false);}};}
+    else if(m.type==='stopped'){setLive(false);}
+    else if(m.type==='daily'){dailyRow(m);}
+    else if(m.type==='dsum'){dailySum(m);}
+    else if(m.type==='dstarted'){dRows={};$('d_tbl').innerHTML='';dSetLive(true);}
+    else if(m.type==='dstopped'){dSetLive(false);}
+    else if(m.type==='deleted'){m.codes.forEach(uc=>{const tr=$('dr_'+uc);if(tr)tr.remove();});$('d_failbar').style.display='none';}
+  };}
 $('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,setup:$('setup').checked,proxies:$('proxies').value};
   buildGrid(body.workers);await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
 $('stop').onclick=()=>fetch('/api/stop',{method:'POST'});
+
+// DAILY LOGIN
+let dRows={}, dUploaded=null;
+function dSetLive(on){$('d_start').disabled=on;$('d_stop').disabled=!on;$('livedot').classList.toggle('active',on);$('livetxt').textContent=on?'RUNNING':'idle';}
+$('d_src').onchange=()=>$('d_upwrap').style.display=$('d_src').value==='upload'?'flex':'none';
+$('d_files').onchange=async(e)=>{const fs=[...e.target.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));dUploaded=[];
+  for(const f of fs){try{const o=JSON.parse((await f.text()).trim());if(o.user_id&&o.auth_code)dUploaded.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),user_id:o.user_id,auth_code:o.auth_code,device_identifier:o.device_identifier||null});}catch(err){}}
+  $('d_cnt').textContent=`โหลด ${dUploaded.length} ไอดี`;};
+const REW_IC={GP:'🟦',COIN:'🟡',ITEM:'🧪',AGENT:'🎁',PLAYER:'👤',UNIFORM:'👕',BILLBOARD:'🖼️'};
+function rewardStr(rewards){if(!rewards||!rewards.length)return '<span style="color:var(--txt3)">—</span>';
+  return rewards.map(r=>`${REW_IC[r.type]||'•'}${r.type} ×${r.count}`).join('  ');}
+function dailyRow(m){const uc=m.user_code;let tr=$('dr_'+uc);
+  if(!tr){const tb=$('d_tbl').querySelector('tbody')||ensureDtable();tr=document.createElement('tr');tr.id='dr_'+uc;tb.appendChild(tr);}
+  const stc={run:'<span style="color:var(--y)">กำลังรับ...</span>',retry:`<span style="color:var(--y)">retry ${m.attempts} · ${m.error||''}</span>`,
+    failed:`<span style="color:var(--r)">FAILED (${m.attempts}x) ${m.error||''}</span>`,ok:'<span style="color:var(--g)">✓ สำเร็จ</span>'}[m.state]||m.state;
+  if(m.state==='ok'){
+    const rid='more_'+uc;
+    tr.innerHTML=`<td style="color:#fff">${uc}</td><td>${stc}</td>
+      <td>${rewardStr(m.rewards)}${m.had_bonus?'':' <span style="color:var(--txt3)">(ไม่มี login bonus วันนี้)</span>'}</td>
+      <td style="color:var(--b)">🟦${(m.gp||0).toLocaleString()}</td>
+      <td style="color:var(--y)">🟡${(m.coins||0).toLocaleString()}</td>
+      <td style="color:var(--p)">⚡${(m.efp||0).toLocaleString()}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="(function(){const e=document.getElementById('${rid}');e.style.display=e.style.display==='none'?'table-row':'none';})()">View More</button></td>`;
+    // detail row
+    let dr=$(rid); if(dr)dr.remove();
+    dr=document.createElement('tr');dr.id=rid;dr.style.display='none';
+    const players=(m.rewards||[]).filter(r=>r.type==='PLAYER');
+    dr.innerHTML=`<td colspan="7" style="background:rgba(0,0,0,.25)">
+      <div style="padding:6px 4px"><b style="color:var(--g)">ของที่ได้วันนี้:</b> ${
+        (m.rewards||[]).map(r=>`${REW_IC[r.type]||'•'} ${r.name||r.type} ×${r.count}${r.title&&r.title!=='NotImplement'?' ('+r.title+')':''}`).join(' · ')||'—'}
+      <br><b style="color:var(--p)">นักเตะที่ได้:</b> ${players.length?players.map(p=>p.title&&p.title!=='NotImplement'?p.title:'PLAYER').join(', '):'<span style="color:var(--txt3)">ไม่มีนักเตะใหม่วันนี้ (ดูทีมเต็มต้องใช้ player API — ยังไม่ทำ)</span>'}</div></td>`;
+    tr.after(dr);
+  } else {
+    tr.innerHTML=`<td style="color:#fff">${uc}</td><td colspan="6">${stc}</td>`;
+  }
+}
+function ensureDtable(){$('d_tbl').innerHTML='<table><thead><tr><th>user_code</th><th>สถานะ</th><th>ของที่ได้</th><th>GP</th><th>Coins</th><th>EFP</th><th></th></tr></thead><tbody></tbody></table>';return $('d_tbl').querySelector('tbody');}
+function dailySum(m){$('d_done').textContent=m.done;$('d_fail').textContent=m.failed;$('d_total').textContent=m.total;
+  $('d_sum').textContent=m.scheduler?(m.next?`⏰ รอบถัดไป ${m.next}`:'⏰ เปิดค้าง (09:00)'):(m.running?'กำลังรัน...':'เสร็จ');
+  $('d_failbar').style.display=m.failed>0?'flex':'none';$('d_failn').textContent=m.failed;dSetLive(m.running);}
+$('d_start').onclick=async()=>{ensureDtable();dRows={};
+  const body={source:$('d_src').value,workers:+$('d_workers').value,max_retries:+$('d_retry').value,schedule:$('d_sched').checked};
+  if(body.source==='upload')body.accounts=dUploaded||[];
+  await fetch('/api/daily/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
+$('d_stop').onclick=()=>fetch('/api/daily/stop',{method:'POST'});
+$('d_del').onclick=()=>{if(confirm('ลบไอดีที่ fail ออกจากโฟลเดอร์ accounts/ ถาวร?'))fetch('/api/daily/delete-failed',{method:'POST'});};
 
 // KONAMI LINK
 let lkExp=0;

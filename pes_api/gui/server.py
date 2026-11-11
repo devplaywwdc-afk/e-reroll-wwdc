@@ -11,7 +11,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
+import queue
 from engine import ENGINE
+from daily_engine import DAILY
 import flows
 import client as cl
 import accounts
@@ -100,6 +102,17 @@ class H(BaseHTTPRequestHandler):
             data = json.loads(raw or b"{}")
         except Exception:
             data = {}
+        if self.path == "/api/daily/start":
+            up = data.get("accounts")  # optional uploaded accounts
+            ok = DAILY.start(source=data.get("source", "folder"), uploaded=up,
+                             workers=int(data.get("workers", 10)),
+                             max_retries=int(data.get("max_retries", 3)),
+                             schedule=bool(data.get("schedule", False)))
+            self._send(200, json.dumps({"ok": ok})); return
+        if self.path == "/api/daily/stop":
+            DAILY.stop(); self._send(200, json.dumps({"ok": True})); return
+        if self.path == "/api/daily/delete-failed":
+            self._send(200, json.dumps({"deleted": DAILY.delete_failed()})); return
         if self.path == "/api/genlink":
             accs = data.get("accounts") or []
             out = []
@@ -130,7 +143,11 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
         self.end_headers()
-        q = ENGINE.add_listener()
+        q = queue.Queue(maxsize=8000)
+        with ENGINE.listeners_lock:
+            ENGINE.listeners.append(q)
+        with DAILY.lock:
+            DAILY.listeners.append(q)
         try:
             self.wfile.write(b": connected\n\n")
             self.wfile.flush()
@@ -145,6 +162,7 @@ class H(BaseHTTPRequestHandler):
             pass
         finally:
             ENGINE.remove_listener(q)
+            DAILY.remove_listener(q)
 
 
 def main():
