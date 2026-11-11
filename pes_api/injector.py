@@ -113,22 +113,45 @@ def list_devices(do_connect=True):
         if len(parts) < 2:
             continue
         dev, state = parts[0], parts[1]
+        # emulator-only: skip physical/USB devices (serial, not host:port)
+        if not (re.search(r":\d+$", dev) or dev.startswith("emulator-")):
+            continue
         if state != "device":
-            devs.append({"device": dev, "state": state, "label": _label(dev, fams)})
+            devs.append({"device": dev, "state": state, "label": _label(dev, fams), "_vm": dev})
             continue
         info = {"device": dev, "state": "device", "label": _label(dev, fams)}
         # game installed?
         info["game"] = PKG in _adb(dev, "shell", "pm", "path", PKG)
         # current logged-in id (if any) — needs root; try after root
-        rooted = "uid=0" in _adb(dev, "root") or True
+        _adb(dev, "root")
         time.sleep(0.3)
         cur = _adb(dev, "shell", "cat", DAT)
         info["root"] = "uid=0" in _adb(dev, "shell", "id")
         m = re.search(r'"user_code"\s*:\s*"([^"]+)"', cur)
         info["current_id"] = m.group(1) if m else None
         info["provisioned"] = "No such file" not in _adb(dev, "shell", "ls", FILES)
+        # boot_id is identical across every adb port of ONE running VM -> dedup key
+        info["_vm"] = _adb(dev, "shell", "cat", "/proc/sys/kernel/random/boot_id").strip() or dev
         devs.append(info)
-    return devs
+    return _dedup_vm(devs)
+
+
+def _dedup_vm(devs):
+    """Collapse the multiple adb ports MuMu/LDPlayer expose for one VM into a single row."""
+    seen, out = {}, []
+    for d in devs:
+        key = d.get("_vm") or d["device"]
+        if key in seen:
+            seen[key].setdefault("alt_ports", []).append(d["device"])
+            if d.get("game") and d.get("root") and not (seen[key].get("game") and seen[key].get("root")):
+                d["alt_ports"] = seen[key]["alt_ports"]
+                out[out.index(seen[key])] = d
+                seen[key] = d
+            continue
+        d.setdefault("alt_ports", [])
+        seen[key] = d
+        out.append(d)
+    return out
 
 
 def _app_uid(dev):
