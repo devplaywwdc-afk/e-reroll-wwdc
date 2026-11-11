@@ -365,7 +365,10 @@ function dailyRow(m){const uc=m.user_code;let tr=$('dr_'+uc);
     tr.innerHTML=`<td style="color:#fff">${uc}</td><td colspan="6">${stc}</td>`;
   }
 }
-function ensureDtable(){$('d_tbl').innerHTML='<table><thead><tr><th>user_code</th><th>สถานะ</th><th>ของที่ได้</th><th>GP</th><th>Coins</th><th>EFP</th><th></th></tr></thead><tbody></tbody></table>';return $('d_tbl').querySelector('tbody');}
+function ensureDtable(){$('d_tbl').innerHTML=`<div class="hint" style="margin-bottom:6px">
+  <b style="color:var(--g)">ของที่ได้</b> = รับวันนี้ · <b style="color:var(--b)">GP/Coins/EFP</b> = <b>ยอดคงเหลือทั้งหมดในไอดี</b> ตอนนั้น (ไม่ใช่ที่รับวันนี้)</div>
+  <table><thead><tr><th>user_code</th><th>สถานะ</th><th>ของที่ได้ (วันนี้)</th><th>GP คงเหลือ</th><th>Coins คงเหลือ</th><th>EFP คงเหลือ</th><th></th></tr></thead><tbody></tbody></table>`;
+  return $('d_tbl').querySelector('tbody');}
 function dailySum(m){$('d_done').textContent=m.done;$('d_fail').textContent=m.failed;$('d_total').textContent=m.total;
   $('d_sum').textContent=m.scheduler?(m.next?`⏰ รอบถัดไป ${m.next}`:'⏰ เปิดค้าง (09:00)'):(m.running?'กำลังรัน...':'เสร็จ');
   $('d_failbar').style.display=m.failed>0?'flex':'none';$('d_failn').textContent=m.failed;dSetLive(m.running);}
