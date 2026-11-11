@@ -145,9 +145,11 @@
       <span class="kbd">Ctrl K</span>
     </div>
     <nav class="nav" id="nav">
-      <div class="nav-label">ฟังก์ชัน <span class="cnt">4</span></div>
+      <div class="nav-label">ฟังก์ชัน <span class="cnt">6</span></div>
       <button class="navitem on" data-tab="reroll" data-name="Reroll Farm" onclick="switchTab('reroll',this)"><span class="em">🎲</span><span>Reroll Farm</span></button>
       <button class="navitem" data-tab="daily" data-name="Daily Login" onclick="switchTab('daily',this)"><span class="em">📅</span><span>Daily Login</span></button>
+      <button class="navitem" data-tab="players" data-name="นักเตะ Players" onclick="switchTab('players',this)"><span class="em">👤</span><span>นักเตะ</span></button>
+      <button class="navitem" data-tab="check" data-name="เช็คไอดี Checker" onclick="switchTab('check',this)"><span class="em">🔎</span><span>เช็คไอดี</span></button>
       <button class="navitem" data-tab="link" data-name="KONAMI Link" onclick="switchTab('link',this)"><span class="em">🔗</span><span>KONAMI Link</span></button>
       <button class="navitem" data-tab="gen" data-name="Gen Link" onclick="switchTab('gen',this)"><span class="em">📄</span><span>Gen Link (batch)</span></button>
     </nav>
@@ -247,6 +249,43 @@
         </div>
       </section>
 
+      <!-- ===== PLAYERS ===== -->
+      <section id="panel-players" class="panel">
+        <div class="wrap" style="max-width:100%">
+          <div class="card">
+            <div class="card-head"><div class="l"><span class="dot"></span>นักเตะในไอดี (roster + การ์ด)</div>
+              <span id="pl_sum" style="color:var(--txt3);text-transform:none;letter-spacing:0"></span></div>
+            <div class="card-body">
+              <div class="row">
+                <input id="pl_acc" list="lk_list" placeholder="user_code (เช่น ASCV...)" style="width:240px">
+                <button class="btn btn-outline btn-sm" id="pl_get">ดูนักเตะ</button>
+                <span class="hint">ดึง roster จริงจากเกม + ชื่อ/OVR/ตำแหน่ง/ภาพการ์ด จาก efootbase</span>
+              </div>
+              <div id="pl_grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ACCOUNT CHECKER ===== -->
+      <section id="panel-check" class="panel">
+        <div class="wrap" style="max-width:100%">
+          <div class="card">
+            <div class="card-head"><div class="l"><span class="dot"></span>เช็คไอดี — รายงานนักเตะ + Currency</div></div>
+            <div class="card-body">
+              <div class="row">
+                <div class="field" style="min-width:200px"><label>แหล่งไอดี</label>
+                  <select id="ck_src"><option value="folder">จากโฟลเดอร์ (accounts/)</option><option value="upload">อัปโหลด .txt</option></select></div>
+                <div class="field" id="ck_upwrap" style="display:none"><label>ไฟล์ .txt</label><input id="ck_files" type="file" accept=".txt" multiple style="padding:6px"><span id="ck_cnt" class="hint"></span></div>
+                <div class="field"><label>&nbsp;</label><button class="btn btn-primary btn-sm" id="ck_run">▶ เช็คทั้งหมด</button></div>
+                <span class="hint" id="ck_prog"></span>
+              </div>
+              <div id="ck_tbl"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== KONAMI LINK ===== -->
       <section id="panel-link" class="panel">
         <div class="wrap"><div class="card">
@@ -288,6 +327,8 @@
 const $=id=>document.getElementById(id);
 const PGINFO={reroll:['🎲','Reroll Farm','— spray สร้างไอดี, เข้า MyClub, กระจาย device'],
   daily:['📅','Daily Login','— login + รับ daily reward ทุก 09:00 ไทย + ดู currency'],
+  players:['👤','นักเตะ','— ดู roster + การ์ดนักเตะในไอดี (efootbase art)'],
+  check:['🔎','เช็คไอดี','— รายงานนักเตะ + currency ของแต่ละไอดี'],
   link:['🔗','KONAMI Link','— ขอ account-link URL ทีละไอดี'],
   gen:['📄','Gen Link','— อัปโหลด .txt หลายไฟล์ ดึง link ทั้งหมด']};
 function switchTab(name,btn){
@@ -329,6 +370,50 @@ function connect(){if(es)es.close();es=new EventSource('/events');
 $('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,setup:$('setup').checked,proxies:$('proxies').value};
   buildGrid(body.workers);await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
 $('stop').onclick=()=>fetch('/api/stop',{method:'POST'});
+
+// PLAYERS + CHECKER
+function playerCard(p){
+  const art=p.art?`<img src="${p.art}" loading="lazy" style="width:100%;height:120px;object-fit:contain;background:#0a0d14">`
+    :`<div style="height:120px;display:flex;align-items:center;justify-content:center;color:var(--txt3)">👤</div>`;
+  const ov=p.overall?`<span style="position:absolute;top:4px;left:6px;font-weight:800;font-size:18px;color:#ffd84d;text-shadow:0 1px 3px #000">${p.overall}</span>`:'';
+  const pos=p.position?`<span style="position:absolute;top:26px;left:6px;font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 2px #000">${p.position}</span>`:'';
+  const lk=p.is_lock?'<span style="position:absolute;top:4px;right:6px">🔒</span>':'';
+  return `<div style="background:var(--glass);border:1px solid var(--border);border-radius:10px;overflow:hidden;position:relative">
+    ${art}${ov}${pos}${lk}
+    <div style="padding:6px 8px"><div style="font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name||('#'+p.id)}</div>
+    <div style="font-size:9.5px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">lv${p.level} · ${p.card||'—'}</div>
+    <div style="font-size:9px;color:var(--txt3)">id ${p.id}</div></div></div>`;
+}
+$('pl_get').onclick=async()=>{const uc=$('pl_acc').value.trim();if(!uc)return;
+  $('pl_sum').textContent='กำลังดึง...';$('pl_grid').innerHTML='';
+  const r=await (await fetch('/api/roster?user_code='+encodeURIComponent(uc))).json();
+  if(r.error){$('pl_sum').textContent='ผิดพลาด: '+r.error;return;}
+  $('pl_sum').textContent=`${r.player_count} คน · GP ${(r.gp||0).toLocaleString()} · Coins ${r.coins} · EFP ${r.efp}`;
+  $('pl_grid').innerHTML=(r.players||[]).map(playerCard).join('');};
+
+let ckUploaded=null;
+$('ck_src').onchange=()=>$('ck_upwrap').style.display=$('ck_src').value==='upload'?'flex':'none';
+$('ck_files').onchange=async(e)=>{const fs=[...e.target.files];ckUploaded=[];
+  for(const f of fs){try{const o=JSON.parse((await f.text()).trim());if(o.user_id&&o.auth_code)ckUploaded.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),user_id:o.user_id,auth_code:o.auth_code,device_identifier:o.device_identifier||null});}catch(err){}}
+  $('ck_cnt').textContent=`โหลด ${ckUploaded.length} ไอดี`;};
+$('ck_run').onclick=async()=>{
+  let accs=null; if($('ck_src').value==='upload')accs=ckUploaded||[];
+  $('ck_prog').textContent='กำลังเช็ค... (รอสักครู่)';$('ck_tbl').innerHTML='';
+  const r=await (await fetch('/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(accs?{accounts:accs}:{})})).json();
+  const res=r.results||[];$('ck_prog').textContent=`เช็คเสร็จ ${res.length} ไอดี`;
+  let h='<table><tr><th>user_code</th><th>GP</th><th>Coins</th><th>EFP</th><th>นักเตะ</th><th>Top</th><th></th></tr>';
+  res.forEach((a,i)=>{
+    if(a.error){h+=`<tr><td style="color:#fff">${a.user_code}</td><td colspan="6" style="color:var(--r)">${a.error}</td></tr>`;return;}
+    const top=(a.players||[]).slice(0,3).map(p=>`${p.name||('#'+p.id)}(${p.overall||'?'})`).join(', ');
+    h+=`<tr><td style="color:#fff">${a.user_code}</td><td style="color:var(--b)">🟦${(a.gp||0).toLocaleString()}</td>
+      <td style="color:var(--y)">🟡${a.coins}</td><td style="color:var(--p)">⚡${a.efp}</td>
+      <td>${a.player_count}</td><td style="color:var(--txt2);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${top}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="ckView(${i})">ดูการ์ด</button></td></tr>
+      <tr id="ckd${i}" style="display:none"><td colspan="7"><div id="ckg${i}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding:6px"></div></td></tr>`;
+  });
+  h+='</table>';$('ck_tbl').innerHTML=h;window._ckres=res;};
+function ckView(i){const dr=$('ckd'+i);const show=dr.style.display==='none';dr.style.display=show?'table-row':'none';
+  if(show&&!$('ckg'+i).innerHTML){$('ckg'+i).innerHTML=((window._ckres[i]||{}).players||[]).map(playerCard).join('');}}
 
 // DAILY LOGIN
 let dRows={}, dUploaded=null;

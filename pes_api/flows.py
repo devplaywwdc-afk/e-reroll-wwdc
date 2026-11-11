@@ -198,6 +198,25 @@ def get_mainmenu(client, user_id, session_id):
                        _commons("CMD_GET_MAINMENU_INFO", user_id, session_id, LOGIN_HASH))
 
 
+def get_roster(login_resp):
+    """Extract the owned-player roster from a LOGIN response (entry_info.gameplayer_list)."""
+    gp = (login_resp.get("entry_info") or {}).get("gameplayer_list", []) if isinstance(login_resp, dict) else []
+    out = []
+    for p in gp:
+        gid = p.get("gameplayer_id", {})
+        out.append({
+            "id": gid.get("id"),
+            "serial": gid.get("serial"),
+            "level": (p.get("level_info") or {}).get("level"),
+            "level_limit": (p.get("level_info") or {}).get("level_limit"),
+            "is_lock": p.get("is_lock") == "YES",
+            "team_id": p.get("initial_base_team_id"),
+            "uniform": p.get("uniform_number"),
+            "type": p.get("type"),
+        })
+    return out
+
+
 # currency names: GP (Game Points), eFootball Coins, eFootball Points (EFP)
 def account_status(client, user_id, session_id, mailbox=None):
     """Live balances from the real game: gp, coins, efp (+ present count)."""

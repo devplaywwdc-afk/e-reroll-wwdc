@@ -17,6 +17,7 @@ from daily_engine import DAILY
 import flows
 import client as cl
 import accounts
+import efootbase
 
 PORT = int(os.environ.get("PORT") or os.environ.get("HOST_PORT") or 8080)
 INDEX = os.path.join(HERE, "index.html")
@@ -59,8 +60,38 @@ class H(BaseHTTPRequestHandler):
             from urllib.parse import urlparse, parse_qs
             uc = (parse_qs(urlparse(self.path).query).get("user_code") or [""])[0]
             self._send(200, json.dumps(self._konami_link(uc), ensure_ascii=False))
+        elif self.path.startswith("/api/roster"):
+            from urllib.parse import urlparse, parse_qs
+            uc = (parse_qs(urlparse(self.path).query).get("user_code") or [""])[0]
+            a = next((x for x in accounts.load_all() if x["user_code"] == uc), None)
+            self._send(200, json.dumps(self._account_report(a), ensure_ascii=False))
         else:
             self._send(404, b"{}")
+
+    def _account_report(self, a):
+        """Full report for an account: currencies + enriched player roster."""
+        if not a:
+            return {"error": "account not found"}
+        uc = a.get("user_code", "?")
+        try:
+            c = cl.GateClient(user_code=uc)
+            lr = flows.login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
+            sid = lr.get("session_id")
+            if not sid:
+                return {"user_code": uc, "error": "login failed"}
+            st = flows.account_status(c, int(a["user_id"]), sid)
+            roster = flows.get_roster(lr)
+            info = efootbase.lookup_many([p["id"] for p in roster])
+            players = []
+            for p in roster:
+                e = info.get(str(p["id"]), {})
+                players.append({**p, "name": e.get("name"), "overall": e.get("overall"),
+                                "position": e.get("position"), "card": e.get("card"), "art": e.get("art")})
+            players.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
+            return {"user_code": uc, "gp": st["gp"], "coins": st["coins"], "efp": st["efp"],
+                    "player_count": len(players), "players": players}
+        except Exception as e:
+            return {"user_code": uc, "error": f"{type(e).__name__}: {e}"}
 
     def _link_for(self, a):
         """Fetch a KONAMI link for an uploaded account dict (may not be in local accounts/)."""
@@ -102,6 +133,10 @@ class H(BaseHTTPRequestHandler):
             data = json.loads(raw or b"{}")
         except Exception:
             data = {}
+        if self.path == "/api/check":
+            accs = data.get("accounts") or accounts.load_all()
+            out = [self._account_report(a) for a in accs]
+            self._send(200, json.dumps({"results": out}, ensure_ascii=False)); return
         if self.path == "/api/daily/start":
             up = data.get("accounts")  # optional uploaded accounts
             ok = DAILY.start(source=data.get("source", "folder"), uploaded=up,
