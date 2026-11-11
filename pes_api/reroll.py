@@ -15,12 +15,13 @@ import gacha
 
 
 def reroll(count: int, delay: float = 1.0, claim: bool = True,
-           do_gacha: bool = False, wanted=None, gacha_agent: int = 0):
+           do_gacha: bool = False, wanted=None, gacha_agent: int = 0,
+           prefix: str = flows.DEFAULT_PREFIX):
     c = cl.GateClient()
     made = []
     for i in range(count):
         try:
-            resp = flows.create_user(c)
+            resp = flows.create_user(c, prefix=prefix)
             if "auth_code" not in resp:
                 print(f"[{i+1}/{count}] FAIL: {resp.get('result')}")
                 time.sleep(delay)
@@ -70,6 +71,8 @@ if __name__ == "__main__":
     ap.add_argument("--gacha", action="store_true", help="open free gacha packs after create")
     ap.add_argument("--want", default="", help="comma-separated wanted players for gacha filter")
     ap.add_argument("--agent", type=int, default=0, help="only draw this agent_id (0=all free)")
+    ap.add_argument("--prefix", default=flows.DEFAULT_PREFIX, help="in-game name prefix (default j3xdr)")
     a = ap.parse_args()
     wanted = [w.strip() for w in a.want.split(",") if w.strip()]
-    reroll(a.count, claim=not a.no_claim, do_gacha=a.gacha, wanted=wanted, gacha_agent=a.agent)
+    reroll(a.count, claim=not a.no_claim, do_gacha=a.gacha, wanted=wanted,
+           gacha_agent=a.agent, prefix=a.prefix)

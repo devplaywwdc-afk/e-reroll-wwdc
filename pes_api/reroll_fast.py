@@ -77,11 +77,11 @@ class Counter:
             self.fail += 1
 
 
-def worker(wid, gov: Governor, cnt: Counter, proxy, do_setup, lock, do_claim=True):
+def worker(wid, gov: Governor, cnt: Counter, proxy, do_setup, lock, do_claim=True, prefix=None):
     c = cl.GateClient(proxy=proxy)
     while cnt.take():
         try:
-            resp = flows.create_user(c)  # already retries soft throttles internally
+            resp = flows.create_user(c, prefix=prefix or flows.DEFAULT_PREFIX)  # retries soft throttles
             # feed governor from the *result* too (first-level pacing)
             if "auth_code" not in resp:
                 if resp.get("result") in cl.RETRYABLE:
@@ -114,7 +114,7 @@ def worker(wid, gov: Governor, cnt: Counter, proxy, do_setup, lock, do_claim=Tru
         gov.wait()
 
 
-def reroll_fast(count, workers=4, proxies=None, do_setup=True, do_claim=True):
+def reroll_fast(count, workers=4, proxies=None, do_setup=True, do_claim=True, prefix=None):
     gov = Governor()
     cnt = Counter(count)
     save_lock = threading.Lock()
@@ -122,7 +122,7 @@ def reroll_fast(count, workers=4, proxies=None, do_setup=True, do_claim=True):
     ths = []
     for i in range(workers):
         px = proxies[i % len(proxies)]
-        t = threading.Thread(target=worker, args=(i, gov, cnt, px, do_setup, save_lock, do_claim))
+        t = threading.Thread(target=worker, args=(i, gov, cnt, px, do_setup, save_lock, do_claim, prefix))
         t.start()
         ths.append(t)
     t0 = time.time()
@@ -140,6 +140,7 @@ if __name__ == "__main__":
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--no-setup", action="store_true", help="create-only, skip MyClub entry")
     ap.add_argument("--no-claim", action="store_true", help="skip claiming starter GP / daily bonus")
+    ap.add_argument("--prefix", default=flows.DEFAULT_PREFIX, help="in-game name prefix (default j3xdr)")
     ap.add_argument("--proxies", help="file with one proxy URL per line (http://host:port)")
     a = ap.parse_args()
     px = None
@@ -147,4 +148,4 @@ if __name__ == "__main__":
         px = [l.strip() for l in open(a.proxies) if l.strip() and not l.startswith("#")]
         print(f"loaded {len(px)} proxies")
     reroll_fast(a.count, workers=a.workers, proxies=px,
-                do_setup=not a.no_setup, do_claim=not a.no_claim)
+                do_setup=not a.no_setup, do_claim=not a.no_claim, prefix=a.prefix)

@@ -69,16 +69,17 @@ class Engine:
 
     # ---- control ----
     def start(self, mode="direct", workers=15, target=0, proxies=None, do_setup=False, do_claim=True,
-              do_gacha=False, gacha_agent=0, wanted=None):
+              do_gacha=False, gacha_agent=0, wanted=None, name_prefix=None):
         if self.running:
             return False
         proxies = proxies or []
         wanted = wanted or []
+        name_prefix = name_prefix or flows.DEFAULT_PREFIX
         if do_gacha:
             do_setup = do_claim = True  # gacha needs a set-up, logged-in account
         self.cfg = dict(mode=mode, workers=workers, target=target, do_setup=do_setup,
                         do_claim=do_claim, do_gacha=do_gacha, gacha_agent=gacha_agent,
-                        wanted=wanted, nproxies=len(proxies))
+                        wanted=wanted, name_prefix=name_prefix, nproxies=len(proxies))
         self.stats.clear()
         self.per_worker.clear()
         self.running = True
@@ -86,7 +87,7 @@ class Engine:
         self.workers = []
         for i in range(workers):
             t = threading.Thread(target=self._worker,
-                                 args=(i, mode, proxies, do_setup, do_claim, do_gacha, gacha_agent, wanted),
+                                 args=(i, mode, proxies, do_setup, do_claim, do_gacha, gacha_agent, wanted, name_prefix),
                                  daemon=True)
             t.start()
             self.workers.append(t)
@@ -118,8 +119,10 @@ class Engine:
         return t and self.stats["ok"] >= t
 
     # ---- worker ----
-    def _worker(self, wid, mode, proxies, do_setup, do_claim=True, do_gacha=False, gacha_agent=0, wanted=None):
+    def _worker(self, wid, mode, proxies, do_setup, do_claim=True, do_gacha=False, gacha_agent=0,
+                wanted=None, name_prefix=None):
         wanted = wanted or []
+        name_prefix = name_prefix or flows.DEFAULT_PREFIX
         pidx = wid % max(1, len(proxies)) if proxies else 0
         proxy = proxies[pidx] if (mode == "proxy" and proxies) else None
         c = cl.GateClient(proxy=proxy, max_retries=0)  # spray: no internal retry, we loop fast
@@ -127,7 +130,7 @@ class Engine:
         self.log(wid, "info", f"worker up  {('proxy=' + proxy) if proxy else 'direct IP'}")
         while self.running and not self._target_reached():
             try:
-                r = flows.create_user(c)
+                r = flows.create_user(c, prefix=name_prefix)
                 if isinstance(r, dict) and "auth_code" in r:
                     uc, auth = r["user_code"], r["auth_code"]
                     uid = r["pes_user_info"]["user_id"]

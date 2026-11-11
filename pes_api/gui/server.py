@@ -222,6 +222,7 @@ class H(BaseHTTPRequestHandler):
                 do_gacha=bool(data.get("gacha", False)),
                 gacha_agent=int(data.get("gacha_agent", 0) or 0),
                 wanted=[w.strip() for w in (data.get("wanted") or []) if w.strip()],
+                name_prefix=(data.get("prefix") or "").strip() or None,
             )
             self._send(200, json.dumps({"ok": ok, "workers": int(data.get("workers", 15))}))
         elif self.path == "/api/stop":

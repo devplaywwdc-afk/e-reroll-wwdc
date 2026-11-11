@@ -41,8 +41,16 @@ EULA_INFO = {
 SURVEY = [{"survey_id": 35, "answer_id": 2}, {"survey_id": 36, "answer_id": 4}]
 
 
-def rand_name():
-    return "efb_" + "".join(random.choices(string.ascii_letters, k=10))
+DEFAULT_PREFIX = "j3xdr"
+MAX_NAME = 15  # eFootball in-game name hard limit (16+ -> ERR_INVALIDARG)
+
+
+def rand_name(prefix: str = DEFAULT_PREFIX):
+    """In-game name = '<prefix>_<random>', total capped at 15 chars (server limit).
+    prefix default 'j3xdr' -> 'j3xdr_' + 9 random letters."""
+    prefix = (prefix or DEFAULT_PREFIX).strip()[:MAX_NAME - 2]  # leave room for '_' + >=1 char
+    tail = MAX_NAME - len(prefix) - 1
+    return f"{prefix}_" + "".join(random.choices(string.ascii_letters, k=max(1, tail)))
 
 
 # Device fingerprints to spread accounts across (server does NOT bind hash to device_identifier,
@@ -90,11 +98,12 @@ def _commons(cmd, user_id, session_id, hash_val):
 
 # ---------------------------------------------------------------- reroll
 def create_user(client: cl.GateClient, name: str | None = None,
-                device: dict | None = None) -> dict:
+                device: dict | None = None, prefix: str = DEFAULT_PREFIX) -> dict:
     """Create a fresh guest account (random device fingerprint by default).
+    In-game name is '<prefix>_<random>' unless an explicit `name` is given.
     Returns the full CREATE_USER response. device_identifier is randomized per account;
     the app `hash` is reused (server does not bind it to the device)."""
-    name = name or rand_name()
+    name = name or rand_name(prefix)
     dev = device or rand_device()
     # 1) name availability check (server expects it before create)
     chk = _commons("CMD_CHECK_STRING", 0, "", DEVICE_HASH)
