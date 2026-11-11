@@ -20,6 +20,7 @@ import client as cl
 import accounts
 import efootbase
 import gacha
+import injector
 
 PORT = int(os.environ.get("PORT") or os.environ.get("HOST_PORT") or 8080)
 INDEX = os.path.join(HERE, "index.html")
@@ -157,6 +158,29 @@ class H(BaseHTTPRequestHandler):
 
             threading.Thread(target=run_check, args=(accs,), daemon=True).start()
             self._send(200, json.dumps({"ok": True, "total": len(accs)})); return
+        if self.path == "/api/inject/devices":
+            try:
+                devs = injector.list_devices()
+                self._send(200, json.dumps({"devices": devs}, ensure_ascii=False))
+            except Exception as e:
+                self._send(200, json.dumps({"error": f"{type(e).__name__}: {e}"}))
+            return
+        if self.path == "/api/inject/run":
+            dev = data.get("device")
+            acct = data.get("account")
+            if not acct and data.get("user_code"):
+                acct = next((x for x in accounts.load_all() if x["user_code"] == data["user_code"]), None)
+            if not dev or not acct:
+                self._send(200, json.dumps({"ok": False, "error": "ต้องมี device + account"})); return
+            try:
+                res = injector.inject(dev, acct,
+                                      backup=bool(data.get("backup", True)),
+                                      clear_system=bool(data.get("clear_system", True)),
+                                      launch=bool(data.get("launch", True)))
+                self._send(200, json.dumps(res, ensure_ascii=False))
+            except Exception as e:
+                self._send(200, json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}))
+            return
         if self.path == "/api/gacha/scan":
             accs = data.get("accounts") or accounts.load_all()
             if not accs:
