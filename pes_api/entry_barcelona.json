@@ -1,0 +1,572 @@
+{
+ "msgid": "CMD_SET_MYCLUB_ENTRY_INFO",
+ "rqid": 1912220227,
+ "user_id": 2049907721,
+ "session_id": "1_gb897g9i6c07vpvuvffgm24da1",
+ "my_platform": "ANDROID",
+ "s_keyword": "ok\u0004~dR\u0018\\",
+ "base_team": {
+  "base_team_id": 108,
+  "base_team_license": "LICENSED",
+  "team_name": "FC Barcelona",
+  "team_name_short": "BAR"
+ },
+ "squad_name": "แผนทีม",
+ "squad_data": {
+  "player_list": [
+   {
+    "gameplayer_id": {
+     "id": 8442123,
+     "serial": 2049907721000000010
+    },
+    "uniform_number": 1
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446097,
+     "serial": 2049907721000000012
+    },
+    "uniform_number": 3
+   },
+   {
+    "gameplayer_id": {
+     "id": 8442092,
+     "serial": 2049907721000000006
+    },
+    "uniform_number": 2
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446214,
+     "serial": 2049907721000000015
+    },
+    "uniform_number": 4
+   },
+   {
+    "gameplayer_id": {
+     "id": 8442103,
+     "serial": 2049907721000000009
+    },
+    "uniform_number": 5
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446364,
+     "serial": 2049907721000000017
+    },
+    "uniform_number": 6
+   },
+   {
+    "gameplayer_id": {
+     "id": 8440914,
+     "serial": 2049907721000000001
+    },
+    "uniform_number": 7
+   },
+   {
+    "gameplayer_id": {
+     "id": 8442096,
+     "serial": 2049907721000000007
+    },
+    "uniform_number": 8
+   },
+   {
+    "gameplayer_id": {
+     "id": 8441052,
+     "serial": 2049907721000000004
+    },
+    "uniform_number": 18
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446885,
+     "serial": 2049907721000000023
+    },
+    "uniform_number": 10
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446483,
+     "serial": 2049907721000000020
+    },
+    "uniform_number": 11
+   },
+   {
+    "gameplayer_id": {
+     "id": 8442089,
+     "serial": 2049907721000000005
+    },
+    "uniform_number": 23
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446166,
+     "serial": 2049907721000000014
+    },
+    "uniform_number": 15
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446372,
+     "serial": 2049907721000000018
+    },
+    "uniform_number": 14
+   },
+   {
+    "gameplayer_id": {
+     "id": 8440987,
+     "serial": 2049907721000000003
+    },
+    "uniform_number": 16
+   },
+   {
+    "gameplayer_id": {
+     "id": 8442097,
+     "serial": 2049907721000000008
+    },
+    "uniform_number": 19
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446409,
+     "serial": 2049907721000000019
+    },
+    "uniform_number": 9
+   },
+   {
+    "gameplayer_id": {
+     "id": 8440955,
+     "serial": 2049907721000000002
+    },
+    "uniform_number": 17
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446150,
+     "serial": 2049907721000000013
+    },
+    "uniform_number": 21
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446665,
+     "serial": 2049907721000000022
+    },
+    "uniform_number": 13
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446495,
+     "serial": 2049907721000000021
+    },
+    "uniform_number": 20
+   },
+   {
+    "gameplayer_id": {
+     "id": 8446311,
+     "serial": 2049907721000000016
+    },
+    "uniform_number": 22
+   },
+   {
+    "gameplayer_id": {
+     "id": 8443209,
+     "serial": 2049907721000000011
+    },
+    "uniform_number": 12
+   }
+  ],
+  "coach": [
+   {
+    "coach_id": {
+     "id": 8491151,
+     "serial": 2049907721000000001
+    }
+   }
+  ],
+  "squad_gameplan": {
+   "formation": [
+    {
+     "formation_offensive": [
+      {
+       "role": 0,
+       "position_x": 3,
+       "position_y": 52
+      },
+      {
+       "role": 1,
+       "position_x": 11,
+       "position_y": 64
+      },
+      {
+       "role": 1,
+       "position_x": 11,
+       "position_y": 40
+      },
+      {
+       "role": 3,
+       "position_x": 13,
+       "position_y": 88
+      },
+      {
+       "role": 2,
+       "position_x": 13,
+       "position_y": 16
+      },
+      {
+       "role": 4,
+       "position_x": 22,
+       "position_y": 64
+      },
+      {
+       "role": 4,
+       "position_x": 22,
+       "position_y": 40
+      },
+      {
+       "role": 7,
+       "position_x": 31,
+       "position_y": 88
+      },
+      {
+       "role": 6,
+       "position_x": 31,
+       "position_y": 16
+      },
+      {
+       "role": 8,
+       "position_x": 32,
+       "position_y": 52
+      },
+      {
+       "role": 12,
+       "position_x": 43,
+       "position_y": 52
+      }
+     ],
+     "formation_defensive": [
+      {
+       "role": 0,
+       "position_x": 3,
+       "position_y": 52
+      },
+      {
+       "role": 1,
+       "position_x": 11,
+       "position_y": 64
+      },
+      {
+       "role": 1,
+       "position_x": 11,
+       "position_y": 40
+      },
+      {
+       "role": 3,
+       "position_x": 13,
+       "position_y": 88
+      },
+      {
+       "role": 2,
+       "position_x": 13,
+       "position_y": 16
+      },
+      {
+       "role": 4,
+       "position_x": 22,
+       "position_y": 64
+      },
+      {
+       "role": 4,
+       "position_x": 22,
+       "position_y": 40
+      },
+      {
+       "role": 7,
+       "position_x": 31,
+       "position_y": 88
+      },
+      {
+       "role": 6,
+       "position_x": 31,
+       "position_y": 16
+      },
+      {
+       "role": 8,
+       "position_x": 32,
+       "position_y": 52
+      },
+      {
+       "role": 12,
+       "position_x": 43,
+       "position_y": 52
+      }
+     ],
+     "team_style": 0,
+     "team_tactics": [
+      {
+       "value_id": [
+        0,
+        0
+       ],
+       "data": [
+        255,
+        255
+       ]
+      },
+      {
+       "value_id": [
+        0,
+        0
+       ],
+       "data": [
+        255,
+        255
+       ]
+      }
+     ],
+     "is_position_edited": [
+      "NO",
+      "NO"
+     ],
+     "coach_link_data": [
+      {
+       "link_member_Id": 255,
+       "key_member_Id": 255,
+       "is_link_on": "YES"
+      },
+      {
+       "link_member_Id": 255,
+       "key_member_Id": 255,
+       "is_link_on": "YES"
+      }
+     ],
+     "use_multi_formation": "NO"
+    },
+    {
+     "formation_offensive": [
+      {
+       "role": 0,
+       "position_x": 3,
+       "position_y": 52
+      },
+      {
+       "role": 1,
+       "position_x": 11,
+       "position_y": 64
+      },
+      {
+       "role": 1,
+       "position_x": 11,
+       "position_y": 40
+      },
+      {
+       "role": 3,
+       "position_x": 13,
+       "position_y": 88
+      },
+      {
+       "role": 2,
+       "position_x": 13,
+       "position_y": 16
+      },
+      {
+       "role": 4,
+       "position_x": 22,
+       "position_y": 64
+      },
+      {
+       "role": 4,
+       "position_x": 22,
+       "position_y": 40
+      },
+      {
+       "role": 7,
+       "position_x": 31,
+       "position_y": 88
+      },
+      {
+       "role": 6,
+       "position_x": 31,
+       "position_y": 16
+      },
+      {
+       "role": 8,
+       "position_x": 32,
+       "position_y": 52
+      },
+      {
+       "role": 12,
+       "position_x": 43,
+       "position_y": 52
+      }
+     ],
+     "formation_defensive": [
+      {
+       "role": 0,
+       "position_x": 3,
+       "position_y": 52
+      },
+      {
+       "role": 1,
+       "position_x": 11,
+       "position_y": 64
+      },
+      {
+       "role": 1,
+       "position_x": 11,
+       "position_y": 40
+      },
+      {
+       "role": 3,
+       "position_x": 13,
+       "position_y": 88
+      },
+      {
+       "role": 2,
+       "position_x": 13,
+       "position_y": 16
+      },
+      {
+       "role": 4,
+       "position_x": 22,
+       "position_y": 64
+      },
+      {
+       "role": 4,
+       "position_x": 22,
+       "position_y": 40
+      },
+      {
+       "role": 7,
+       "position_x": 31,
+       "position_y": 88
+      },
+      {
+       "role": 6,
+       "position_x": 31,
+       "position_y": 16
+      },
+      {
+       "role": 8,
+       "position_x": 32,
+       "position_y": 52
+      },
+      {
+       "role": 12,
+       "position_x": 43,
+       "position_y": 52
+      }
+     ],
+     "team_style": 0,
+     "team_tactics": [
+      {
+       "value_id": [
+        0,
+        0
+       ],
+       "data": [
+        255,
+        255
+       ]
+      },
+      {
+       "value_id": [
+        0,
+        0
+       ],
+       "data": [
+        255,
+        255
+       ]
+      }
+     ],
+     "is_position_edited": [
+      "NO",
+      "NO"
+     ],
+     "coach_link_data": [
+      {
+       "link_member_Id": 255,
+       "key_member_Id": 255,
+       "is_link_on": "YES"
+      },
+      {
+       "link_member_Id": 255,
+       "key_member_Id": 255,
+       "is_link_on": "YES"
+      }
+     ],
+     "use_multi_formation": "NO"
+    }
+   ],
+   "match_plan_settings": {
+    "order": [
+     0,
+     2,
+     1,
+     3,
+     4,
+     6,
+     5,
+     7,
+     8,
+     9,
+     10,
+     12,
+     14,
+     13,
+     15,
+     18,
+     17,
+     16,
+     21,
+     22,
+     19,
+     20,
+     11,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255,
+     255
+    ],
+    "set_piece_taker": [
+     9,
+     9,
+     8,
+     9,
+     9,
+     9
+    ],
+    "df_overlap_setplay": [
+     255,
+     255,
+     255
+    ],
+    "captain": 1,
+    "auto_member_change": 0,
+    "auto_offside_trap": 0,
+    "auto_plan_change": 0,
+    "use_multi_tactics_plan": 0,
+    "auto_attack_level": 0,
+    "member_assisit": 0
+   }
+  }
+ },
+ "check_status": {
+  "skip_check_team_name": "YES",
+  "skip_check_team_name_short": "YES"
+ }
+}

@@ -1,0 +1,1061 @@
+{
+ "CMD_GET_SERVER_ENV": {
+  "msgid": "CMD_GET_SERVER_ENV",
+  "rqid": 1740424205,
+  "user_id": 2055734095,
+  "session_id": "",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "lang": "TH",
+  "region": "REGION_ASIA",
+  "platform": "ANDROID",
+  "client_version": "6.1.1"
+ },
+ "CMD_GET_USER_EULA_INFO": {
+  "msgid": "CMD_GET_USER_EULA_INFO",
+  "rqid": 1740424206,
+  "user_id": 2055734095,
+  "session_id": "",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "steam_id": "NotImplement",
+  "xuid": "NotImplement",
+  "account_id": "NotImplement"
+ },
+ "CMD_GET_COUNTRY_LIST": {
+  "msgid": "CMD_GET_COUNTRY_LIST",
+  "rqid": 1740424207,
+  "user_id": 2055734095,
+  "session_id": "",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "lang": "TH",
+  "platform": "ANDROID"
+ },
+ "CMD_GET_AGE_GATE_REQUIREMENTS": {
+  "msgid": "CMD_GET_AGE_GATE_REQUIREMENTS",
+  "rqid": 1740424208,
+  "user_id": 2055734095,
+  "session_id": "",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "country_code": "THA"
+ },
+ "CMD_GET_KID_USER_AGE_KIND": {
+  "msgid": "CMD_GET_KID_USER_AGE_KIND",
+  "rqid": 1740424209,
+  "user_id": 2055734095,
+  "session_id": "",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "country_code": "THA",
+  "age": "2001-02-28",
+  "country_age_kind": "BIRTH_YEAR_MONTH",
+  "is_birthday_input_flow_passed": "NO"
+ },
+ "CMD_GET_ADVERTISEMENT": {
+  "msgid": "CMD_GET_ADVERTISEMENT",
+  "rqid": 1740424210,
+  "user_id": 2055734095,
+  "session_id": "",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "platform": "ANDROID",
+  "country": "THA",
+  "state": "",
+  "birthday": "2001-02-28"
+ },
+ "CMD_LOGIN": {
+  "msgid": "CMD_LOGIN",
+  "rqid": 2620224507,
+  "user_id": 2055734095,
+  "session_id": "",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "auth_code": "f807b34d81cfaf6f3485b955429b8421ed248e74",
+  "hash": "e8bbc34f90e46bbbbb6ef7a7a74df3ba",
+  "client_version": "6.1.1",
+  "platform": "ANDROID",
+  "device": {
+   "device_identifier": "ae2efa4abb162b4f353a2cbb3b06cd84345726ebcd129c1b92000e79f638ef38"
+  },
+  "lang": "TH",
+  "country_code": [],
+  "region": "REGION_ASIA",
+  "pcspec": "NotImplement",
+  "cross_platform_option": "NO",
+  "is_disable_sharing": "NO",
+  "os_version": "14",
+  "model_name": "SM-A526B",
+  "gpu_name": "Adreno (TM) 619",
+  "soc_name": "SM7225",
+  "is_rooting": "YES",
+  "phy_mem_used_mib": 949,
+  "phy_mem_available_mib": 3079,
+  "app_storage_used_mib": 29647,
+  "app_storage_available_mib": 79969,
+  "data_storage_used_mib": 29647,
+  "data_storage_available_mib": 79969,
+  "payment_store_link_send_info": {
+   "country_code": ""
+  },
+  "is_savedata_existing": "NO"
+ },
+ "CMD_GET_PRODUCT_LIST": {
+  "msgid": "CMD_GET_PRODUCT_LIST",
+  "rqid": 2620224508,
+  "user_id": 2055734095,
+  "session_id": "5_3bdeh0kfr80fffmj0a1s382f30",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\"
+ },
+ "CMD_SET_TRACKRECORD": {
+  "msgid": "CMD_SET_TRACKRECORD",
+  "rqid": 2620224509,
+  "user_id": 2055734095,
+  "session_id": "5_3bdeh0kfr80fffmj0a1s382f30",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "play_data": "1a,19,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,640,2d0,0,0,0",
+  "sound_data": "{\"sound_preset\":5,\"sound_volume\":[7,7,7,7,7,7,7]}\n"
+ },
+ "CMD_GET_STADIUM_DATA": {
+  "msgid": "CMD_GET_STADIUM_DATA",
+  "rqid": 2620224510,
+  "user_id": 2055734095,
+  "session_id": "5_3bdeh0kfr80fffmj0a1s382f30",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "region": "REGION_ASIA",
+  "client_version": "6.1.1"
+ },
+ "CMD_GET_GAMERELAY_QUALITYCHECK_LIST": {
+  "msgid": "CMD_GET_GAMERELAY_QUALITYCHECK_LIST",
+  "rqid": 2620224512,
+  "user_id": 2055734095,
+  "session_id": "5_3bdeh0kfr80fffmj0a1s382f30",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\"
+ },
+ "CMD_GET_MAINMENU_INFO": {
+  "msgid": "CMD_GET_MAINMENU_INFO",
+  "rqid": 2620224514,
+  "user_id": 2055734095,
+  "session_id": "5_3bdeh0kfr80fffmj0a1s382f30",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "is_skip": "NO",
+  "is_back": "NO",
+  "is_first": "YES"
+ },
+ "CMD_SET_GAMERELAY_QUALITY": {
+  "msgid": "CMD_SET_GAMERELAY_QUALITY",
+  "rqid": 2620224520,
+  "user_id": 2055734095,
+  "session_id": "5_3bdeh0kfr80fffmj0a1s382f30",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "quality_list": [
+   {
+    "region": "asia-southeast1",
+    "quality": 37,
+    "last_update": 1794375939
+   },
+   {
+    "region": "asia-southeast2",
+    "quality": 50,
+    "last_update": 1794375939
+   },
+   {
+    "region": "asia-northeast1",
+    "quality": 105,
+    "last_update": 1794375939
+   },
+   {
+    "region": "asia-northeast2",
+    "quality": 111,
+    "last_update": 1794375939
+   },
+   {
+    "region": "asia-northeast3",
+    "quality": 100,
+    "last_update": 1794375939
+   },
+   {
+    "region": "asia-east1",
+    "quality": 73,
+    "last_update": 1794375939
+   },
+   {
+    "region": "asia-east2",
+    "quality": 63,
+    "last_update": 1794375939
+   },
+   {
+    "region": "southamerica-east1",
+    "quality": 358,
+    "last_update": 1794375939
+   },
+   {
+    "region": "southamerica-west1",
+    "quality": 302,
+    "last_update": 1794375939
+   },
+   {
+    "region": "asia-south1",
+    "quality": 97,
+    "last_update": 1794375939
+   },
+   {
+    "region": "asia-south2",
+    "quality": 104,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-west2",
+    "quality": 206,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-west6",
+    "quality": 198,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-west3",
+    "quality": 195,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-west4",
+    "quality": 203,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-west1",
+    "quality": 202,
+    "last_update": 1794375939
+   },
+   {
+    "region": "us-east4",
+    "quality": 257,
+    "last_update": 1794375939
+   },
+   {
+    "region": "us-east1",
+    "quality": 255,
+    "last_update": 1794375939
+   },
+   {
+    "region": "us-central1",
+    "quality": 235,
+    "last_update": 1794375939
+   },
+   {
+    "region": "us-west2",
+    "quality": 202,
+    "last_update": 1794375939
+   },
+   {
+    "region": "us-west1",
+    "quality": 209,
+    "last_update": 1794375939
+   },
+   {
+    "region": "us-west3",
+    "quality": 222,
+    "last_update": 1794375939
+   },
+   {
+    "region": "us-west4",
+    "quality": 204,
+    "last_update": 1794375939
+   },
+   {
+    "region": "northamerica-northeast1",
+    "quality": 264,
+    "last_update": 1794375939
+   },
+   {
+    "region": "northamerica-northeast2",
+    "quality": 261,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-central2",
+    "quality": 209,
+    "last_update": 1794375939
+   },
+   {
+    "region": "australia-southeast1",
+    "quality": 131,
+    "last_update": 1794375939
+   },
+   {
+    "region": "australia-southeast2",
+    "quality": 121,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-north1",
+    "quality": 230,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-southwest1",
+    "quality": 231,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-west12",
+    "quality": 205,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-west8",
+    "quality": 201,
+    "last_update": 1794375939
+   },
+   {
+    "region": "europe-west9",
+    "quality": 202,
+    "last_update": 1794375939
+   },
+   {
+    "region": "me-central1",
+    "quality": 154,
+    "last_update": 1794375939
+   },
+   {
+    "region": "me-west1",
+    "quality": 211,
+    "last_update": 1794375939
+   },
+   {
+    "region": "africa-south1",
+    "quality": 226,
+    "last_update": 1794375939
+   },
+   {
+    "region": "me-central2",
+    "quality": 137,
+    "last_update": 1794375939
+   },
+   {
+    "region": "northamerica-south1",
+    "quality": 242,
+    "last_update": 1794375939
+   },
+   {
+    "region": "ap-southeast-7",
+    "quality": 11,
+    "last_update": 1794375939
+   },
+   {
+    "region": "eu-south-1",
+    "quality": 184,
+    "last_update": 1794375939
+   },
+   {
+    "region": "ap-southeast-5",
+    "quality": 33,
+    "last_update": 1794375939
+   },
+   {
+    "region": "sa-east-1",
+    "quality": 370,
+    "last_update": 1794375939
+   },
+   {
+    "region": "af-south-1-los-1",
+    "quality": 278,
+    "last_update": 1794375939
+   },
+   {
+    "region": "eu-central-1-ath-1",
+    "quality": 209,
+    "last_update": 1794375939
+   },
+   {
+    "region": "eu-central-1-ist-1",
+    "quality": 215,
+    "last_update": 1794375939
+   },
+   {
+    "region": "ap-northeast-1",
+    "quality": 105,
+    "last_update": 1794375939
+   },
+   {
+    "region": "ap-northeast-3",
+    "quality": 111,
+    "last_update": 1794375939
+   },
+   {
+    "region": "ap-southeast-1",
+    "quality": 36,
+    "last_update": 1794375939
+   },
+   {
+    "region": "ap-southeast-3",
+    "quality": 52,
+    "last_update": 1794375939
+   },
+   {
+    "region": "ap-south-1",
+    "quality": 97,
+    "last_update": 1794375939
+   },
+   {
+    "region": "ap-south-2",
+    "quality": 78,
+    "last_update": 1794375939
+   },
+   {
+    "region": "eu-west-3",
+    "quality": 182,
+    "last_update": 1794375939
+   },
+   {
+    "region": "eu-south-2",
+    "quality": 193,
+    "last_update": 1794375939
+   },
+   {
+    "region": "af-south-1",
+    "quality": 239,
+    "last_update": 1794375939
+   }
+  ]
+ },
+ "CMD_RECV_PRESENT": {
+  "msgid": "CMD_RECV_PRESENT",
+  "rqid": 1912220238,
+  "user_id": 2049907721,
+  "session_id": "1_gb897g9i6c07vpvuvffgm24da1",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "present_list": [
+   {
+    "present_id": 200030,
+    "breakdown_present_id": 0
+   },
+   {
+    "present_id": 200020,
+    "breakdown_present_id": 0
+   },
+   {
+    "present_id": 200010,
+    "breakdown_present_id": 0
+   },
+   {
+    "present_id": 200031,
+    "breakdown_present_id": 0
+   },
+   {
+    "present_id": 200021,
+    "breakdown_present_id": 0
+   },
+   {
+    "present_id": 200011,
+    "breakdown_present_id": 0
+   }
+  ],
+  "advertising_id": 0
+ },
+ "CMD_GET_USEABLE_TEAM_LIST": {
+  "msgid": "CMD_GET_USEABLE_TEAM_LIST",
+  "rqid": 1912220226,
+  "user_id": 2049907721,
+  "session_id": "1_gb897g9i6c07vpvuvffgm24da1",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "list_type": "BASE_TEAM_SELECT",
+  "event_id": 0
+ },
+ "CMD_SET_MYCLUB_ENTRY_INFO": {
+  "msgid": "CMD_SET_MYCLUB_ENTRY_INFO",
+  "rqid": 1912220227,
+  "user_id": 2049907721,
+  "session_id": "1_gb897g9i6c07vpvuvffgm24da1",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "base_team": {
+   "base_team_id": 108,
+   "base_team_license": "LICENSED",
+   "team_name": "FC Barcelona",
+   "team_name_short": "BAR"
+  },
+  "squad_name": "แผนทีม",
+  "squad_data": {
+   "player_list": [
+    {
+     "gameplayer_id": {
+      "id": 8442123,
+      "serial": 2049907721000000010
+     },
+     "uniform_number": 1
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446097,
+      "serial": 2049907721000000012
+     },
+     "uniform_number": 3
+    },
+    {
+     "gameplayer_id": {
+      "id": 8442092,
+      "serial": 2049907721000000006
+     },
+     "uniform_number": 2
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446214,
+      "serial": 2049907721000000015
+     },
+     "uniform_number": 4
+    },
+    {
+     "gameplayer_id": {
+      "id": 8442103,
+      "serial": 2049907721000000009
+     },
+     "uniform_number": 5
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446364,
+      "serial": 2049907721000000017
+     },
+     "uniform_number": 6
+    },
+    {
+     "gameplayer_id": {
+      "id": 8440914,
+      "serial": 2049907721000000001
+     },
+     "uniform_number": 7
+    },
+    {
+     "gameplayer_id": {
+      "id": 8442096,
+      "serial": 2049907721000000007
+     },
+     "uniform_number": 8
+    },
+    {
+     "gameplayer_id": {
+      "id": 8441052,
+      "serial": 2049907721000000004
+     },
+     "uniform_number": 18
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446885,
+      "serial": 2049907721000000023
+     },
+     "uniform_number": 10
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446483,
+      "serial": 2049907721000000020
+     },
+     "uniform_number": 11
+    },
+    {
+     "gameplayer_id": {
+      "id": 8442089,
+      "serial": 2049907721000000005
+     },
+     "uniform_number": 23
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446166,
+      "serial": 2049907721000000014
+     },
+     "uniform_number": 15
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446372,
+      "serial": 2049907721000000018
+     },
+     "uniform_number": 14
+    },
+    {
+     "gameplayer_id": {
+      "id": 8440987,
+      "serial": 2049907721000000003
+     },
+     "uniform_number": 16
+    },
+    {
+     "gameplayer_id": {
+      "id": 8442097,
+      "serial": 2049907721000000008
+     },
+     "uniform_number": 19
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446409,
+      "serial": 2049907721000000019
+     },
+     "uniform_number": 9
+    },
+    {
+     "gameplayer_id": {
+      "id": 8440955,
+      "serial": 2049907721000000002
+     },
+     "uniform_number": 17
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446150,
+      "serial": 2049907721000000013
+     },
+     "uniform_number": 21
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446665,
+      "serial": 2049907721000000022
+     },
+     "uniform_number": 13
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446495,
+      "serial": 2049907721000000021
+     },
+     "uniform_number": 20
+    },
+    {
+     "gameplayer_id": {
+      "id": 8446311,
+      "serial": 2049907721000000016
+     },
+     "uniform_number": 22
+    },
+    {
+     "gameplayer_id": {
+      "id": 8443209,
+      "serial": 2049907721000000011
+     },
+     "uniform_number": 12
+    }
+   ],
+   "coach": [
+    {
+     "coach_id": {
+      "id": 8491151,
+      "serial": 2049907721000000001
+     }
+    }
+   ],
+   "squad_gameplan": {
+    "formation": [
+     {
+      "formation_offensive": [
+       {
+        "role": 0,
+        "position_x": 3,
+        "position_y": 52
+       },
+       {
+        "role": 1,
+        "position_x": 11,
+        "position_y": 64
+       },
+       {
+        "role": 1,
+        "position_x": 11,
+        "position_y": 40
+       },
+       {
+        "role": 3,
+        "position_x": 13,
+        "position_y": 88
+       },
+       {
+        "role": 2,
+        "position_x": 13,
+        "position_y": 16
+       },
+       {
+        "role": 4,
+        "position_x": 22,
+        "position_y": 64
+       },
+       {
+        "role": 4,
+        "position_x": 22,
+        "position_y": 40
+       },
+       {
+        "role": 7,
+        "position_x": 31,
+        "position_y": 88
+       },
+       {
+        "role": 6,
+        "position_x": 31,
+        "position_y": 16
+       },
+       {
+        "role": 8,
+        "position_x": 32,
+        "position_y": 52
+       },
+       {
+        "role": 12,
+        "position_x": 43,
+        "position_y": 52
+       }
+      ],
+      "formation_defensive": [
+       {
+        "role": 0,
+        "position_x": 3,
+        "position_y": 52
+       },
+       {
+        "role": 1,
+        "position_x": 11,
+        "position_y": 64
+       },
+       {
+        "role": 1,
+        "position_x": 11,
+        "position_y": 40
+       },
+       {
+        "role": 3,
+        "position_x": 13,
+        "position_y": 88
+       },
+       {
+        "role": 2,
+        "position_x": 13,
+        "position_y": 16
+       },
+       {
+        "role": 4,
+        "position_x": 22,
+        "position_y": 64
+       },
+       {
+        "role": 4,
+        "position_x": 22,
+        "position_y": 40
+       },
+       {
+        "role": 7,
+        "position_x": 31,
+        "position_y": 88
+       },
+       {
+        "role": 6,
+        "position_x": 31,
+        "position_y": 16
+       },
+       {
+        "role": 8,
+        "position_x": 32,
+        "position_y": 52
+       },
+       {
+        "role": 12,
+        "position_x": 43,
+        "position_y": 52
+       }
+      ],
+      "team_style": 0,
+      "team_tactics": [
+       {
+        "value_id": [
+         0,
+         0
+        ],
+        "data": [
+         255,
+         255
+        ]
+       },
+       {
+        "value_id": [
+         0,
+         0
+        ],
+        "data": [
+         255,
+         255
+        ]
+       }
+      ],
+      "is_position_edited": [
+       "NO",
+       "NO"
+      ],
+      "coach_link_data": [
+       {
+        "link_member_Id": 255,
+        "key_member_Id": 255,
+        "is_link_on": "YES"
+       },
+       {
+        "link_member_Id": 255,
+        "key_member_Id": 255,
+        "is_link_on": "YES"
+       }
+      ],
+      "use_multi_formation": "NO"
+     },
+     {
+      "formation_offensive": [
+       {
+        "role": 0,
+        "position_x": 3,
+        "position_y": 52
+       },
+       {
+        "role": 1,
+        "position_x": 11,
+        "position_y": 64
+       },
+       {
+        "role": 1,
+        "position_x": 11,
+        "position_y": 40
+       },
+       {
+        "role": 3,
+        "position_x": 13,
+        "position_y": 88
+       },
+       {
+        "role": 2,
+        "position_x": 13,
+        "position_y": 16
+       },
+       {
+        "role": 4,
+        "position_x": 22,
+        "position_y": 64
+       },
+       {
+        "role": 4,
+        "position_x": 22,
+        "position_y": 40
+       },
+       {
+        "role": 7,
+        "position_x": 31,
+        "position_y": 88
+       },
+       {
+        "role": 6,
+        "position_x": 31,
+        "position_y": 16
+       },
+       {
+        "role": 8,
+        "position_x": 32,
+        "position_y": 52
+       },
+       {
+        "role": 12,
+        "position_x": 43,
+        "position_y": 52
+       }
+      ],
+      "formation_defensive": [
+       {
+        "role": 0,
+        "position_x": 3,
+        "position_y": 52
+       },
+       {
+        "role": 1,
+        "position_x": 11,
+        "position_y": 64
+       },
+       {
+        "role": 1,
+        "position_x": 11,
+        "position_y": 40
+       },
+       {
+        "role": 3,
+        "position_x": 13,
+        "position_y": 88
+       },
+       {
+        "role": 2,
+        "position_x": 13,
+        "position_y": 16
+       },
+       {
+        "role": 4,
+        "position_x": 22,
+        "position_y": 64
+       },
+       {
+        "role": 4,
+        "position_x": 22,
+        "position_y": 40
+       },
+       {
+        "role": 7,
+        "position_x": 31,
+        "position_y": 88
+       },
+       {
+        "role": 6,
+        "position_x": 31,
+        "position_y": 16
+       },
+       {
+        "role": 8,
+        "position_x": 32,
+        "position_y": 52
+       },
+       {
+        "role": 12,
+        "position_x": 43,
+        "position_y": 52
+       }
+      ],
+      "team_style": 0,
+      "team_tactics": [
+       {
+        "value_id": [
+         0,
+         0
+        ],
+        "data": [
+         255,
+         255
+        ]
+       },
+       {
+        "value_id": [
+         0,
+         0
+        ],
+        "data": [
+         255,
+         255
+        ]
+       }
+      ],
+      "is_position_edited": [
+       "NO",
+       "NO"
+      ],
+      "coach_link_data": [
+       {
+        "link_member_Id": 255,
+        "key_member_Id": 255,
+        "is_link_on": "YES"
+       },
+       {
+        "link_member_Id": 255,
+        "key_member_Id": 255,
+        "is_link_on": "YES"
+       }
+      ],
+      "use_multi_formation": "NO"
+     }
+    ],
+    "match_plan_settings": {
+     "order": [
+      0,
+      2,
+      1,
+      3,
+      4,
+      6,
+      5,
+      7,
+      8,
+      9,
+      10,
+      12,
+      14,
+      13,
+      15,
+      18,
+      17,
+      16,
+      21,
+      22,
+      19,
+      20,
+      11,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255,
+      255
+     ],
+     "set_piece_taker": [
+      9,
+      9,
+      8,
+      9,
+      9,
+      9
+     ],
+     "df_overlap_setplay": [
+      255,
+      255,
+      255
+     ],
+     "captain": 1,
+     "auto_member_change": 0,
+     "auto_offside_trap": 0,
+     "auto_plan_change": 0,
+     "use_multi_tactics_plan": 0,
+     "auto_attack_level": 0,
+     "member_assisit": 0
+    }
+   }
+  },
+  "check_status": {
+   "skip_check_team_name": "YES",
+   "skip_check_team_name_short": "YES"
+  }
+ },
+ "CMD_SET_REWARD_TYPE": {
+  "msgid": "CMD_SET_REWARD_TYPE",
+  "rqid": 1912220236,
+  "user_id": 2049907721,
+  "session_id": "1_gb897g9i6c07vpvuvffgm24da1",
+  "my_platform": "ANDROID",
+  "s_keyword": "ok\u0004~dR\u0018\\",
+  "reward_type_list": [
+   "AGENT",
+   "SHOP_COIN",
+   "BILLBOARD"
+  ]
+ }
+}
