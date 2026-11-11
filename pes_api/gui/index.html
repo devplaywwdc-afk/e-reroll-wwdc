@@ -337,9 +337,13 @@ $('d_src').onchange=()=>$('d_upwrap').style.display=$('d_src').value==='upload'?
 $('d_files').onchange=async(e)=>{const fs=[...e.target.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));dUploaded=[];
   for(const f of fs){try{const o=JSON.parse((await f.text()).trim());if(o.user_id&&o.auth_code)dUploaded.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),user_id:o.user_id,auth_code:o.auth_code,device_identifier:o.device_identifier||null});}catch(err){}}
   $('d_cnt').textContent=`โหลด ${dUploaded.length} ไอดี`;};
-const REW_IC={GP:'🟦',COIN:'🟡',ITEM:'🧪',AGENT:'🎁',PLAYER:'👤',UNIFORM:'👕',BILLBOARD:'🖼️'};
+const REW={GP:['🟦','GP'],COIN:['🟡','eF Coins'],POINT:['⚡','eF Points'],EFOOTBALL_POINT:['⚡','eF Points'],
+  ITEM:['🧪','ไอเทม'],AGENT:['🎁','Agent'],PLAYER:['👤','นักเตะ'],UNIFORM:['👕','ชุด'],
+  BILLBOARD:['🖼️','ป้าย'],SKILL:['✨','สกิล'],EXP:['📈','EXP'],CONTRACT:['📄','สัญญา'],EMBLEM:['🏅','ตรา']};
+function rewInfo(t){return REW[t]||['•',t];}
 function rewardStr(rewards){if(!rewards||!rewards.length)return '<span style="color:var(--txt3)">—</span>';
-  return rewards.map(r=>`${REW_IC[r.type]||'•'}${r.type} ×${r.count}`).join('  ');}
+  return rewards.map(r=>{const[ic,nm]=rewInfo(r.type);const hl=(r.type==='GP'||r.type==='COIN'||r.type.includes('POINT'))?'style="color:var(--g);font-weight:700"':'';
+    return `<span ${hl}>${ic}${nm} ×${(r.count||0).toLocaleString()}</span>`;}).join('  ');}
 function dailyRow(m){const uc=m.user_code;let tr=$('dr_'+uc);
   if(!tr){const tb=$('d_tbl').querySelector('tbody')||ensureDtable();tr=document.createElement('tr');tr.id='dr_'+uc;tb.appendChild(tr);}
   const stc={run:'<span style="color:var(--y)">กำลังรับ...</span>',retry:`<span style="color:var(--y)">retry ${m.attempts} · ${m.error||''}</span>`,
@@ -358,7 +362,7 @@ function dailyRow(m){const uc=m.user_code;let tr=$('dr_'+uc);
     const players=(m.rewards||[]).filter(r=>r.type==='PLAYER');
     dr.innerHTML=`<td colspan="7" style="background:rgba(0,0,0,.25)">
       <div style="padding:6px 4px"><b style="color:var(--g)">ของที่ได้วันนี้:</b> ${
-        (m.rewards||[]).map(r=>`${REW_IC[r.type]||'•'} ${r.name||r.type} ×${r.count}${r.title&&r.title!=='NotImplement'?' ('+r.title+')':''}`).join(' · ')||'—'}
+        (m.rewards||[]).map(r=>{const[ic,nm]=rewInfo(r.type);return `${ic} ${nm} ×${(r.count||0).toLocaleString()}${r.title&&r.title!=='NotImplement'?' ('+r.title+')':''}`;}).join(' · ')||'—'}
       <br><b style="color:var(--p)">นักเตะที่ได้:</b> ${players.length?players.map(p=>p.title&&p.title!=='NotImplement'?p.title:'PLAYER').join(', '):'<span style="color:var(--txt3)">ไม่มีนักเตะใหม่วันนี้ (ดูทีมเต็มต้องใช้ player API — ยังไม่ทำ)</span>'}</div></td>`;
     tr.after(dr);
   } else {
