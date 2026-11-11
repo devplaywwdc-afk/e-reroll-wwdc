@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(HERE))  # pes_api/
 import client as cl
 import flows
 import accounts
+import gacha
 
 
 class Engine:
@@ -57,7 +58,7 @@ class Engine:
         dt = max(0.001, time.time() - self.start_ts)
         self.emit({
             "type": "stats",
-            "ok": self.stats["ok"], "fail": self.stats["fail"],
+            "ok": self.stats["ok"], "fail": self.stats["fail"], "hits": self.stats["hits"],
             "rate": round(self.stats["ok"] / dt, 2),
             "perday": int(self.stats["ok"] / dt * 86400),
             "elapsed": int(dt),
@@ -67,19 +68,26 @@ class Engine:
         })
 
     # ---- control ----
-    def start(self, mode="direct", workers=15, target=0, proxies=None, do_setup=False, do_claim=True):
+    def start(self, mode="direct", workers=15, target=0, proxies=None, do_setup=False, do_claim=True,
+              do_gacha=False, gacha_agent=0, wanted=None):
         if self.running:
             return False
         proxies = proxies or []
+        wanted = wanted or []
+        if do_gacha:
+            do_setup = do_claim = True  # gacha needs a set-up, logged-in account
         self.cfg = dict(mode=mode, workers=workers, target=target, do_setup=do_setup,
-                        do_claim=do_claim, nproxies=len(proxies))
+                        do_claim=do_claim, do_gacha=do_gacha, gacha_agent=gacha_agent,
+                        wanted=wanted, nproxies=len(proxies))
         self.stats.clear()
         self.per_worker.clear()
         self.running = True
         self.start_ts = time.time()
         self.workers = []
         for i in range(workers):
-            t = threading.Thread(target=self._worker, args=(i, mode, proxies, do_setup, do_claim), daemon=True)
+            t = threading.Thread(target=self._worker,
+                                 args=(i, mode, proxies, do_setup, do_claim, do_gacha, gacha_agent, wanted),
+                                 daemon=True)
             t.start()
             self.workers.append(t)
         threading.Thread(target=self._stats_loop, daemon=True).start()
@@ -110,7 +118,8 @@ class Engine:
         return t and self.stats["ok"] >= t
 
     # ---- worker ----
-    def _worker(self, wid, mode, proxies, do_setup, do_claim=True):
+    def _worker(self, wid, mode, proxies, do_setup, do_claim=True, do_gacha=False, gacha_agent=0, wanted=None):
+        wanted = wanted or []
         pidx = wid % max(1, len(proxies)) if proxies else 0
         proxy = proxies[pidx] if (mode == "proxy" and proxies) else None
         c = cl.GateClient(proxy=proxy, max_retries=0)  # spray: no internal retry, we loop fast
@@ -141,6 +150,19 @@ class Engine:
                             setup = " (setup fail)"
                     with self.save_lock:
                         accounts.save(uc, auth, uid, devid)
+                    if do_gacha and "+myclub" in setup:
+                        try:
+                            acct = {"user_code": uc, "user_id": uid, "auth_code": auth,
+                                    "device_identifier": devid}
+                            gr = gacha.run_account(acct, wanted, agent_id=gacha_agent)
+                            if gr.get("hits"):
+                                self.stats["hits"] += 1
+                                self.log(wid, "ok", f"[★] {uc} gacha HIT {', '.join(gr['hits'])} -> {gr['folder']}")
+                                setup += f" +HIT:{gr['folder']}"
+                            else:
+                                setup += f" +gacha({gr.get('drawn', 0)})"
+                        except Exception:
+                            setup += " (gacha fail)"
                     self.stats["ok"] += 1
                     self.per_worker[wid]["ok"] += 1
                     throttle_streak = 0

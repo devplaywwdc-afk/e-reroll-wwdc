@@ -185,6 +185,13 @@
               </div>
               <label style="font-size:12px;color:var(--txt2)"><input id="setup" type="checkbox" style="width:auto;vertical-align:-1px"> ไอดีพร้อมใช้ (เข้า MyClub, ช้าลง)</label>
               <label style="font-size:12px;color:var(--txt2)"><input id="claim" type="checkbox" checked style="width:auto;vertical-align:-1px"> รับของเริ่มต้น + Daily เลย (GP/เหรียญ) — ต้องเปิด MyClub ด้วย</label>
+              <label style="font-size:12px;color:var(--txt2)"><input id="gacha" type="checkbox" style="width:auto;vertical-align:-1px"> 🎰 เปิดกาชา pack ฟรี + กรองนักเตะหลังสมัคร (บังคับเปิด MyClub+รับของ)</label>
+              <div class="field" id="gcwrap" style="display:none;background:rgba(0,255,136,.04);border:1px solid var(--border);border-radius:8px;padding:8px">
+                <label>agent_id เจาะจง (เว้นว่าง / 0 = ทุก pack ฟรี · ดูเลขจาก tab กาชา)</label>
+                <input id="r_agent" type="number" value="0" style="padding:6px">
+                <label style="margin-top:6px">กรองนักเตะที่อยากได้ (1 บรรทัด 1 ชื่อ) — hit จะถูกแยกเข้าโฟลเดอร์ gacha_hits/</label>
+                <textarea id="r_wanted" placeholder="Jude Bellingham&#10;Lamine Yamal" style="min-height:60px"></textarea>
+              </div>
               <div class="field proxywrap" id="proxywrap" style="display:none">
                 <label>Proxy list (1 บรรทัด 1 proxy)</label>
                 <textarea id="proxies" placeholder="http://user:pass@host:port&#10;socks5://host:port"></textarea>
@@ -407,7 +414,12 @@ function connect(){if(es)es.close();es=new EventSource('/events');
     else if(m.type==='grow'){gcRow(m.rep,m.done,m.total);}
     else if(m.type==='gdone'){gcDone(m.total);}
   };}
-$('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,setup:$('setup').checked,claim:$('claim').checked,proxies:$('proxies').value};
+$('gacha').onchange=()=>{const on=$('gacha').checked;$('gcwrap').style.display=on?'block':'none';
+  if(on){$('setup').checked=true;$('claim').checked=true;}};
+$('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,
+    setup:$('setup').checked,claim:$('claim').checked,proxies:$('proxies').value,
+    gacha:$('gacha').checked,gacha_agent:+$('r_agent').value||0,
+    wanted:$('r_wanted').value.split('\n').map(s=>s.trim()).filter(Boolean)};
   buildGrid(body.workers);await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
 $('stop').onclick=()=>fetch('/api/stop',{method:'POST'});
 

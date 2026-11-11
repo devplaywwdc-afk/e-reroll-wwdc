@@ -177,13 +177,14 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/gacha/run":
             accs = data.get("accounts") or accounts.load_all()
             wanted = [w.strip() for w in (data.get("wanted") or []) if w.strip()]
+            agent_id = int(data.get("gacha_agent", 0) or 0)
 
             def run_gacha(accs, wanted):
                 total = len(accs)
                 ENGINE.emit({"type": "gstart", "total": total, "wanted": wanted})
                 done = 0
                 for a in accs:
-                    rep = gacha.run_account(a, wanted)
+                    rep = gacha.run_account(a, wanted, agent_id=agent_id)
                     done += 1
                     ENGINE.emit({"type": "grow", "done": done, "total": total, "rep": rep})
                 ENGINE.emit({"type": "gdone", "total": total})
@@ -218,6 +219,9 @@ class H(BaseHTTPRequestHandler):
                 proxies=proxies,
                 do_setup=bool(data.get("setup", False)),
                 do_claim=bool(data.get("claim", True)),
+                do_gacha=bool(data.get("gacha", False)),
+                gacha_agent=int(data.get("gacha_agent", 0) or 0),
+                wanted=[w.strip() for w in (data.get("wanted") or []) if w.strip()],
             )
             self._send(200, json.dumps({"ok": ok, "workers": int(data.get("workers", 15))}))
         elif self.path == "/api/stop":

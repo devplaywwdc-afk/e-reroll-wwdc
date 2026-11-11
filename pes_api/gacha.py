@@ -88,11 +88,14 @@ def use_agent(client, uid, sid, agent_id, count, buy_type="BUY_BY_COIN"):
     return {"result": r.get("result") if isinstance(r, dict) else "ERR", "players": players}
 
 
-def draw_all_free(client, uid, sid, scan=None):
-    """Open every free draw the account currently has. Returns the list of pulled players."""
+def draw_all_free(client, uid, sid, scan=None, only_agent=0):
+    """Open free draws the account has. only_agent>0 limits to that one agent_id.
+    Returns the list of pulled players."""
     scan = scan or scan_agents(client, uid, sid)
     drawn = []
     for a in scan["free"]:
+        if only_agent and a["agent_id"] != only_agent:
+            continue
         for _ in range(a["remaining"]):
             res = use_agent(client, uid, sid, a["agent_id"], a["count"], a["buy_type"])
             if res["result"] != "NOERR":
@@ -152,9 +155,9 @@ def sort_account(user_code, hits):
 
 
 # ---------------------------------------------------------------- one account end-to-end
-def run_account(acct, wanted):
-    """Login, open all free packs, enrich names, filter by `wanted`, sort into folder.
-    Returns a report dict."""
+def run_account(acct, wanted, agent_id=0):
+    """Login, open free packs (all, or only agent_id), enrich names, filter by `wanted`,
+    sort into folder. Returns a report dict."""
     uc = acct["user_code"]
     try:
         c = cl.GateClient(user_code=uc)
@@ -163,7 +166,7 @@ def run_account(acct, wanted):
         if not sid:
             return {"user_code": uc, "error": "login failed"}
         scan = scan_agents(c, int(acct["user_id"]), sid)
-        drawn = draw_all_free(c, int(acct["user_id"]), sid, scan)
+        drawn = draw_all_free(c, int(acct["user_id"]), sid, scan, only_agent=agent_id)
         info = efootbase.lookup_many([p["id"] for p in drawn if p["id"]])
         for p in drawn:
             e = info.get(str(p["id"]), {})
