@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PES Reroll Farm</title>
+<style>
+  :root{ --bg:#0b0e14; --panel:#121722; --edge:#222a3a; --fg:#c7d0e0; --muted:#6b7789;
+         --ok:#39d353; --err:#ff5c5c; --info:#58a6ff; --accent:#2f81f7; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.4 "Segoe UI",system-ui,sans-serif}
+  header{position:sticky;top:0;z-index:10;background:#0e1420;border-bottom:1px solid var(--edge);
+         padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  header h1{font-size:15px;margin:0 10px 0 0;letter-spacing:.5px}
+  .grp{display:flex;gap:6px;align-items:center}
+  label{color:var(--muted);font-size:12px}
+  input,select,textarea{background:#0b1019;color:var(--fg);border:1px solid var(--edge);
+         border-radius:6px;padding:6px 8px;font:12px monospace}
+  input[type=number]{width:70px}
+  button{cursor:pointer;border:0;border-radius:6px;padding:8px 16px;font-weight:600;font-size:13px}
+  #start{background:var(--accent);color:#fff} #stop{background:#3a2330;color:#ff9aa2}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .stat{display:flex;gap:4px;align-items:baseline}
+  .stat b{font-size:17px} .stat.ok b{color:var(--ok)} .stat.err b{color:var(--err)}
+  .proxywrap{display:none;flex-basis:100%;margin-top:8px}
+  .proxywrap.show{display:block}
+  textarea{width:100%;height:60px;resize:vertical}
+  .hint{color:var(--muted);font-size:11px;margin-top:4px}
+  .hint code{color:var(--info)}
+  #grid{display:grid;gap:8px;padding:10px;
+        grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .pane{background:var(--panel);border:1px solid var(--edge);border-radius:8px;display:flex;
+        flex-direction:column;height:230px;overflow:hidden}
+  .pane .ph{background:#0e1420;border-bottom:1px solid var(--edge);padding:5px 10px;
+        display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+  .pane .ph b{color:var(--fg)}
+  .pane .log{flex:1;overflow-y:auto;padding:5px 8px;font:11px/1.35 Consolas,monospace;
+        white-space:pre-wrap;word-break:break-all}
+  .log .ok{color:var(--ok)} .log .err{color:var(--err)} .log .info{color:var(--info)}
+  .dot{width:8px;height:8px;border-radius:50%;background:#444;display:inline-block;margin-right:5px}
+  .dot.live{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ PES Reroll Farm</h1>
+  <div class="grp">
+    <label>โหมด</label>
+    <select id="mode">
+      <option value="direct">Direct (IP นี้ยิงตรง — spray)</option>
+      <option value="proxy">Proxy rotation (หลาย IP)</option>
+    </select>
+  </div>
+  <div class="grp"><label>Workers</label><input id="workers" type="number" value="15" min="1" max="64"></div>
+  <div class="grp"><label>เป้า (0=ไม่จำกัด)</label><input id="target" type="number" value="0" min="0"></div>
+  <div class="grp"><label><input id="setup" type="checkbox"> ไอดีพร้อมใช้ (เข้า MyClub, ช้าลง)</label></div>
+  <button id="start">▶ START</button>
+  <button id="stop" disabled>■ STOP</button>
+  <div style="flex:1"></div>
+  <span class="stat ok"><b id="s_ok">0</b><label>สำเร็จ</label></span>
+  <span class="stat err"><b id="s_fail">0</b><label>fail</label></span>
+  <span class="stat"><b id="s_rate">0</b><label>/วิ</label></span>
+  <span class="stat"><b id="s_day">0</b><label>/วัน</label></span>
+  <span class="stat"><b id="s_time">0</b><label>วิ</label></span>
+  <span><span class="dot" id="livedot"></span><span id="livetxt" style="color:var(--muted)">idle</span></span>
+
+  <div class="proxywrap" id="proxywrap">
+    <label>Proxy list (1 บรรทัด 1 proxy):</label>
+    <textarea id="proxies" placeholder="http://user:pass@host:port&#10;socks5://host:port"></textarea>
+    <div class="hint">
+      ใช้ <code>HTTP(S)</code> หรือ <code>SOCKS5</code> · แนะนำ <b>rotating residential / mobile proxy</b>
+      (datacenter โดนแบนง่าย) · รูปแบบ <code>http://user:pass@host:port</code> หรือ
+      <code>socks5://host:port</code> · SOCKS ต้องมี <code>pip install requests[socks]</code> ·
+      worker จะหมุนไป proxy ถัดไปเองเมื่อตัวที่ใช้โดนหน่วง
+    </div>
+  </div>
+</header>
+
+<div id="grid"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+let panes={}, es=null;
+
+$('mode').onchange=()=>{ $('proxywrap').classList.toggle('show', $('mode').value==='proxy'); };
+
+function buildGrid(n){
+  const g=$('grid'); g.innerHTML=''; panes={};
+  for(let i=0;i<n;i++){
+    const p=document.createElement('div'); p.className='pane';
+    p.innerHTML=`<div class="ph"><span>PES API Worker #${i}</span><span>ok:<b id="w${i}c">0</b></span></div>
+                 <div class="log" id="w${i}"></div>`;
+    g.appendChild(p); panes[i]=$('w'+i);
+  }
+}
+function addLine(w,lvl,t){
+  const el=panes[w]; if(!el) return;
+  const d=document.createElement('div'); d.className=lvl; d.textContent=t;
+  el.appendChild(d);
+  while(el.childNodes.length>200) el.removeChild(el.firstChild);
+  el.scrollTop=el.scrollHeight;
+}
+function connect(){
+  if(es) es.close();
+  es=new EventSource('/events');
+  es.onmessage=e=>{
+    const m=JSON.parse(e.data);
+    if(m.type==='log'){ addLine(m.w,m.lvl,m.t); const c=$('w'+m.w+'c');
+      if(m.lvl==='ok'&&c) c.textContent=(+c.textContent+1); }
+    else if(m.type==='stats'){
+      $('s_ok').textContent=m.ok; $('s_fail').textContent=m.fail;
+      $('s_rate').textContent=m.rate; $('s_day').textContent=m.perday.toLocaleString();
+      $('s_time').textContent=m.elapsed;
+      setLive(m.running);
+    }
+    else if(m.type==='started'){ buildGrid(m.workers); setLive(true); }
+    else if(m.type==='stopped'){ setLive(false); }
+  };
+}
+function setLive(on){ $('livedot').classList.toggle('live',on);
+  $('livetxt').textContent=on?'RUNNING':'idle';
+  $('start').disabled=on; $('stop').disabled=!on; }
+
+$('start').onclick=async()=>{
+  const body={ mode:$('mode').value, workers:+$('workers').value, target:+$('target').value,
+               setup:$('setup').checked, proxies:$('proxies').value };
+  buildGrid(body.workers);
+  await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+};
+$('stop').onclick=()=>fetch('/api/stop',{method:'POST'});
+
+buildGrid(15);
+connect();
+</script>
+</body>
+</html>

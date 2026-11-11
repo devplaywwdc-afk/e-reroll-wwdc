@@ -26,6 +26,21 @@ eFootball 11.1.1 has no forced playable tutorial; MyClub entry is the only requi
 The starter squad template is `entry_barcelona.json` (FC Barcelona, team 108); per-account
 player/coach serials are regenerated as `user_id*1e9 + offset`.
 
+## GUI (web dashboard, like the rental tools)
+Double-click **`pes_api/gui/START_REROLL_GUI.bat`** → opens a local web dashboard (auto-picks a
+free port, like the Cookie Run launcher). One grid pane = one worker's live log (green `[+]` =
+created, red `[!]` = throttled/500), with success/fail/rate/per-day stats on top.
+
+- **Mode switch:**
+  - `Direct` — spray from this machine's IP, keep only the accounts that succeed, discard the rest
+    (same idea as the rental tools flooding until the backend 500s).
+  - `Proxy rotation` — paste a proxy list (one per line); each worker uses one and auto-rotates to
+    the next when its IP gets throttled. Use **HTTP(S) or SOCKS5**, prefer **rotating residential /
+    mobile** proxies (datacenter gets flagged); format `http://user:pass@host:port` or
+    `socks5://host:port` (SOCKS needs `pip install requests[socks]`).
+- **Workers** default 15 (matches the 15-window rental layout). **เป้า** 0 = unlimited.
+- Click the .bat again to open another independent dashboard on the next port.
+
 ## Reroll — fast / parallel (for scale)
 ```bash
 python pes_api/reroll_fast.py 500 --workers 8        # parallel, adaptive pacing
