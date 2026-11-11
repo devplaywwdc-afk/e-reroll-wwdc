@@ -50,3 +50,8 @@ pes_api/daily.log
 pes_api/efootbase_cache.json
 
 pes_api/gacha_hits/
+
+injector_app/build/
+injector_app/dist/
+injector_app/backups/
+injector_app/__pycache__/
