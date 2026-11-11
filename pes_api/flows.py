@@ -165,6 +165,29 @@ def login(client: cl.GateClient, user_id: int, auth_code: str,
     return client.send("CMD_LOGIN", t)
 
 
+def get_konami_link(client, user_id, session_id, lang="th") -> dict:
+    """Get the KONAMI ID account-link URL for this account (pure API, no game UI).
+    Returns {url, expires, link_status}. The URL lets a buyer bind the account to their own
+    KONAMI ID at my.konami.net; it is short-lived (see `expires`)."""
+    b = _commons("CMD_GET_IS_KONAMIID_LINK", user_id, session_id, LOGIN_HASH)
+    b.update({
+        "steam_id": "NotImplement", "xuid": "NotImplement", "account_id": "NotImplement",
+        "platform": "ANDROID", "region": "REGION_ASIA",
+        "is_needless_url": "NO", "is_need_info_url": "YES",
+    })
+    r = client.send("CMD_GET_IS_KONAMIID_LINK", b)
+    url = r.get("mykonami_url", "")
+    # the in-game webview uses a locale path (/th/...); insert it to match
+    if url and lang and "/account-link/" in url and f"/{lang}/account-link/" not in url:
+        url = url.replace("my.konami.net/account-link/", f"my.konami.net/{lang}/account-link/")
+    return {
+        "url": url,
+        "expires": r.get("url_expiration_date", 0),
+        "link_status": r.get("link_status"),
+        "result": r.get("result"),
+    }
+
+
 def get_mailbox(client, user_id, session_id):
     return client.send("CMD_GET_MAILBOX_INFO",
                        _commons("CMD_GET_MAILBOX_INFO", user_id, session_id, LOGIN_HASH))

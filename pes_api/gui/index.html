@@ -43,7 +43,23 @@
 </head>
 <body>
 <header>
-  <h1>⚽ PES Reroll Farm</h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="logo" style="width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center">
+      <!-- default eFootball-style emblem; overridden by logo.png if present -->
+      <svg viewBox="0 0 48 48" width="40" height="40" aria-hidden="true">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#00e0ff"/><stop offset="1" stop-color="#ff2bd1"/></linearGradient></defs>
+        <circle cx="24" cy="24" r="21" fill="none" stroke="url(#g)" stroke-width="4"/>
+        <rect x="11" y="21.5" width="26" height="5" rx="2.5" fill="url(#g)"/>
+      </svg>
+    </span>
+    <div style="line-height:1.05">
+      <h1 style="margin:0;background:linear-gradient(90deg,#00e0ff,#ff2bd1);-webkit-background-clip:text;
+                 background-clip:text;color:transparent;font-weight:800;font-size:17px">E-FOOTBALL REROLL</h1>
+      <a href="https://t.me/j3xdr" target="_blank"
+         style="color:var(--muted);font-size:11px;text-decoration:none">credit: t.me/j3xdr</a>
+    </div>
+  </div>
   <div class="grp">
     <label>โหมด</label>
     <select id="mode">
@@ -75,6 +91,28 @@
     </div>
   </div>
 </header>
+
+<div id="linkbar" style="padding:8px 14px;border-bottom:1px solid var(--edge);background:#0e1420;
+     display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <b style="color:var(--info)">🔗 KONAMI ID Link</b>
+  <input id="lk_acc" list="lk_list" placeholder="user_code (เช่น ASCV...)" style="width:200px">
+  <datalist id="lk_list"></datalist>
+  <button id="lk_get" style="background:#1b3a2a;color:#9af0bf;padding:6px 14px">ขอ Link</button>
+  <input id="lk_url" readonly placeholder="link จะขึ้นที่นี่" style="flex:1;min-width:280px;color:var(--info)">
+  <button id="lk_copy" style="background:#263040;color:#c7d0e0;padding:6px 12px">คัดลอก</button>
+  <span id="lk_cd" style="color:var(--muted);font-variant-numeric:tabular-nums"></span>
+</div>
+
+<div id="genbar" style="padding:8px 14px;border-bottom:1px solid var(--edge);background:#0b1019">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b style="color:#ffcf6b">📄 Gen Link (อัปโหลด .txt หลายไฟล์)</b>
+    <input id="gl_files" type="file" accept=".txt" multiple>
+    <span id="gl_cnt" style="color:var(--muted)">ยังไม่เลือกไฟล์</span>
+    <button id="gl_run" style="background:#3a3320;color:#ffcf6b;padding:6px 14px" disabled>▶ ดึง Link ทั้งหมด</button>
+    <span class="hint">1 ไฟล์ = 1 ไอดี · เรียงตามลำดับไฟล์ · ขอ Link ใหม่ได้เมื่อครบ 10 นาที</span>
+  </div>
+  <div id="gl_tbl" style="margin-top:8px"></div>
+</div>
 
 <div id="grid"></div>
 
@@ -129,8 +167,115 @@ $('start').onclick=async()=>{
 };
 $('stop').onclick=()=>fetch('/api/stop',{method:'POST'});
 
+// ---- KONAMI ID link tool ----
+let lkTimer=null, lkExp=0;
+async function loadAccounts(){
+  try{ const r=await (await fetch('/api/accounts')).json();
+    $('lk_list').innerHTML=(r.accounts||[]).map(a=>`<option value="${a}">`).join(''); }catch(e){}
+}
+function startCountdown(){
+  clearInterval(lkTimer);
+  lkTimer=setInterval(async()=>{
+    const left=lkExp-Math.floor(Date.now()/1000);
+    if(left<=0){ $('lk_cd').textContent='หมดอายุ — กำลังขอใหม่...'; clearInterval(lkTimer); getLink(); return; }
+    const m=String(Math.floor(left/60)).padStart(2,'0'), s=String(left%60).padStart(2,'0');
+    $('lk_cd').textContent=`เหลือ ${m}:${s}`;
+    $('lk_cd').style.color = left<60?'var(--err)':'var(--muted)';
+  },1000);
+}
+async function getLink(){
+  const uc=$('lk_acc').value.trim(); if(!uc) return;
+  $('lk_cd').textContent='กำลังขอ...'; $('lk_url').value='';
+  try{
+    const r=await (await fetch('/api/link?user_code='+encodeURIComponent(uc))).json();
+    if(r.error){ $('lk_cd').textContent='ผิดพลาด: '+r.error; return; }
+    $('lk_url').value=r.url; lkExp=r.expires; startCountdown();
+  }catch(e){ $('lk_cd').textContent='error '+e; }
+}
+$('lk_get').onclick=getLink;
+$('lk_copy').onclick=()=>{ $('lk_url').select(); document.execCommand('copy'); $('lk_cd').textContent='คัดลอกแล้ว ✓'; };
+
+// ---- Gen Link: batch upload .txt (1 file = 1 id), ordered ----
+const COOLDOWN=600;  // 10 min between link requests per account
+let glAccts=[];      // parsed account objects, in file order
+let glState={};      // user_code -> {expires, lastFetch}
+
+$('gl_files').onchange=async(e)=>{
+  const files=[...e.target.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  glAccts=[];
+  for(const f of files){
+    try{
+      const txt=await f.text();
+      const o=JSON.parse(txt.trim());
+      if(o.user_id && o.auth_code) glAccts.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),
+        user_id:o.user_id, auth_code:o.auth_code, device_identifier:o.device_identifier||null});
+    }catch(err){ /* skip bad file */ }
+  }
+  $('gl_cnt').textContent=`โหลด ${glAccts.length} ไอดี`;
+  $('gl_run').disabled=glAccts.length===0;
+  renderGlTable(glAccts.map(a=>({user_code:a.user_code})));
+};
+
+function renderGlTable(rows){
+  const h=['<table style="width:100%;border-collapse:collapse;font-size:12px">',
+    '<tr style="color:var(--muted);text-align:left"><th style="padding:4px">#</th><th>user_code</th><th>Link</th><th>สถานะ/เวลา</th><th></th></tr>'];
+  rows.forEach((r,i)=>{
+    h.push(`<tr style="border-top:1px solid var(--edge)">
+      <td style="padding:4px">${i+1}</td>
+      <td style="color:#fff">${r.user_code}</td>
+      <td><input id="glu${i}" readonly value="${r.url||''}" style="width:100%;color:var(--info)" placeholder="—"></td>
+      <td id="glc${i}" style="color:var(--muted);white-space:nowrap">${r.error? '<span style="color:var(--err)">'+r.error+'</span>':''}</td>
+      <td><button data-i="${i}" class="glcopy" style="padding:4px 8px;background:#263040;color:#c7d0e0">คัดลอก</button>
+          <button data-i="${i}" class="glref" style="padding:4px 8px;background:#1b3a2a;color:#9af0bf">ขอใหม่</button></td>
+    </tr>`);
+  });
+  h.push('</table>');
+  $('gl_tbl').innerHTML=h.join('');
+  document.querySelectorAll('.glcopy').forEach(b=>b.onclick=()=>{const el=$('glu'+b.dataset.i);el.select();document.execCommand('copy');});
+  document.querySelectorAll('.glref').forEach(b=>b.onclick=()=>fetchOne(+b.dataset.i));
+}
+
+async function fetchOne(i){
+  const a=glAccts[i]; const st=glState[a.user_code]||{};
+  const since=(Date.now()/1000)-(st.lastFetch||0);
+  if(st.lastFetch && since<COOLDOWN){
+    $('glc'+i).innerHTML=`<span style="color:var(--err)">ขอใหม่ได้ใน ${Math.ceil((COOLDOWN-since))}s</span>`; return;
+  }
+  $('glc'+i).textContent='กำลังขอ...';
+  const r=await (await fetch('/api/genlink',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({accounts:[a]})})).json();
+  const res=(r.results||[])[0]||{};
+  if(res.error){ $('glc'+i).innerHTML='<span style="color:var(--err)">'+res.error+'</span>'; return; }
+  $('glu'+i).value=res.url||''; glState[a.user_code]={expires:res.expires, lastFetch:Date.now()/1000};
+}
+
+$('gl_run').onclick=async()=>{
+  renderGlTable(glAccts.map(a=>({user_code:a.user_code})));
+  for(let i=0;i<glAccts.length;i++){ await fetchOne(i); }
+};
+
+// one countdown ticker updates all Gen Link rows
+setInterval(()=>{
+  glAccts.forEach((a,i)=>{
+    const st=glState[a.user_code]; const c=$('glc'+i); if(!st||!c) return;
+    const left=(st.expires||0)-Math.floor(Date.now()/1000);
+    const cd=COOLDOWN-((Date.now()/1000)-(st.lastFetch||0));
+    if(left>0){ const m=String(Math.floor(left/60)).padStart(2,'0'),s=String(left%60).padStart(2,'0');
+      c.innerHTML=`<span style="color:${left<60?'var(--err)':'var(--ok)'}">valid ${m}:${s}</span>`; }
+    else { c.innerHTML = cd>0 ? `<span style="color:var(--err)">หมดอายุ · ขอใหม่ได้ใน ${Math.ceil(cd)}s</span>`
+                               : `<span style="color:var(--muted)">หมดอายุ · กด "ขอใหม่" ได้</span>`; }
+  });
+},1000);
+
+// use logo.png if the user dropped one into pes_api/gui/
+(()=>{ const im=new Image();
+  im.onload=()=>{ $('logo').innerHTML=`<img src="logo.png?x=${Date.now()}" style="width:40px;height:40px;border-radius:9px;object-fit:cover">`; };
+  im.src='logo.png?x='+Date.now();
+})();
+
 buildGrid(15);
 connect();
+loadAccounts();
 </script>
 </body>
 </html>

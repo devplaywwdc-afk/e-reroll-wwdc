@@ -12,6 +12,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 from engine import ENGINE
+import flows
+import client as cl
+import accounts
 
 PORT = int(os.environ.get("PORT") or os.environ.get("HOST_PORT") or 8080)
 INDEX = os.path.join(HERE, "index.html")
@@ -33,13 +36,62 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/" or self.path.startswith("/index"):
             with open(INDEX, "rb") as f:
                 self._send(200, f.read(), "text/html; charset=utf-8")
+        elif self.path.lstrip("/") in ("logo.png", "logo.jpg", "logo.webp"):
+            name = self.path.lstrip("/")
+            fp = os.path.join(HERE, name)
+            if os.path.exists(fp):
+                ctype = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}[name.split(".")[-1]]
+                with open(fp, "rb") as f:
+                    self._send(200, f.read(), ctype)
+            else:
+                self._send(404, b"")
         elif self.path == "/events":
             self._sse()
         elif self.path == "/api/status":
             self._send(200, json.dumps({"running": ENGINE.running, "cfg": ENGINE.cfg,
                                         "ok": ENGINE.stats["ok"], "fail": ENGINE.stats["fail"]}))
+        elif self.path == "/api/accounts":
+            accs = [a["user_code"] for a in accounts.load_all()]
+            self._send(200, json.dumps({"accounts": accs, "count": len(accs)}))
+        elif self.path.startswith("/api/link"):
+            from urllib.parse import urlparse, parse_qs
+            uc = (parse_qs(urlparse(self.path).query).get("user_code") or [""])[0]
+            self._send(200, json.dumps(self._konami_link(uc), ensure_ascii=False))
         else:
             self._send(404, b"{}")
+
+    def _link_for(self, a):
+        """Fetch a KONAMI link for an uploaded account dict (may not be in local accounts/)."""
+        uc = a.get("user_code", "?")
+        try:
+            uid = int(a["user_id"])
+            auth = a["auth_code"]
+        except Exception:
+            return {"user_code": uc, "error": "bad account file (need user_id + auth_code)"}
+        devid = a.get("device_identifier")  # optional; login works without the original device
+        try:
+            c = cl.GateClient(user_code=uc)
+            sid = flows.login(c, uid, auth, devid).get("session_id")
+            if not sid:
+                return {"user_code": uc, "error": "login failed (bad auth_code?)"}
+            r = flows.get_konami_link(c, uid, sid)
+            r["user_code"] = uc
+            return r
+        except Exception as e:
+            return {"user_code": uc, "error": f"{type(e).__name__}: {e}"}
+
+    def _konami_link(self, user_code):
+        a = next((x for x in accounts.load_all() if x["user_code"] == user_code), None)
+        if not a:
+            return {"error": "account not found"}
+        try:
+            c = cl.GateClient(user_code=user_code)
+            sid = flows.login(c, a["user_id"], a["auth_code"], a.get("device_identifier")).get("session_id")
+            if not sid:
+                return {"error": "login failed"}
+            return flows.get_konami_link(c, a["user_id"], sid)
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
 
     def do_POST(self):
         ln = int(self.headers.get("Content-Length", 0))
@@ -48,6 +100,13 @@ class H(BaseHTTPRequestHandler):
             data = json.loads(raw or b"{}")
         except Exception:
             data = {}
+        if self.path == "/api/genlink":
+            accs = data.get("accounts") or []
+            out = []
+            for a in accs:
+                out.append(self._link_for(a))
+            self._send(200, json.dumps({"results": out}, ensure_ascii=False))
+            return
         if self.path == "/api/start":
             proxies = [p.strip() for p in (data.get("proxies") or "").splitlines()
                        if p.strip() and not p.strip().startswith("#")]
