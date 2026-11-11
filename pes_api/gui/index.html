@@ -183,6 +183,7 @@
                 <div class="field"><label>เป้า (0=ไม่จำกัด)</label><input id="target" type="number" value="0" min="0"></div>
               </div>
               <label style="font-size:12px;color:var(--txt2)"><input id="setup" type="checkbox" style="width:auto;vertical-align:-1px"> ไอดีพร้อมใช้ (เข้า MyClub, ช้าลง)</label>
+              <label style="font-size:12px;color:var(--txt2)"><input id="claim" type="checkbox" checked style="width:auto;vertical-align:-1px"> รับของเริ่มต้น + Daily เลย (GP/เหรียญ) — ต้องเปิด MyClub ด้วย</label>
               <div class="field proxywrap" id="proxywrap" style="display:none">
                 <label>Proxy list (1 บรรทัด 1 proxy)</label>
                 <textarea id="proxies" placeholder="http://user:pass@host:port&#10;socks5://host:port"></textarea>
@@ -367,7 +368,7 @@ function connect(){if(es)es.close();es=new EventSource('/events');
     else if(m.type==='dstopped'){dSetLive(false);}
     else if(m.type==='deleted'){m.codes.forEach(uc=>{const tr=$('dr_'+uc);if(tr)tr.remove();});$('d_failbar').style.display='none';}
   };}
-$('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,setup:$('setup').checked,proxies:$('proxies').value};
+$('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,setup:$('setup').checked,claim:$('claim').checked,proxies:$('proxies').value};
   buildGrid(body.workers);await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
 $('stop').onclick=()=>fetch('/api/stop',{method:'POST'});
 

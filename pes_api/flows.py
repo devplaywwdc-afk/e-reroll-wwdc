@@ -229,25 +229,77 @@ def account_status(client, user_id, session_id, mailbox=None):
             "mailbox": len(mb.get("present_list", [])) if isinstance(mb, dict) else 0}
 
 
-def claim_daily(client, user_id, session_id):
-    """Claim everything in the mailbox (daily login bonus goes here). Returns the
-    claimed items (type/name/count) + whether any LOGIN_BONUS was among them."""
-    mb = get_mailbox(client, user_id, session_id)
-    pres = mb.get("present_list", []) if isinstance(mb, dict) else []
-    ids = [p["present_id"] for p in pres]
+def claim_daily(client, user_id, session_id, retries: int = 6, wait: float = 3.0):
+    """Claim everything in the mailbox (daily login bonus lands here).
+
+    A brand-new account hasn't "settled" server-side: RECV_PRESENT may even ACK SUCCESS_ADDED
+    and then roll back, so we DON'T trust the ack — we re-read the mailbox and only count a
+    present as claimed once it has actually disappeared from the box. We also call
+    GET_LOGIN_BONUS_INFO each round (the daily-login popup is what makes the bonus claimable),
+    and retry until the box drains or `retries` runs out.
+    Returns the claimed items (type/name/count) + whether any LOGIN_BONUS was among them."""
+    import time as _t
     claimed = []
-    had_login_bonus = any(p.get("reason") == "LOGIN_BONUS" for p in pres)
-    if ids:
-        rr = recv_present(client, user_id, session_id, ids)
-        if rr.get("result") == "NOERR":
-            for it in rr.get("receive_result_list", []):
-                i = it.get("item", {})
-                claimed.append({"type": i.get("present_type"), "name": i.get("name"),
-                                "count": i.get("count"), "title": i.get("title"),
-                                "reason": i.get("reason")})
-        else:
-            return {"result": rr.get("result"), "claimed": [], "had_login_bonus": had_login_bonus}
+    had_login_bonus = False
+    seen = {}  # present_id -> item dict (from the mailbox, before claim)
+    for attempt in range(max(1, retries)):
+        try:
+            get_login_bonus(client, user_id, session_id)  # "opens" today's bonus
+        except Exception:
+            pass
+        mb = get_mailbox(client, user_id, session_id)
+        pres = mb.get("present_list", []) if isinstance(mb, dict) else []
+        if any(p.get("reason") == "LOGIN_BONUS" for p in pres):
+            had_login_bonus = True
+        for p in pres:
+            seen.setdefault(p.get("present_id"), p)
+        if not pres:
+            break  # box empty -> everything (if any) is done
+        recv_present(client, user_id, session_id, [p["present_id"] for p in pres])
+        _t.sleep(1.0)
+        mb2 = get_mailbox(client, user_id, session_id)
+        remaining = {p.get("present_id") for p in (mb2.get("present_list") or [])}
+        gone = [pid for pid in [p["present_id"] for p in pres] if pid not in remaining]
+        for pid in gone:
+            i = seen.get(pid, {})
+            claimed.append({"type": i.get("present_type"), "name": i.get("name"),
+                            "count": i.get("count"), "title": i.get("title"),
+                            "reason": i.get("reason")})
+        if not remaining:
+            break  # fully drained
+        if attempt < retries - 1:
+            _t.sleep(wait)  # still settling -> wait and try the leftovers again
     return {"result": "NOERR", "claimed": claimed, "had_login_bonus": had_login_bonus}
+
+
+def claim_starter(user_id, auth_code, device_identifier=None, user_code=None,
+                  tries: int = 7, wait: float = 4.0):
+    """Durably claim a freshly-rerolled account's starter box + first daily-login bonus.
+
+    A new account needs ~10-30s to "settle": before that, RECV_PRESENT drains the box only
+    transiently (the server restores it). So we use a FRESH login each round and treat the
+    claim as done only once a later round sees the mailbox empty with GP credited.
+    Returns {claimed, gp, coins, efp, had_login_bonus}."""
+    import time as _t
+    claimed_all = []
+    for _ in range(max(1, tries)):
+        c = cl.GateClient(user_code=user_code)
+        sid = login(c, user_id, auth_code, device_identifier).get("session_id")
+        if not sid:
+            _t.sleep(wait); continue
+        st0 = account_status(c, user_id, sid)
+        if st0["mailbox"] == 0 and (st0["gp"] > 0 or claimed_all):
+            return {"claimed": claimed_all, "gp": st0["gp"], "coins": st0["coins"],
+                    "efp": st0["efp"], "had_login_bonus": bool(claimed_all)}
+        cd = claim_daily(c, user_id, sid, retries=1)
+        if cd["claimed"]:
+            claimed_all = cd["claimed"]
+        _t.sleep(wait)
+    c = cl.GateClient(user_code=user_code)
+    sid = login(c, user_id, auth_code, device_identifier).get("session_id")
+    st = account_status(c, user_id, sid) if sid else {"gp": 0, "coins": 0, "efp": 0}
+    return {"claimed": claimed_all, "gp": st["gp"], "coins": st["coins"],
+            "efp": st["efp"], "had_login_bonus": bool(claimed_all)}
 
 
 def get_login_bonus(client, user_id, session_id):

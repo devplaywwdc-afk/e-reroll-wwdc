@@ -77,7 +77,7 @@ class Counter:
             self.fail += 1
 
 
-def worker(wid, gov: Governor, cnt: Counter, proxy, do_setup, lock):
+def worker(wid, gov: Governor, cnt: Counter, proxy, do_setup, lock, do_claim=True):
     c = cl.GateClient(proxy=proxy)
     while cnt.take():
         try:
@@ -97,6 +97,11 @@ def worker(wid, gov: Governor, cnt: Counter, proxy, do_setup, lock):
                 sid = lr.get("session_id")
                 if sid:
                     flows.finish_setup(c, uid, sid)
+                    if do_claim:
+                        try:
+                            flows.claim_starter(uid, auth, devid, uc)  # durable starter+daily
+                        except Exception:
+                            pass
             with lock:
                 accounts.save(uc, auth, uid, devid)
             n = cnt.win()
@@ -109,7 +114,7 @@ def worker(wid, gov: Governor, cnt: Counter, proxy, do_setup, lock):
         gov.wait()
 
 
-def reroll_fast(count, workers=4, proxies=None, do_setup=True):
+def reroll_fast(count, workers=4, proxies=None, do_setup=True, do_claim=True):
     gov = Governor()
     cnt = Counter(count)
     save_lock = threading.Lock()
@@ -117,7 +122,7 @@ def reroll_fast(count, workers=4, proxies=None, do_setup=True):
     ths = []
     for i in range(workers):
         px = proxies[i % len(proxies)]
-        t = threading.Thread(target=worker, args=(i, gov, cnt, px, do_setup, save_lock))
+        t = threading.Thread(target=worker, args=(i, gov, cnt, px, do_setup, save_lock, do_claim))
         t.start()
         ths.append(t)
     t0 = time.time()
@@ -134,10 +139,12 @@ if __name__ == "__main__":
     ap.add_argument("count", type=int)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--no-setup", action="store_true", help="create-only, skip MyClub entry")
+    ap.add_argument("--no-claim", action="store_true", help="skip claiming starter GP / daily bonus")
     ap.add_argument("--proxies", help="file with one proxy URL per line (http://host:port)")
     a = ap.parse_args()
     px = None
     if a.proxies:
         px = [l.strip() for l in open(a.proxies) if l.strip() and not l.startswith("#")]
         print(f"loaded {len(px)} proxies")
-    reroll_fast(a.count, workers=a.workers, proxies=px, do_setup=not a.no_setup)
+    reroll_fast(a.count, workers=a.workers, proxies=px,
+                do_setup=not a.no_setup, do_claim=not a.no_claim)

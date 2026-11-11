@@ -67,19 +67,19 @@ class Engine:
         })
 
     # ---- control ----
-    def start(self, mode="direct", workers=15, target=0, proxies=None, do_setup=False):
+    def start(self, mode="direct", workers=15, target=0, proxies=None, do_setup=False, do_claim=True):
         if self.running:
             return False
         proxies = proxies or []
         self.cfg = dict(mode=mode, workers=workers, target=target, do_setup=do_setup,
-                        nproxies=len(proxies))
+                        do_claim=do_claim, nproxies=len(proxies))
         self.stats.clear()
         self.per_worker.clear()
         self.running = True
         self.start_ts = time.time()
         self.workers = []
         for i in range(workers):
-            t = threading.Thread(target=self._worker, args=(i, mode, proxies, do_setup), daemon=True)
+            t = threading.Thread(target=self._worker, args=(i, mode, proxies, do_setup, do_claim), daemon=True)
             t.start()
             self.workers.append(t)
         threading.Thread(target=self._stats_loop, daemon=True).start()
@@ -110,7 +110,7 @@ class Engine:
         return t and self.stats["ok"] >= t
 
     # ---- worker ----
-    def _worker(self, wid, mode, proxies, do_setup):
+    def _worker(self, wid, mode, proxies, do_setup, do_claim=True):
         pidx = wid % max(1, len(proxies)) if proxies else 0
         proxy = proxies[pidx] if (mode == "proxy" and proxies) else None
         c = cl.GateClient(proxy=proxy, max_retries=0)  # spray: no internal retry, we loop fast
@@ -131,6 +131,12 @@ class Engine:
                             if sid:
                                 flows.finish_setup(c, uid, sid)
                                 setup = " +myclub"
+                                if do_claim:
+                                    try:
+                                        cd = flows.claim_starter(uid, auth, devid, uc)
+                                        setup += f" +GP{cd['gp']}"
+                                    except Exception:
+                                        setup += " (claim fail)"
                         except Exception:
                             setup = " (setup fail)"
                     with self.save_lock:

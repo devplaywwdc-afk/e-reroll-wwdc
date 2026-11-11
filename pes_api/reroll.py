@@ -13,7 +13,7 @@ import flows
 import accounts
 
 
-def reroll(count: int, delay: float = 1.0):
+def reroll(count: int, delay: float = 1.0, claim: bool = True):
     c = cl.GateClient()
     made = []
     for i in range(count):
@@ -29,17 +29,22 @@ def reroll(count: int, delay: float = 1.0):
             devid = resp.get("_device_identifier")
             # enter MyClub (pick starter team) so the account is lobby-ready (no tutorial)
             setup = "skipped"
+            got = ""
             try:
                 lr = flows.login(c, uid, auth, devid)
                 sid = lr.get("session_id")
                 if sid:
                     er = flows.finish_setup(c, uid, sid)
                     setup = er.get("result", "?")
+                    # claim the starter box + first daily (durable; waits out the settle delay)
+                    if claim:
+                        cd = flows.claim_starter(uid, auth, devid, uc)
+                        got = f"  got={len(cd['claimed'])} items  GP={cd['gp']} coin={cd['coins']}"
             except Exception as e:
                 setup = f"err:{e}"
             accounts.save(uc, auth, uid, devid)
             made.append(uc)
-            print(f"[{i+1}/{count}] OK  {uc}  uid={uid}  myclub={setup}")
+            print(f"[{i+1}/{count}] OK  {uc}  uid={uid}  myclub={setup}{got}")
         except Exception as e:
             print(f"[{i+1}/{count}] ERROR: {e}")
         time.sleep(delay + random.random())
@@ -49,4 +54,5 @@ def reroll(count: int, delay: float = 1.0):
 
 if __name__ == "__main__":
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    reroll(n)
+    claim = "--no-claim" not in sys.argv   # default: claim starter GP/daily
+    reroll(n, claim=claim)

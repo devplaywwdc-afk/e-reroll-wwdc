@@ -164,6 +164,7 @@ class H(BaseHTTPRequestHandler):
                 target=int(data.get("target", 0)),
                 proxies=proxies,
                 do_setup=bool(data.get("setup", False)),
+                do_claim=bool(data.get("claim", True)),
             )
             self._send(200, json.dumps({"ok": ok, "workers": int(data.get("workers", 15))}))
         elif self.path == "/api/stop":
