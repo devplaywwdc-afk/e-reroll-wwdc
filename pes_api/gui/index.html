@@ -281,6 +281,8 @@
                 <div class="field"><label>&nbsp;</label><button class="btn btn-primary btn-sm" id="ck_run">▶ เช็คทั้งหมด</button></div>
                 <span class="hint" id="ck_prog"></span>
               </div>
+              <div id="ck_barwrap" style="display:none;height:8px;background:var(--glass);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:2px 0 12px">
+                <div id="ck_bar" style="height:100%;width:0;background:linear-gradient(90deg,var(--g),var(--p));transition:width .25s"></div></div>
               <div id="ck_tbl"></div>
             </div>
           </div>
@@ -367,6 +369,9 @@ function connect(){if(es)es.close();es=new EventSource('/events');
     else if(m.type==='dstarted'){dRows={};$('d_tbl').innerHTML='';dSetLive(true);}
     else if(m.type==='dstopped'){dSetLive(false);}
     else if(m.type==='deleted'){m.codes.forEach(uc=>{const tr=$('dr_'+uc);if(tr)tr.remove();});$('d_failbar').style.display='none';}
+    else if(m.type==='cstart'){ckStart(m.total);}
+    else if(m.type==='crow'){ckRow(m.rep,m.done,m.total);}
+    else if(m.type==='cdone'){ckDone(m.total);}
   };}
 $('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,setup:$('setup').checked,claim:$('claim').checked,proxies:$('proxies').value};
   buildGrid(body.workers);await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
@@ -397,22 +402,29 @@ $('ck_src').onchange=()=>$('ck_upwrap').style.display=$('ck_src').value==='uploa
 $('ck_files').onchange=async(e)=>{const fs=[...e.target.files];ckUploaded=[];
   for(const f of fs){try{const o=JSON.parse((await f.text()).trim());if(o.user_id&&o.auth_code)ckUploaded.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),user_id:o.user_id,auth_code:o.auth_code,device_identifier:o.device_identifier||null});}catch(err){}}
   $('ck_cnt').textContent=`โหลด ${ckUploaded.length} ไอดี`;};
+function ckRowHtml(a,i){
+  if(a.error)return `<tr><td style="color:#fff">${a.user_code}</td><td colspan="6" style="color:var(--r)">${a.error}</td></tr>`;
+  const top=(a.players||[]).slice(0,3).map(p=>`${p.name||('#'+p.id)}(${p.overall||'?'})`).join(', ');
+  return `<tr><td style="color:#fff">${a.user_code}</td><td style="color:var(--b)">🟦${(a.gp||0).toLocaleString()}</td>
+    <td style="color:var(--y)">🟡${a.coins}</td><td style="color:var(--p)">⚡${a.efp}</td>
+    <td>${a.player_count}</td><td style="color:var(--txt2);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${top}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="ckView(${i})">ดูการ์ด</button></td></tr>
+    <tr id="ckd${i}" style="display:none"><td colspan="7"><div id="ckg${i}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding:6px"></div></td></tr>`;
+}
+function ckBar(done,total){const pct=total?Math.round(done/total*100):0;$('ck_bar').style.width=pct+'%';
+  $('ck_prog').textContent=done>=total?`เช็คเสร็จ ${total} ไอดี`:`กำลังเช็ค ${done}/${total}... (${pct}%)`;}
 $('ck_run').onclick=async()=>{
   let accs=null; if($('ck_src').value==='upload')accs=ckUploaded||[];
-  $('ck_prog').textContent='กำลังเช็ค... (รอสักครู่)';$('ck_tbl').innerHTML='';
-  const r=await (await fetch('/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(accs?{accounts:accs}:{})})).json();
-  const res=r.results||[];$('ck_prog').textContent=`เช็คเสร็จ ${res.length} ไอดี`;
-  let h='<table><tr><th>user_code</th><th>GP</th><th>Coins</th><th>EFP</th><th>นักเตะ</th><th>Top</th><th></th></tr>';
-  res.forEach((a,i)=>{
-    if(a.error){h+=`<tr><td style="color:#fff">${a.user_code}</td><td colspan="6" style="color:var(--r)">${a.error}</td></tr>`;return;}
-    const top=(a.players||[]).slice(0,3).map(p=>`${p.name||('#'+p.id)}(${p.overall||'?'})`).join(', ');
-    h+=`<tr><td style="color:#fff">${a.user_code}</td><td style="color:var(--b)">🟦${(a.gp||0).toLocaleString()}</td>
-      <td style="color:var(--y)">🟡${a.coins}</td><td style="color:var(--p)">⚡${a.efp}</td>
-      <td>${a.player_count}</td><td style="color:var(--txt2);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${top}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="ckView(${i})">ดูการ์ด</button></td></tr>
-      <tr id="ckd${i}" style="display:none"><td colspan="7"><div id="ckg${i}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding:6px"></div></td></tr>`;
-  });
-  h+='</table>';$('ck_tbl').innerHTML=h;window._ckres=res;};
+  window._ckres=[]; $('ck_tbl').innerHTML=''; $('ck_bar').style.width='0';
+  $('ck_barwrap').style.display='block'; $('ck_prog').textContent='เริ่มเช็ค...'; $('ck_run').disabled=true;
+  await fetch('/api/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(accs?{accounts:accs}:{})});
+};
+function ckStart(total){window._ckres=[];
+  $('ck_tbl').innerHTML='<table><tr><th>user_code</th><th>GP</th><th>Coins</th><th>EFP</th><th>นักเตะ</th><th>Top</th><th></th></tr><tbody id="ck_body"></tbody></table>';
+  ckBar(0,total);}
+function ckRow(rep,done,total){const i=window._ckres.length;window._ckres.push(rep);
+  const b=$('ck_body'); if(b)b.insertAdjacentHTML('beforeend',ckRowHtml(rep,i)); ckBar(done,total);}
+function ckDone(total){ckBar(total,total);$('ck_run').disabled=false;setTimeout(()=>{$('ck_barwrap').style.display='none';},1200);}
 function ckView(i){const dr=$('ckd'+i);const show=dr.style.display==='none';dr.style.display=show?'table-row':'none';
   if(show&&!$('ckg'+i).innerHTML){$('ckg'+i).innerHTML=((window._ckres[i]||{}).players||[]).map(playerCard).join('');}}
 

@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, HERE)
 import queue
+import threading
 from engine import ENGINE
 from daily_engine import DAILY
 import flows
@@ -135,8 +136,26 @@ class H(BaseHTTPRequestHandler):
             data = {}
         if self.path == "/api/check":
             accs = data.get("accounts") or accounts.load_all()
-            out = [self._account_report(a) for a in accs]
-            self._send(200, json.dumps({"results": out}, ensure_ascii=False)); return
+            report = self._account_report
+
+            def run_check(accs):
+                import concurrent.futures as cf
+                total = len(accs)
+                ENGINE.emit({"type": "cstart", "total": total})
+                done = 0
+                with cf.ThreadPoolExecutor(max_workers=5) as ex:
+                    futs = {ex.submit(report, a): a for a in accs}
+                    for fu in cf.as_completed(futs):
+                        try:
+                            rep = fu.result()
+                        except Exception as e:
+                            rep = {"user_code": futs[fu].get("user_code", "?"), "error": str(e)}
+                        done += 1
+                        ENGINE.emit({"type": "crow", "done": done, "total": total, "rep": rep})
+                ENGINE.emit({"type": "cdone", "total": total})
+
+            threading.Thread(target=run_check, args=(accs,), daemon=True).start()
+            self._send(200, json.dumps({"ok": True, "total": len(accs)})); return
         if self.path == "/api/daily/start":
             up = data.get("accounts")  # optional uploaded accounts
             ok = DAILY.start(source=data.get("source", "folder"), uploaded=up,
