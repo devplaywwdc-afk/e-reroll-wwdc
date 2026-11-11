@@ -26,6 +26,22 @@ eFootball 11.1.1 has no forced playable tutorial; MyClub entry is the only requi
 The starter squad template is `entry_barcelona.json` (FC Barcelona, team 108); per-account
 player/coach serials are regenerated as `user_id*1e9 + offset`.
 
+## Reroll — fast / parallel (for scale)
+```bash
+python pes_api/reroll_fast.py 500 --workers 8        # parallel, adaptive pacing
+python pes_api/reroll_fast.py 500 --no-setup         # create-only (~2x faster, no MyClub)
+python pes_api/reroll_fast.py 500 --proxies proxies.txt   # one proxy/IP per line
+```
+The server **soft-throttles CREATE_USER per source IP** (`ERR_TEMP_UNAVAILABLE`, retryable, not a
+ban) and the throttle tightens the more you create from one IP. `reroll_fast` runs a worker pool
+with an **AIMD governor** (backs off on throttle, speeds up on success) so one IP stays at its safe
+max, and `client.py` retries soft throttles with jittered backoff.
+
+**Throughput (measured):** ~1 s/acct create, ~2 s/acct full-ready on a single unthrottled IP
+(≈40–90k/day). The server caps a single IP well below 1M/day. **1M/day ≈ 11.6 acct/s needs ~20–50
+source IPs** — a VPS fleet (one process per box, no proxy needed per box) or a proxy list via
+`--proxies`. The code is IP-agnostic; scale horizontally.
+
 ## Daily-login bot — claim rewards every day
 ```bash
 python pes_api/daily.py run         # one pass now: login every saved account + claim mailbox
