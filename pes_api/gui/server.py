@@ -181,6 +181,22 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(200, json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}))
             return
+        if self.path == "/api/gacha/pack-players":
+            agent_ids = data.get("agent_ids") or []
+            accs = data.get("accounts") or accounts.load_all()
+            if not accs:
+                self._send(200, json.dumps({"error": "ต้องมีไอดีอย่างน้อย 1 ตัวเพื่อสแกน pack"})); return
+            a = accs[0]
+            try:
+                c = cl.GateClient(user_code=a.get("user_code"))
+                sid = flows.login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier")).get("session_id")
+                if not sid:
+                    self._send(200, json.dumps({"error": "login failed"})); return
+                res = gacha.pack_players(c, int(a["user_id"]), sid, agent_ids)
+                self._send(200, json.dumps(res, ensure_ascii=False))
+            except Exception as e:
+                self._send(200, json.dumps({"error": f"{type(e).__name__}: {e}"}))
+            return
         if self.path == "/api/gacha/scan":
             accs = data.get("accounts") or accounts.load_all()
             if not accs:
@@ -201,6 +217,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/gacha/run":
             accs = data.get("accounts") or accounts.load_all()
             wanted = [w.strip() for w in (data.get("wanted") or []) if w.strip()]
+            wanted_ids = [int(x) for x in (data.get("wanted_ids") or [])]
             agent_id = int(data.get("gacha_agent", 0) or 0)
 
             def run_gacha(accs, wanted):
@@ -208,7 +225,7 @@ class H(BaseHTTPRequestHandler):
                 ENGINE.emit({"type": "gstart", "total": total, "wanted": wanted})
                 done = 0
                 for a in accs:
-                    rep = gacha.run_account(a, wanted, agent_id=agent_id)
+                    rep = gacha.run_account(a, wanted, agent_id=agent_id, wanted_ids=wanted_ids)
                     done += 1
                     ENGINE.emit({"type": "grow", "done": done, "total": total, "rep": rep})
                 ENGINE.emit({"type": "gdone", "total": total})
@@ -246,6 +263,7 @@ class H(BaseHTTPRequestHandler):
                 do_gacha=bool(data.get("gacha", False)),
                 gacha_agent=int(data.get("gacha_agent", 0) or 0),
                 wanted=[w.strip() for w in (data.get("wanted") or []) if w.strip()],
+                wanted_ids=[int(x) for x in (data.get("wanted_ids") or [])],
                 name_prefix=(data.get("prefix") or "").strip() or None,
             )
             self._send(200, json.dumps({"ok": ok, "workers": int(data.get("workers", 15))}))

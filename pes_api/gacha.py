@@ -32,6 +32,41 @@ def _buy_type(price):
     return "BUY_BY_COIN"  # ad/other free fallback
 
 
+def pack_players(client, uid, sid, agent_ids):
+    """For the given agent_ids, return each pack's featured (pickup) players enriched with
+    name/overall/position/card/art + rarity, so the user can tick who they want straight
+    from the pack. Grouped/ordered client-side by tier."""
+    b = flows._commons("CMD_GET_MYCLUB_AGENTLIST", uid, sid, flows.LOGIN_HASH)
+    r = client.send("CMD_GET_MYCLUB_AGENTLIST", b)
+    if not isinstance(r, dict) or r.get("result") != "NOERR":
+        return {"agents": [], "error": r.get("result") if isinstance(r, dict) else "bad response"}
+    want = {int(x) for x in agent_ids}
+    byid = {a.get("agent_id"): a for a in r.get("agent_list", [])}
+    allids = []
+    for aid in want:
+        for p in (byid.get(aid, {}).get("pickup_list") or []):
+            gid = p.get("gameplayer_id", {}).get("id")
+            if gid:
+                allids.append(gid)
+    info = efootbase.lookup_many(allids) if allids else {}
+    agents = []
+    for aid in want:
+        a = byid.get(aid)
+        if not a:
+            continue
+        players = []
+        for p in (a.get("pickup_list") or []):
+            gid = p.get("gameplayer_id", {}).get("id")
+            e = info.get(str(gid), {})
+            players.append({"id": gid, "name": e.get("name"), "overall": e.get("overall"),
+                            "position": e.get("position"), "card": e.get("card"),
+                            "art": e.get("art"), "rarity": p.get("default_rarity")})
+        players.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
+        agents.append({"agent_id": aid, "title": a.get("title"), "sub": a.get("subcategory"),
+                       "players": players})
+    return {"agents": agents}
+
+
 def scan_agents(client, uid, sid):
     """List all gacha agents and flag the free ones (0 coin & 0 GP for some count)."""
     b = flows._commons("CMD_GET_MYCLUB_AGENTLIST", uid, sid, flows.LOGIN_HASH)
@@ -128,11 +163,8 @@ def match_wanted(drawn_names, wanted):
 
 
 def folder_for(hits):
-    """1 hit -> 'jude_bellingham'; 2+ -> '2_jude_bellingham_lamine_yamal'."""
-    parts = [slug(h) for h in hits]
-    if len(parts) == 1:
-        return parts[0]
-    return f"{len(parts)}_" + "_".join(parts)
+    """Obtained players joined by '_': 'a', 'a_b', 'a_b_c_d' (no count prefix)."""
+    return "_".join(slug(h) for h in hits) or "hit"
 
 
 def sort_account(user_code, hits):
@@ -155,10 +187,12 @@ def sort_account(user_code, hits):
 
 
 # ---------------------------------------------------------------- one account end-to-end
-def run_account(acct, wanted, agent_id=0):
-    """Login, open free packs (all, or only agent_id), enrich names, filter by `wanted`,
-    sort into folder. Returns a report dict."""
+def run_account(acct, wanted=None, agent_id=0, wanted_ids=None):
+    """Login, open free packs (all, or only agent_id), enrich names, filter, sort into folder.
+    Filter by `wanted_ids` (player ids ticked from the pack — preferred) or `wanted` (names).
+    Returns a report dict."""
     uc = acct["user_code"]
+    wid_set = {int(x) for x in (wanted_ids or [])}
     try:
         c = cl.GateClient(user_code=uc)
         lr = flows.login(c, int(acct["user_id"]), acct["auth_code"], acct.get("device_identifier"))
@@ -170,12 +204,20 @@ def run_account(acct, wanted, agent_id=0):
         info = efootbase.lookup_many([p["id"] for p in drawn if p["id"]])
         for p in drawn:
             e = info.get(str(p["id"]), {})
-            p["name"] = e.get("name")
-            p["overall"] = e.get("overall")
-            p["position"] = e.get("position")
-            p["art"] = e.get("art")
-        names = [p.get("name") for p in drawn]
-        hits = match_wanted(names, wanted) if wanted else []
+            p["name"] = e.get("name"); p["overall"] = e.get("overall")
+            p["position"] = e.get("position"); p["art"] = e.get("art")
+        # which wanted players did we actually pull? distinct, in the order they were wanted.
+        if wid_set:
+            by_id = {}
+            for p in drawn:
+                by_id.setdefault(p["id"], p.get("name") or f"#{p['id']}")
+            order = [int(x) for x in (wanted_ids or [])]
+            hits = []
+            for wid in order:
+                if wid in by_id and by_id[wid] not in hits:
+                    hits.append(by_id[wid])
+        else:
+            hits = match_wanted([p.get("name") for p in drawn], wanted or []) if wanted else []
         folder = sort_account(uc, hits) if hits else None
         drawn.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
         return {"user_code": uc, "free_count": scan["free_count"], "drawn": len(drawn),

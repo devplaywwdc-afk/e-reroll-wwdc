@@ -190,10 +190,8 @@
               <label style="font-size:12px;color:var(--txt2)"><input id="claim" type="checkbox" checked style="width:auto;vertical-align:-1px"> รับของเริ่มต้น + Daily เลย (GP/เหรียญ) — ต้องเปิด MyClub ด้วย</label>
               <label style="font-size:12px;color:var(--txt2)"><input id="gacha" type="checkbox" style="width:auto;vertical-align:-1px"> 🎰 เปิดกาชา pack ฟรี + กรองนักเตะหลังสมัคร (บังคับเปิด MyClub+รับของ)</label>
               <div class="field" id="gcwrap" style="display:none;background:rgba(0,255,136,.04);border:1px solid var(--border);border-radius:8px;padding:8px">
-                <label>agent_id เจาะจง (เว้นว่าง / 0 = ทุก pack ฟรี · ดูเลขจาก tab กาชา)</label>
-                <input id="r_agent" type="number" value="0" style="padding:6px">
-                <label style="margin-top:6px">กรองนักเตะที่อยากได้ (1 บรรทัด 1 ชื่อ) — hit จะถูกแยกเข้าโฟลเดอร์ gacha_hits/</label>
-                <textarea id="r_wanted" placeholder="Jude Bellingham&#10;Lamine Yamal" style="min-height:60px"></textarea>
+                <label style="margin-bottom:4px">เลือก Pack + ติ๊กนักเตะที่อยากได้ (hit แยกเข้าโฟลเดอร์ gacha_hits/)</label>
+                <div id="pick_rr"></div>
               </div>
               <div class="field proxywrap" id="proxywrap" style="display:none">
                 <label>Proxy list (1 บรรทัด 1 proxy)</label>
@@ -320,19 +318,15 @@
                 <div class="field" style="min-width:200px"><label>แหล่งไอดี</label>
                   <select id="gc_src"><option value="folder">จากโฟลเดอร์ (accounts/)</option><option value="upload">อัปโหลด .txt</option></select></div>
                 <div class="field" id="gc_upwrap" style="display:none"><label>ไฟล์ .txt</label><input id="gc_files" type="file" accept=".txt" multiple style="padding:6px"><span id="gc_cnt" class="hint"></span></div>
-                <div class="field"><label>&nbsp;</label><button class="btn btn-outline btn-sm" id="gc_scan">🔍 สแกน Pack ฟรี</button></div>
-                <span class="hint" id="gc_scaninfo"></span>
               </div>
-              <div id="gc_scantbl" style="margin:4px 0 10px"></div>
-              <div class="field"><label>กรองนักเตะที่อยากได้ (1 บรรทัด 1 ชื่อ — เว้นว่าง = เปิดอย่างเดียวไม่กรอง)</label>
-                <textarea id="gc_wanted" placeholder="Jude Bellingham&#10;Lamine Yamal" style="min-height:70px"></textarea></div>
-              <div class="row">
+              <div id="pick_gc"></div>
+              <div class="row" style="margin-top:8px">
                 <button class="btn btn-primary btn-sm" id="gc_run">▶ เปิดกาชาทั้งหมด + กรอง</button>
                 <span class="hint" id="gc_prog"></span>
               </div>
               <div id="gc_barwrap" style="display:none;height:8px;background:var(--glass);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:2px 0 12px">
                 <div id="gc_bar" style="height:100%;width:0;background:linear-gradient(90deg,var(--g),var(--p));transition:width .25s"></div></div>
-              <div class="hint" style="margin-bottom:8px">ไอดีที่เปิดได้นักเตะตรงที่กรอง จะถูก copy เข้าโฟลเดอร์ <b style="color:var(--g)">pes_api/gacha_hits/&lt;ชื่อนักเตะ&gt;/</b> (ได้หลายตัว → <b>2_ชื่อ1_ชื่อ2</b>)</div>
+              <div class="hint" style="margin-bottom:8px">ไอดีที่เปิดได้นักเตะที่ติ๊ก จะถูก copy เข้าโฟลเดอร์ <b style="color:var(--g)">pes_api/gacha_hits/&lt;ชื่อนักเตะ&gt;/</b> (ได้หลายตัว → <b>ชื่อ1_ชื่อ2_ชื่อ3</b>)</div>
               <div id="gc_tbl"></div>
             </div>
           </div>
@@ -454,8 +448,8 @@ $('gacha').onchange=()=>{const on=$('gacha').checked;$('gcwrap').style.display=o
 $('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,
     setup:$('setup').checked,claim:$('claim').checked,proxies:$('proxies').value,
     prefix:($('r_prefix').value||'').trim()||'j3xdr',
-    gacha:$('gacha').checked,gacha_agent:+$('r_agent').value||0,
-    wanted:$('r_wanted').value.split('\n').map(s=>s.trim()).filter(Boolean)};
+    gacha:$('gacha').checked};
+  if(body.gacha){const sel=pkGet('rr');body.wanted_ids=sel.wanted_ids;body.gacha_agent=sel.agent_ids.length===1?sel.agent_ids[0]:0;}
   buildGrid(body.workers);await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
 $('stop').onclick=()=>fetch('/api/stop',{method:'POST'});
 
@@ -554,24 +548,81 @@ $('gc_files').onchange=async(e)=>{const fs=[...e.target.files].sort((a,b)=>a.nam
   for(const f of fs){try{const o=JSON.parse((await f.text()).trim());if(o.user_id&&o.auth_code)gcUploaded.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),user_id:o.user_id,auth_code:o.auth_code,device_identifier:o.device_identifier||null});}catch(err){}}
   $('gc_cnt').textContent=`โหลด ${gcUploaded.length} ไอดี`;};
 function gcAccs(){return $('gc_src').value==='upload'?(gcUploaded||[]):null;}
-$('gc_scan').onclick=async()=>{
-  const accs=gcAccs(); $('gc_scaninfo').textContent='กำลังสแกน...'; $('gc_scantbl').innerHTML='';
-  const r=await (await fetch('/api/gacha/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(accs?{accounts:accs}:{})})).json();
-  if(r.error){$('gc_scaninfo').textContent='ผิดพลาด: '+r.error;return;}
-  const free=r.free||[], all=r.all||[];
-  $('gc_scaninfo').innerHTML=`พบ <b style="color:var(--g)">${r.free_count} pack ฟรี</b> (จาก ${all.length} pack · sample ${r.sample||''})`;
-  let h='<table><tr><th>Pack</th><th>ประเภท</th><th>ฟรี?</th><th>จำนวน/ครั้ง</th><th>เหลือ</th><th>หมดอายุ</th></tr>';
-  all.forEach(a=>{const fr=a.free?(a.needs_ad?'<span style="color:var(--y)">ฟรี(ต้องดูโฆษณา)</span>':'<span style="color:var(--g);font-weight:700">ฟรี</span>'):'<span style="color:var(--txt3)">เสียเงิน</span>';
-    const exp=a.expires?new Date(a.expires*1000).toLocaleDateString('th-TH'):'—';
-    h+=`<tr${a.free&&!a.needs_ad?' style="background:rgba(0,255,136,.05)"':''}><td style="color:#fff">${a.title||a.agent_id}</td><td style="color:var(--txt2)">${a.sub||''}</td><td>${fr}</td><td>${a.count||'—'}</td><td>${a.remaining}</td><td style="color:var(--txt3)">${exp}</td></tr>`;});
-  h+='</table>';$('gc_scantbl').innerHTML=h;};
+// ---- shared Pack → Player picker (used by Gacha + Reroll) ----
+const PK={};  // host -> {wanted:Set(ids), packs:Set(agent_id), agents:[]}
+function pkInit(host){
+  PK[host]={wanted:new Set(), packs:new Set(), agents:[]};
+  $('pick_'+host).innerHTML=`
+    <div class="row"><button class="btn btn-outline btn-sm" id="pk_${host}_scan">🔍 สแกน Pack</button>
+      <span class="hint" id="pk_${host}_info">กดสแกนหา pack ที่มี</span></div>
+    <div id="pk_${host}_packs" style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0"></div>
+    <div class="row" style="display:none" id="pk_${host}_loadrow"><button class="btn btn-ghost btn-sm" id="pk_${host}_load">👁 ดูนักเตะในแพ็คที่เลือก</button>
+      <span class="hint" id="pk_${host}_sel">ติ๊กนักเตะ 0 คน</span></div>
+    <div id="pk_${host}_players" style="margin-top:6px"></div>`;
+  $('pk_'+host+'_scan').onclick=()=>pkScan(host);
+  $('pk_'+host+'_load').onclick=()=>pkLoad(host);
+}
+async function pkScan(host){
+  $('pk_'+host+'_info').textContent='กำลังสแกน...'; $('pk_'+host+'_packs').innerHTML=''; $('pk_'+host+'_players').innerHTML='';
+  const r=await (await fetch('/api/gacha/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json();
+  if(r.error){$('pk_'+host+'_info').textContent='ผิดพลาด: '+r.error;return;}
+  const all=r.all||[]; PK[host].packs.clear();
+  $('pk_'+host+'_info').innerHTML=`พบ ${all.length} pack · <b style="color:var(--g)">ฟรี ${r.free_count}</b> — ติ๊ก pack ที่จะกรอง`;
+  $('pk_'+host+'_packs').innerHTML=all.map(a=>{
+    const free=a.free&&!a.needs_ad; const tag=free?'<span style="color:var(--g)">ฟรี</span>':(a.needs_ad?'<span style="color:var(--y)">ฟรี(ads)</span>':'<span style="color:var(--txt3)">เสียเงิน</span>');
+    return `<label style="display:inline-flex;align-items:center;gap:5px;background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:12px${free?';box-shadow:inset 0 0 0 1px rgba(0,255,136,.25)':''}">
+      <input type="checkbox" data-aid="${a.agent_id}" onchange="pkTogglePack('${host}',${a.agent_id},this.checked)" style="width:auto">
+      <span style="color:#fff">${a.title||a.agent_id}</span> <span style="color:var(--txt3)">${a.sub||''}</span> ${tag}</label>`;}).join('');
+}
+function pkTogglePack(host,aid,on){on?PK[host].packs.add(aid):PK[host].packs.delete(aid);
+  $('pk_'+host+'_loadrow').style.display=PK[host].packs.size?'flex':'none';}
+async function pkLoad(host){
+  const ids=[...PK[host].packs]; if(!ids.length)return;
+  $('pk_'+host+'_players').innerHTML='<span class="hint">กำลังดึงนักเตะ...</span>';
+  const r=await (await fetch('/api/gacha/pack-players',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agent_ids:ids})})).json();
+  if(r.error){$('pk_'+host+'_players').innerHTML='<span style="color:var(--r)">'+r.error+'</span>';return;}
+  PK[host].agents=r.agents||[];
+  let h='';
+  (r.agents||[]).forEach(ag=>{
+    h+=`<div style="margin-top:8px"><div style="font-size:12px;font-weight:700;color:var(--p);border-left:3px solid var(--p);padding-left:6px;margin-bottom:4px">${ag.title} · <span style="color:var(--txt2)">${ag.sub}</span> · ${ag.players.length} ตัว</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px">`;
+    h+=ag.players.map(p=>pkCard(host,p)).join('');
+    h+='</div></div>';
+  });
+  $('pk_'+host+'_players').innerHTML=h||'<span class="hint">pack นี้ไม่มีนักเตะเด่น</span>';
+  pkUpdateSel(host);
+}
+function pkCard(host,p){
+  const on=PK[host].wanted.has(p.id);
+  const art=p.art?`<img src="${p.art}" loading="lazy" style="width:100%;height:92px;object-fit:contain;background:#0a0d14">`
+    :`<div style="height:92px;display:flex;align-items:center;justify-content:center;color:var(--txt3)">👤</div>`;
+  const ov=p.overall?`<span style="position:absolute;top:3px;left:5px;font-weight:800;font-size:15px;color:#ffd84d;text-shadow:0 1px 3px #000">${p.overall}</span>`:'';
+  const ck=on?'<span style="position:absolute;top:3px;right:5px;color:var(--g);font-weight:800">✓</span>':'';
+  return `<div onclick="pkToggle('${host}',${p.id})" style="background:var(--glass);border:2px solid ${on?'var(--g)':'var(--border)'};border-radius:9px;overflow:hidden;position:relative;cursor:pointer">
+    ${art}${ov}${ck}
+    <div style="padding:4px 6px"><div style="font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name||('#'+p.id)}</div>
+    <div style="font-size:9px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.position||''} · ${p.card||''}</div></div></div>`;
+}
+function pkToggle(host,pid){const w=PK[host].wanted; w.has(pid)?w.delete(pid):w.add(pid); pkLoadRefresh(host); pkUpdateSel(host);}
+function pkLoadRefresh(host){ // re-render cards to reflect selection
+  let h='';
+  PK[host].agents.forEach(ag=>{
+    h+=`<div style="margin-top:8px"><div style="font-size:12px;font-weight:700;color:var(--p);border-left:3px solid var(--p);padding-left:6px;margin-bottom:4px">${ag.title} · <span style="color:var(--txt2)">${ag.sub}</span> · ${ag.players.length} ตัว</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px">`+ag.players.map(p=>pkCard(host,p)).join('')+'</div></div>';
+  });
+  $('pk_'+host+'_players').innerHTML=h;
+}
+function pkUpdateSel(host){$('pk_'+host+'_sel').textContent=`ติ๊กนักเตะ ${PK[host].wanted.size} คน`;}
+function pkGet(host){return {agent_ids:[...PK[host].packs], wanted_ids:[...PK[host].wanted]};}
+pkInit('gc'); pkInit('rr');
 function gcBar(done,total){const pct=total?Math.round(done/total*100):0;$('gc_bar').style.width=pct+'%';
   $('gc_prog').textContent=done>=total?`เปิดเสร็จ ${total} ไอดี`:`กำลังเปิด ${done}/${total}... (${pct}%)`;}
 $('gc_run').onclick=async()=>{
-  const accs=gcAccs(); const wanted=$('gc_wanted').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const accs=gcAccs(); const sel=pkGet('gc');
+  const gacha_agent=sel.agent_ids.length===1?sel.agent_ids[0]:0;
   window._gcres=[]; $('gc_tbl').innerHTML=''; $('gc_bar').style.width='0'; $('gc_barwrap').style.display='block';
   $('gc_prog').textContent='เริ่มเปิด...'; $('gc_run').disabled=true;
-  await fetch('/api/gacha/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...(accs?{accounts:accs}:{}),wanted})});
+  await fetch('/api/gacha/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...(accs?{accounts:accs}:{}),wanted_ids:sel.wanted_ids,gacha_agent})});
 };
 function gcStart(total){window._gcres=[];
   $('gc_tbl').innerHTML='<table><tr><th>user_code</th><th>pack ฟรี</th><th>เปิดได้</th><th>ตรงที่กรอง</th><th>โฟลเดอร์</th><th></th></tr><tbody id="gc_body"></tbody></table>';

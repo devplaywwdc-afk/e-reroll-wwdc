@@ -69,17 +69,18 @@ class Engine:
 
     # ---- control ----
     def start(self, mode="direct", workers=15, target=0, proxies=None, do_setup=False, do_claim=True,
-              do_gacha=False, gacha_agent=0, wanted=None, name_prefix=None):
+              do_gacha=False, gacha_agent=0, wanted=None, wanted_ids=None, name_prefix=None):
         if self.running:
             return False
         proxies = proxies or []
         wanted = wanted or []
+        wanted_ids = wanted_ids or []
         name_prefix = name_prefix or flows.DEFAULT_PREFIX
         if do_gacha:
             do_setup = do_claim = True  # gacha needs a set-up, logged-in account
         self.cfg = dict(mode=mode, workers=workers, target=target, do_setup=do_setup,
                         do_claim=do_claim, do_gacha=do_gacha, gacha_agent=gacha_agent,
-                        wanted=wanted, name_prefix=name_prefix, nproxies=len(proxies))
+                        wanted=wanted, wanted_ids=wanted_ids, name_prefix=name_prefix, nproxies=len(proxies))
         self.stats.clear()
         self.per_worker.clear()
         self.running = True
@@ -87,7 +88,8 @@ class Engine:
         self.workers = []
         for i in range(workers):
             t = threading.Thread(target=self._worker,
-                                 args=(i, mode, proxies, do_setup, do_claim, do_gacha, gacha_agent, wanted, name_prefix),
+                                 args=(i, mode, proxies, do_setup, do_claim, do_gacha, gacha_agent,
+                                       wanted, name_prefix, wanted_ids),
                                  daemon=True)
             t.start()
             self.workers.append(t)
@@ -120,8 +122,9 @@ class Engine:
 
     # ---- worker ----
     def _worker(self, wid, mode, proxies, do_setup, do_claim=True, do_gacha=False, gacha_agent=0,
-                wanted=None, name_prefix=None):
+                wanted=None, name_prefix=None, wanted_ids=None):
         wanted = wanted or []
+        wanted_ids = wanted_ids or []
         name_prefix = name_prefix or flows.DEFAULT_PREFIX
         pidx = wid % max(1, len(proxies)) if proxies else 0
         proxy = proxies[pidx] if (mode == "proxy" and proxies) else None
@@ -157,7 +160,7 @@ class Engine:
                         try:
                             acct = {"user_code": uc, "user_id": uid, "auth_code": auth,
                                     "device_identifier": devid}
-                            gr = gacha.run_account(acct, wanted, agent_id=gacha_agent)
+                            gr = gacha.run_account(acct, wanted, agent_id=gacha_agent, wanted_ids=wanted_ids)
                             if gr.get("hits"):
                                 self.stats["hits"] += 1
                                 self.log(wid, "ok", f"[★] {uc} gacha HIT {', '.join(gr['hits'])} -> {gr['folder']}")
