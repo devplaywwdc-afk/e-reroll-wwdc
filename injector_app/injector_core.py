@@ -135,6 +135,9 @@ def list_devices(do_connect=True):
         if len(parts) < 2:
             continue
         dev, state = parts[0], parts[1]
+        # emulator-only: skip physical/USB devices (they have a serial, not host:port)
+        if not (re.search(r":\d+$", dev) or dev.startswith("emulator-")):
+            continue
         d = {"device": dev, "state": state, "label": _label(dev, fams),
              "game": False, "root": False, "provisioned": False, "current_id": None}
         if state == "device":
@@ -146,10 +149,34 @@ def list_devices(do_connect=True):
             d["current_id"] = m.group(1) if m else None
             d["provisioned"] = "No such file" not in _adb(dev, "shell", "ls", FILES)
             d["usable"] = d["game"] and d["root"]
+            # boot_id is identical across every adb port of ONE running VM -> dedup key
+            d["_vm"] = _adb(dev, "shell", "cat", "/proc/sys/kernel/random/boot_id").strip() or dev
         else:
             d["usable"] = False
+            d["_vm"] = dev
         devs.append(d)
-    return devs
+    return _dedup_vm(devs)
+
+
+def _dedup_vm(devs):
+    """Collapse the multiple adb ports MuMu/LDPlayer expose for one VM into a single row."""
+    seen = {}
+    out = []
+    for d in devs:
+        key = d.get("_vm") or d["device"]
+        if key in seen:
+            seen[key]["alt_ports"].append(d["device"])  # remember the duplicate port
+            # prefer a usable representative if the first wasn't
+            if d.get("usable") and not seen[key].get("usable"):
+                keep = seen[key]["alt_ports"]
+                d["alt_ports"] = keep
+                out[out.index(seen[key])] = d
+                seen[key] = d
+            continue
+        d["alt_ports"] = []
+        seen[key] = d
+        out.append(d)
+    return out
 
 
 def _app_uid(dev):
