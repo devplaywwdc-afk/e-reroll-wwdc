@@ -12,6 +12,7 @@ import injector_core as core
 
 BG = "#0e1116"; CARD = "#151a22"; FG = "#e6e9ef"; SUB = "#8b93a7"
 GREEN = "#00ff88"; RED = "#ff5c6c"; YEL = "#ffd84d"; ACC = "#a855f7"
+FONT = "Tahoma"  # renders Thai correctly in Tk (unlike Segoe UI bold / Consolas)
 
 
 class App:
@@ -24,6 +25,7 @@ class App:
         self.accounts = []  # loaded from folder mode
         self.single = None  # loaded from single-file mode
 
+        root.option_add("*Font", (FONT, 10))  # Thai-safe default for all widgets
         self._style()
         self._build()
         self._set_adb(core.ADB)
@@ -36,20 +38,21 @@ class App:
         except Exception:
             pass
         s.configure("Treeview", background=CARD, fieldbackground=CARD, foreground=FG,
-                    rowheight=26, borderwidth=0)
-        s.configure("Treeview.Heading", background="#1d2531", foreground=SUB, borderwidth=0)
+                    rowheight=26, borderwidth=0, font=(FONT, 10))
+        s.configure("Treeview.Heading", background="#1d2531", foreground=SUB, borderwidth=0,
+                    font=(FONT, 9, "bold"))
         s.map("Treeview", background=[("selected", "#1f3b2e")], foreground=[("selected", GREEN)])
 
     def _hdr(self, parent, text):
-        tk.Label(parent, text=text, bg=BG, fg=SUB, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(10, 2))
+        tk.Label(parent, text=text, bg=BG, fg=SUB, font=("Tahoma", 9, "bold")).pack(anchor="w", pady=(10, 2))
 
     # ---- layout ----
     def _build(self):
         top = tk.Frame(self.root, bg=BG); top.pack(fill="x", padx=14, pady=(12, 0))
-        tk.Label(top, text="💉 eFootball Account Injector", bg=BG, fg=FG,
-                 font=("Segoe UI", 15, "bold")).pack(side="left")
+        tk.Label(top, text="eFootball Account Injector", bg=BG, fg=FG,
+                 font=("Tahoma", 15, "bold")).pack(side="left")
         tk.Label(top, text="emulator only · batch", bg=BG, fg=SUB,
-                 font=("Segoe UI", 9)).pack(side="left", padx=10)
+                 font=("Tahoma", 9)).pack(side="left", padx=10)
 
         # adb path
         arow = tk.Frame(self.root, bg=BG); arow.pack(fill="x", padx=14, pady=(8, 0))
@@ -58,8 +61,8 @@ class App:
         tk.Entry(arow, textvariable=self.adb_var, bg=CARD, fg=FG, insertbackground=FG,
                  relief="flat", width=60).pack(side="left", padx=6, ipady=3)
         tk.Button(arow, text="…", command=self._pick_adb, bg=CARD, fg=FG, relief="flat").pack(side="left")
-        self.btn_scan = tk.Button(arow, text="🔄 สแกน emulator", command=self._scan,
-                                  bg=ACC, fg="#fff", relief="flat", font=("Segoe UI", 9, "bold"))
+        self.btn_scan = tk.Button(arow, text="สแกน emulator", command=self._scan,
+                                  bg=ACC, fg="#fff", relief="flat", font=("Tahoma", 9, "bold"))
         self.btn_scan.pack(side="left", padx=10, ipadx=6, ipady=2)
         self.scan_lbl = tk.Label(arow, text="", bg=BG, fg=SUB); self.scan_lbl.pack(side="left")
 
@@ -95,15 +98,15 @@ class App:
         for txt, var in [("backup ไอดีเดิม", self.v_backup), ("ล้าง device-bind (SYSTEM)", self.v_clear), ("เปิดเกมหลัง inject", self.v_launch)]:
             tk.Checkbutton(opt, text=txt, variable=var, bg=BG, fg=FG, selectcolor=CARD,
                            activebackground=BG).pack(side="left", padx=(0, 14))
-        self.btn_run = tk.Button(opt, text="💉 INJECT", command=self._run, bg=GREEN, fg="#04120a",
-                                 relief="flat", font=("Segoe UI", 10, "bold"))
+        self.btn_run = tk.Button(opt, text="INJECT", command=self._run, bg=GREEN, fg="#04120a",
+                                 relief="flat", font=("Tahoma", 10, "bold"))
         self.btn_run.pack(side="right", ipadx=12, ipady=3)
 
         # log
         self._hdr_f2 = tk.Frame(self.root, bg=BG); self._hdr_f2.pack(fill="x", padx=14)
         self._hdr(self._hdr_f2, "log")
         self.log = tk.Text(self.root, bg="#0a0d13", fg=FG, insertbackground=FG, relief="flat",
-                           font=("Consolas", 9), height=12)
+                           font=("Tahoma", 9), height=12)
         self.log.pack(fill="both", expand=True, padx=14, pady=(0, 12))
         for tag, col in [("ok", GREEN), ("err", RED), ("info", SUB), ("hi", YEL)]:
             self.log.tag_config(tag, foreground=col)
