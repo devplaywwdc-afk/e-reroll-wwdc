@@ -582,7 +582,7 @@ function pkTogglePack(host,aid,on){on?PK[host].packs.add(aid):PK[host].packs.del
   $('pk_'+host+'_loadrow').style.display=PK[host].packs.size?'flex':'none';}
 async function pkLoad(host){
   const ids=[...PK[host].packs]; if(!ids.length)return;
-  $('pk_'+host+'_players').innerHTML='<span class="hint">กำลังดึงนักเตะ...</span>';
+  $('pk_'+host+'_players').innerHTML='<span class="hint">กำลังดึงนักเตะ... (ครั้งแรกช้าหน่อย กำลังโหลดชื่อ+รูป)</span>';
   const r=await (await fetch('/api/gacha/pack-players',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agent_ids:ids})})).json();
   if(r.error){$('pk_'+host+'_players').innerHTML='<span style="color:var(--r)">'+r.error+'</span>';return;}
   PK[host].agents=r.agents||[]; PK[host].expanded=new Set();

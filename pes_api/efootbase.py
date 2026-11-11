@@ -39,7 +39,7 @@ def _save():
         pass
 
 
-def lookup(player_id, timeout=12):
+def lookup(player_id, timeout=7):
     """Return {id, name, overall, position, card, art} for a game player id (cached)."""
     key = str(player_id)
     with _lock:
@@ -91,7 +91,7 @@ def lookup(player_id, timeout=12):
     return info
 
 
-def lookup_many(ids, max_workers=8):
+def lookup_many(ids, max_workers=16):
     """Enrich many ids concurrently (cache-first)."""
     out = {}
     todo = []
