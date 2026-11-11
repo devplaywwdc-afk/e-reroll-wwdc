@@ -551,7 +551,7 @@ function gcAccs(){return $('gc_src').value==='upload'?(gcUploaded||[]):null;}
 // ---- shared Pack → Player picker (used by Gacha + Reroll) ----
 const PK={};  // host -> {wanted:Set(ids), packs:Set(agent_id), agents:[]}
 function pkInit(host){
-  PK[host]={wanted:new Set(), packs:new Set(), agents:[]};
+  PK[host]={wanted:new Set(), packs:new Set(), agents:[], expanded:new Set()};
   $('pick_'+host).innerHTML=`
     <div class="row"><button class="btn btn-outline btn-sm" id="pk_${host}_scan">🔍 สแกน Pack</button>
       <span class="hint" id="pk_${host}_info">กดสแกนหา pack ที่มี</span></div>
@@ -568,11 +568,15 @@ async function pkScan(host){
   if(r.error){$('pk_'+host+'_info').textContent='ผิดพลาด: '+r.error;return;}
   const all=r.all||[]; PK[host].packs.clear();
   $('pk_'+host+'_info').innerHTML=`พบ ${all.length} pack · <b style="color:var(--g)">ฟรี ${r.free_count}</b> — ติ๊ก pack ที่จะกรอง`;
-  $('pk_'+host+'_packs').innerHTML=all.map(a=>{
-    const free=a.free&&!a.needs_ad; const tag=free?'<span style="color:var(--g)">ฟรี</span>':(a.needs_ad?'<span style="color:var(--y)">ฟรี(ads)</span>':'<span style="color:var(--txt3)">เสียเงิน</span>');
-    return `<label style="display:inline-flex;align-items:center;gap:5px;background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:5px 9px;cursor:pointer;font-size:12px${free?';box-shadow:inset 0 0 0 1px rgba(0,255,136,.25)':''}">
-      <input type="checkbox" data-aid="${a.agent_id}" onchange="pkTogglePack('${host}',${a.agent_id},this.checked)" style="width:auto">
-      <span style="color:#fff">${a.title||a.agent_id}</span> <span style="color:var(--txt3)">${a.sub||''}</span> ${tag}</label>`;}).join('');
+  let h='<table><tr><th>☑</th><th>Pack</th><th>ประเภท</th><th>ฟรี?</th><th>จำนวน/ครั้ง</th><th>เหลือ</th><th>หมดอายุ</th></tr>';
+  all.forEach(a=>{const free=a.free&&!a.needs_ad;
+    const fr=free?'<span style="color:var(--g);font-weight:700">ฟรี</span>':(a.needs_ad?'<span style="color:var(--y)">ฟรี(ads)</span>':'<span style="color:var(--txt3)">เสียเงิน</span>');
+    const exp=a.expires?new Date(a.expires*1000).toLocaleDateString('th-TH'):'—';
+    h+=`<tr${free?' style="background:rgba(0,255,136,.05)"':''}>
+      <td><input type="checkbox" onchange="pkTogglePack('${host}',${a.agent_id},this.checked)" style="width:auto"></td>
+      <td style="color:#fff">${a.title||a.agent_id}</td><td style="color:var(--txt2)">${a.sub||''}</td>
+      <td>${fr}</td><td>${a.count||'—'}</td><td>${a.remaining}</td><td style="color:var(--txt3)">${exp}</td></tr>`;});
+  $('pk_'+host+'_packs').innerHTML=h+'</table>';
 }
 function pkTogglePack(host,aid,on){on?PK[host].packs.add(aid):PK[host].packs.delete(aid);
   $('pk_'+host+'_loadrow').style.display=PK[host].packs.size?'flex':'none';}
@@ -581,16 +585,23 @@ async function pkLoad(host){
   $('pk_'+host+'_players').innerHTML='<span class="hint">กำลังดึงนักเตะ...</span>';
   const r=await (await fetch('/api/gacha/pack-players',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agent_ids:ids})})).json();
   if(r.error){$('pk_'+host+'_players').innerHTML='<span style="color:var(--r)">'+r.error+'</span>';return;}
-  PK[host].agents=r.agents||[];
+  PK[host].agents=r.agents||[]; PK[host].expanded=new Set();
+  pkRender(host); pkUpdateSel(host);
+}
+function pkExpand(host,aid){PK[host].expanded.add(aid);pkRender(host);}
+function pkRender(host){
   let h='';
-  (r.agents||[]).forEach(ag=>{
-    h+=`<div style="margin-top:8px"><div style="font-size:12px;font-weight:700;color:var(--p);border-left:3px solid var(--p);padding-left:6px;margin-bottom:4px">${ag.title} · <span style="color:var(--txt2)">${ag.sub}</span> · ${ag.players.length} ตัว</div>
+  (PK[host].agents||[]).forEach(ag=>{
+    const exp=PK[host].expanded&&PK[host].expanded.has(ag.agent_id);
+    h+=`<div style="margin-top:8px"><div style="font-size:12px;font-weight:700;color:var(--p);border-left:3px solid var(--p);padding-left:6px;margin-bottom:4px">${ag.title} · <span style="color:var(--txt2)">${ag.sub}</span> · เด่น ${ag.pickup.length}${ag.total?` / ทั้งหมด ${ag.total}`:''}</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px">`;
-    h+=ag.players.map(p=>pkCard(host,p)).join('');
-    h+='</div></div>';
+    h+=ag.pickup.map(p=>pkCard(host,p)).join('');
+    if(exp)h+=ag.more.map(p=>pkCard(host,p)).join('');
+    h+='</div>';
+    if(ag.more.length&&!exp)h+=`<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="pkExpand('${host}',${ag.agent_id})">＋ ดูเพิ่มเติม (${ag.more.length})</button>`;
+    h+='</div>';
   });
   $('pk_'+host+'_players').innerHTML=h||'<span class="hint">pack นี้ไม่มีนักเตะเด่น</span>';
-  pkUpdateSel(host);
 }
 function pkCard(host,p){
   const on=PK[host].wanted.has(p.id);
@@ -603,15 +614,7 @@ function pkCard(host,p){
     <div style="padding:4px 6px"><div style="font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name||('#'+p.id)}</div>
     <div style="font-size:9px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.position||''} · ${p.card||''}</div></div></div>`;
 }
-function pkToggle(host,pid){const w=PK[host].wanted; w.has(pid)?w.delete(pid):w.add(pid); pkLoadRefresh(host); pkUpdateSel(host);}
-function pkLoadRefresh(host){ // re-render cards to reflect selection
-  let h='';
-  PK[host].agents.forEach(ag=>{
-    h+=`<div style="margin-top:8px"><div style="font-size:12px;font-weight:700;color:var(--p);border-left:3px solid var(--p);padding-left:6px;margin-bottom:4px">${ag.title} · <span style="color:var(--txt2)">${ag.sub}</span> · ${ag.players.length} ตัว</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:7px">`+ag.players.map(p=>pkCard(host,p)).join('')+'</div></div>';
-  });
-  $('pk_'+host+'_players').innerHTML=h;
-}
+function pkToggle(host,pid){const w=PK[host].wanted; w.has(pid)?w.delete(pid):w.add(pid); pkRender(host); pkUpdateSel(host);}
 function pkUpdateSel(host){$('pk_'+host+'_sel').textContent=`ติ๊กนักเตะ ${PK[host].wanted.size} คน`;}
 function pkGet(host){return {agent_ids:[...PK[host].packs], wanted_ids:[...PK[host].wanted]};}
 pkInit('gc'); pkInit('rr');

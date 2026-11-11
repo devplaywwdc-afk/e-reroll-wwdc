@@ -7,6 +7,7 @@ Results are cached to disk (public data; one fetch per id, reused forever).
 """
 import os
 import re
+import html
 import json
 import threading
 
@@ -43,7 +44,11 @@ def lookup(player_id, timeout=12):
     key = str(player_id)
     with _lock:
         if key in _cache:
-            return _cache[key]
+            c = _cache[key]
+            for k in ("name", "card"):  # fix entries cached before html-unescape
+                if isinstance(c.get(k), str) and "&#" in c[k]:
+                    c[k] = html.unescape(c[k])
+            return c
     info = {"id": key, "name": None, "overall": None, "position": None, "card": None, "art": None}
     try:
         url = f"https://efootbase.com/players/{key}"
@@ -63,7 +68,7 @@ def lookup(player_id, timeout=12):
             h = r.text
             m = re.search(r"<title>([^<]+)</title>", h)
             if m:
-                title = m.group(1).split("—")[0].split("|")[0].strip()
+                title = html.unescape(m.group(1)).split("—")[0].split("|")[0].strip()
                 # "Name · 82 AMF · Card Name"
                 parts = [p.strip() for p in title.split("·")]
                 if parts:

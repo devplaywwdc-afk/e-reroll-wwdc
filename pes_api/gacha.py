@@ -33,9 +33,10 @@ def _buy_type(price):
 
 
 def pack_players(client, uid, sid, agent_ids):
-    """For the given agent_ids, return each pack's featured (pickup) players enriched with
-    name/overall/position/card/art + rarity, so the user can tick who they want straight
-    from the pack. Grouped/ordered client-side by tier."""
+    """For the given agent_ids, return each pack's showcase players enriched with
+    name/overall/position/card/art, split into `pickup` (the top featured/Epic cards) and
+    `more` (the rest of the pack's notable cards — pickup_cardtype_list), so the user can tick
+    who they want straight from the pack and optionally reveal the rest."""
     b = flows._commons("CMD_GET_MYCLUB_AGENTLIST", uid, sid, flows.LOGIN_HASH)
     r = client.send("CMD_GET_MYCLUB_AGENTLIST", b)
     if not isinstance(r, dict) or r.get("result") != "NOERR":
@@ -44,26 +45,30 @@ def pack_players(client, uid, sid, agent_ids):
     byid = {a.get("agent_id"): a for a in r.get("agent_list", [])}
     allids = []
     for aid in want:
-        for p in (byid.get(aid, {}).get("pickup_list") or []):
-            gid = p.get("gameplayer_id", {}).get("id")
-            if gid:
-                allids.append(gid)
-    info = efootbase.lookup_many(allids) if allids else {}
+        a = byid.get(aid, {})
+        allids += [p.get("gameplayer_id", {}).get("id") for p in (a.get("pickup_list") or [])]
+        allids += [x.get("id") for x in (a.get("pickup_cardtype_list") or [])]
+    info = efootbase.lookup_many([i for i in allids if i])
+
+    def card(gid):
+        e = info.get(str(gid), {})
+        return {"id": gid, "name": e.get("name"), "overall": e.get("overall"),
+                "position": e.get("position"), "card": e.get("card"), "art": e.get("art")}
+
     agents = []
     for aid in want:
         a = byid.get(aid)
         if not a:
             continue
-        players = []
-        for p in (a.get("pickup_list") or []):
-            gid = p.get("gameplayer_id", {}).get("id")
-            e = info.get(str(gid), {})
-            players.append({"id": gid, "name": e.get("name"), "overall": e.get("overall"),
-                            "position": e.get("position"), "card": e.get("card"),
-                            "art": e.get("art"), "rarity": p.get("default_rarity")})
-        players.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
+        pickup_ids = [p.get("gameplayer_id", {}).get("id") for p in (a.get("pickup_list") or [])]
+        pickup = [card(i) for i in pickup_ids if i]
+        seen = set(pickup_ids)
+        more = [card(x["id"]) for x in (a.get("pickup_cardtype_list") or [])
+                if x.get("id") and x["id"] not in seen]
+        pickup.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
+        more.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
         agents.append({"agent_id": aid, "title": a.get("title"), "sub": a.get("subcategory"),
-                       "players": players})
+                       "total": a.get("player_list_total"), "pickup": pickup, "more": more})
     return {"agents": agents}
 
 
