@@ -13,268 +13,306 @@
     --bg:#050508; --bg2:#0c0c14; --bg3:#141420;
     --glass:rgba(255,255,255,.04); --glass2:rgba(255,255,255,.08);
     --border:rgba(255,255,255,.08); --txt:#e2e8f0; --txt2:#94a3b8; --txt3:#475569;
-    --radius:14px; --radius-sm:8px; --trans:all .2s ease;
+    --radius:14px; --radius-sm:8px; --trans:all .18s ease;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;background:var(--bg);color:var(--txt);
     font-family:'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif;font-size:13.5px;overflow:hidden}
   body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-    background-image:linear-gradient(rgba(168,85,247,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.06) 1px,transparent 1px);
-    background-size:40px 40px}
-  body::after{content:'';position:fixed;width:600px;height:600px;top:-200px;left:-150px;z-index:0;pointer-events:none;
-    background:radial-gradient(circle,rgba(168,85,247,.12) 0%,transparent 65%)}
+    background-image:linear-gradient(rgba(168,85,247,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.05) 1px,transparent 1px);background-size:40px 40px}
+  body::after{content:'';position:fixed;width:600px;height:600px;top:-200px;left:200px;z-index:0;pointer-events:none;
+    background:radial-gradient(circle,rgba(168,85,247,.1) 0%,transparent 65%)}
   .orb2{position:fixed;width:500px;height:500px;bottom:-180px;right:-100px;z-index:0;pointer-events:none;
-    background:radial-gradient(circle,rgba(0,255,136,.09) 0%,transparent 65%)}
-  .root{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column}
+    background:radial-gradient(circle,rgba(0,255,136,.07) 0%,transparent 65%)}
+  a{text-decoration:none}
 
-  header{display:flex;align-items:center;gap:12px;padding:12px 20px;flex-shrink:0;
-    background:rgba(5,5,8,.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
-  .logo{width:36px;height:36px;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--p),var(--g));box-shadow:0 0 16px rgba(168,85,247,.5)}
-  .logo img{width:36px;height:36px;object-fit:cover}
-  header h1{font-size:15px;font-weight:700;letter-spacing:.3px;
+  .app{position:relative;z-index:1;height:100vh;display:grid;grid-template-columns:248px 1fr}
+
+  /* ===== SIDEBAR ===== */
+  .side{display:flex;flex-direction:column;background:rgba(8,8,14,.92);border-right:1px solid var(--border);overflow:hidden}
+  .side-brand{display:flex;align-items:center;gap:11px;padding:16px 16px 14px;border-bottom:1px solid var(--border)}
+  .logo{width:38px;height:38px;border-radius:11px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--p),var(--g));box-shadow:0 0 16px rgba(168,85,247,.5);flex-shrink:0}
+  .logo img{width:38px;height:38px;object-fit:cover}
+  .side-brand h1{font-size:15px;font-weight:800;letter-spacing:.3px;
     background:linear-gradient(90deg,var(--g),var(--p));-webkit-background-clip:text;background-clip:text;color:transparent}
-  header a.credit{color:var(--txt2);font-size:11px;text-decoration:none}
-  header a.credit:hover{color:var(--g)}
-  .status-dot{width:9px;height:9px;border-radius:50%;background:var(--txt3);margin-left:auto}
-  .status-dot.active{background:var(--g);box-shadow:0 0 8px var(--g);animation:pulse 1.5s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-  .hdr-stat{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
-  .hdr-stat b{font-size:16px}.hdr-stat small{color:var(--txt3);font-size:10px}
-  .hdr-stat.ok b{color:var(--g)}.hdr-stat.err b{color:var(--r)}
+  .side-brand small{color:var(--txt2);font-size:10.5px}
+  .side-search{margin:12px 14px;position:relative}
+  .side-search input{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:8px 10px 8px 30px;color:var(--txt);font-size:12px;outline:none}
+  .side-search input:focus{border-color:rgba(168,85,247,.6)}
+  .side-search .ic{position:absolute;left:9px;top:7px;color:var(--txt3)}
+  .side-search .kbd{position:absolute;right:8px;top:6px;font-size:9px;color:var(--txt3);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+  .nav{flex:1;overflow-y:auto;padding:4px 10px 14px}
+  .nav::-webkit-scrollbar{width:4px}.nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px}
+  .nav-label{display:flex;align-items:center;justify-content:space-between;padding:12px 8px 6px;font-size:11px;font-weight:700;
+    color:var(--txt2);text-transform:uppercase;letter-spacing:.5px}
+  .nav-label .cnt{background:rgba(0,255,136,.12);color:var(--g);border-radius:20px;padding:1px 8px;font-size:10px}
+  .navitem{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border-radius:9px;border:1px solid transparent;
+    background:transparent;color:var(--txt2);cursor:pointer;font-size:13px;font-weight:600;text-align:left;transition:var(--trans);margin-bottom:2px;font-family:inherit}
+  .navitem:hover{background:var(--glass);color:var(--txt)}
+  .navitem.on{background:linear-gradient(90deg,rgba(0,255,136,.12),rgba(168,85,247,.08));border-color:rgba(0,255,136,.3);color:#fff}
+  .navitem.on .em{filter:drop-shadow(0 0 5px var(--g))}
+  .navitem .em{font-size:15px}
+  .side-foot{padding:12px 16px;border-top:1px solid var(--border);color:var(--txt3);font-size:11px}
+  .side-foot a{color:var(--g)}
 
-  .tabs{display:flex;gap:2px;padding:10px 12px 0;background:rgba(5,5,8,.6);flex-shrink:0;overflow-x:auto}
-  .tab-btn{padding:8px 16px;border-radius:var(--radius-sm) var(--radius-sm) 0 0;white-space:nowrap;
-    border:1px solid transparent;border-bottom:none;background:transparent;color:var(--txt2);cursor:pointer;
-    font-size:13px;font-weight:600;transition:var(--trans);position:relative}
-  .tab-btn:hover{background:var(--glass);color:var(--txt)}
-  .tab-btn.active{background:var(--bg3);border-color:var(--border);color:var(--g)}
+  /* ===== MAIN ===== */
+  .main{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);background:rgba(5,5,8,.6);backdrop-filter:blur(14px)}
+  .pg-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--glass);border:1px solid var(--border)}
+  .pg-tt{font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:1px}
+  .pg-h{font-size:17px;font-weight:700}
+  .pg-sub{color:var(--txt2);font-size:11.5px}
+  .status-dot{width:9px;height:9px;border-radius:50%;background:var(--txt3)}
+  .status-dot.active{background:var(--g);box-shadow:0 0 8px var(--g);animation:pulse 1.5s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;background:var(--glass);border:1px solid var(--border);font-size:12px;color:var(--txt2)}
 
   .panels{flex:1;overflow:hidden}
   .panel{display:none;height:100%}
-  .panel.active{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+  .panel.active{display:flex;flex-direction:column;overflow:hidden}
 
-  .card{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);
-    backdrop-filter:blur(10px);display:flex;flex-direction:column;overflow:hidden}
-  .card-head{padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;
-    letter-spacing:1px;text-transform:uppercase;color:var(--txt2);display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .card{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(10px);display:flex;flex-direction:column;overflow:hidden}
+  .card-head{padding:11px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--txt2);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
+  .card-head .l{display:flex;align-items:center;gap:8px}
   .card-head .dot{width:6px;height:6px;border-radius:50%;background:var(--p);box-shadow:0 0 6px var(--p)}
-  .card-body{padding:14px;display:flex;flex-direction:column;gap:12px}
+  .badge{background:rgba(168,85,247,.2);color:var(--p);border:1px solid rgba(168,85,247,.4);border-radius:20px;padding:2px 9px;font-size:9px;letter-spacing:.5px}
+  .card-body{padding:14px;overflow:auto;display:flex;flex-direction:column;gap:12px}
 
-  .field{display:flex;flex-direction:column;gap:4px}
-  .field label{font-size:11px;color:var(--txt2);letter-spacing:.5px}
-  input,select,textarea{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:var(--radius-sm);
-    padding:7px 10px;color:var(--txt);font-size:13px;outline:none;transition:var(--trans);font-family:inherit}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--txt2);letter-spacing:.4px}
+  input,select,textarea{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;color:var(--txt);font-size:13px;outline:none;transition:var(--trans);font-family:inherit}
   input:focus,select:focus,textarea:focus{border-color:rgba(168,85,247,.6);box-shadow:0 0 0 2px rgba(168,85,247,.15)}
   input::placeholder{color:var(--txt3)}
-  textarea{height:64px;resize:vertical;font-family:'JetBrains Mono',monospace;font-size:12px}
-  input[type=number]{width:78px}
+  textarea{height:62px;resize:vertical;font-family:'JetBrains Mono',monospace;font-size:12px}
+  .sec-lbl{font-size:11px;font-weight:700;color:var(--g);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
 
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;
-    border-radius:var(--radius-sm);border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;
-    transition:var(--trans);white-space:nowrap;font-family:inherit}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);border:1px solid transparent;font-size:13px;font-weight:700;cursor:pointer;transition:var(--trans);white-space:nowrap;font-family:inherit}
   .btn:active{transform:scale(.97)}
-  .btn-primary{background:linear-gradient(135deg,rgba(0,255,136,.15),rgba(0,255,136,.08));border-color:rgba(0,255,136,.4);color:var(--g)}
-  .btn-primary:hover{background:rgba(0,255,136,.2);box-shadow:0 0 16px rgba(0,255,136,.2)}
-  .btn-danger{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.4);color:var(--r)}
-  .btn-danger:hover{background:rgba(239,68,68,.2)}
+  .btn-primary{background:linear-gradient(135deg,var(--g),#00cc6a);border-color:rgba(0,255,136,.5);color:#021;box-shadow:0 0 16px rgba(0,255,136,.25)}
+  .btn-primary:hover{box-shadow:0 0 22px rgba(0,255,136,.4)}
+  .btn-outline{background:linear-gradient(135deg,rgba(0,255,136,.12),rgba(0,255,136,.05));border-color:rgba(0,255,136,.4);color:var(--g)}
+  .btn-outline:hover{background:rgba(0,255,136,.18)}
+  .btn-danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.4);color:var(--r)}
+  .btn-danger:hover{background:rgba(239,68,68,.22)}
   .btn-ghost{background:var(--glass2);border-color:var(--border);color:var(--txt2)}
   .btn-ghost:hover{background:rgba(255,255,255,.1);color:var(--txt)}
-  .btn-sm{padding:5px 11px;font-size:12px}
+  .btn-sm{padding:6px 11px;font-size:12px}
   .btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 
-  /* worker grid */
-  #grid{display:grid;gap:10px;padding:14px;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}
-  .pane{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(10px);
-    display:flex;flex-direction:column;height:220px;overflow:hidden}
-  .pane .ph{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;
-    font-size:11px;font-weight:600;color:var(--txt2);letter-spacing:.5px}
+  /* Reroll 2-zone body: config | grid */
+  .reroll-body{flex:1;display:grid;grid-template-columns:320px 1fr;gap:14px;padding:14px;overflow:hidden}
+  .reroll-body>.card{min-height:0}
+  .stat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat-card{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .stat-card b{font-size:24px;font-weight:800;display:block}
+  .stat-card small{color:var(--txt3);font-size:11px}
+  .stat-card.ok b{color:var(--g)}.stat-card.err b{color:var(--r)}.stat-card.p b{color:var(--p)}
+  #gridwrap{flex:1;overflow:auto;min-height:0}
+  #grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+  .pane{background:var(--glass);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;height:200px;overflow:hidden}
+  .pane .ph{padding:7px 11px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:var(--txt2)}
   .pane .ph b{color:var(--g)}
-  .log-area{flex:1;overflow-y:auto;overflow-x:hidden;background:rgba(0,0,0,.4);margin:0;
-    padding:7px 10px;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11px;line-height:1.3}
-  .log-area::-webkit-scrollbar{width:4px}
-  .log-area::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
-  .log-line{display:block;animation:fadeIn .15s ease}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
-  .log-line.ok{color:var(--g)}.log-line.err{color:var(--r)}.log-line.info{color:var(--b)}.log-line.warn{color:var(--y)}
+  .log-area{flex:1;overflow-y:auto;background:rgba(0,0,0,.4);padding:6px 9px;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.3}
+  .log-area::-webkit-scrollbar{width:4px}.log-area::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+  .log-line{display:block;animation:fade .15s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .log-line.ok{color:var(--g)}.log-line.err{color:var(--r)}.log-line.info{color:var(--b)}
 
   table{width:100%;border-collapse:collapse;font-size:12px}
-  th{color:var(--txt2);text-align:left;padding:7px 6px;font-weight:600;font-size:11px;letter-spacing:.5px}
+  th{color:var(--txt2);text-align:left;padding:7px 6px;font-weight:700;font-size:11px}
   td{padding:7px 6px;border-top:1px solid var(--border)}
   .hint{color:var(--txt3);font-size:11px;line-height:1.5}.hint code{color:var(--b)}
-  .wrap{padding:16px;max-width:1100px}
+  .wrap{padding:18px;max-width:1080px;width:100%;overflow:auto}
 </style>
 </head>
 <body>
 <div class="orb2"></div>
-<div class="root">
-  <header>
-    <span class="logo" id="logo"><svg viewBox="0 0 48 48" width="36" height="36">
-      <circle cx="24" cy="24" r="20" fill="none" stroke="#050508" stroke-width="4"/>
-      <rect x="12" y="21.5" width="24" height="5" rx="2.5" fill="#050508"/></svg></span>
-    <div style="line-height:1.15">
-      <h1>E-FOOTBALL REROLL</h1>
-      <a class="credit" href="https://t.me/j3xdr" target="_blank">credit: t.me/j3xdr</a>
+<div class="app">
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="side">
+    <div class="side-brand">
+      <span class="logo" id="logo"><svg viewBox="0 0 48 48" width="38" height="38">
+        <circle cx="24" cy="24" r="20" fill="none" stroke="#050508" stroke-width="4"/><rect x="12" y="21.5" width="24" height="5" rx="2.5" fill="#050508"/></svg></span>
+      <div><h1>E-FOOTBALL</h1><small>REROLL · ระบบอัตโนมัติ</small></div>
     </div>
-    <div style="flex:1"></div>
-    <div class="hdr-stat ok"><b id="s_ok">0</b><small>สำเร็จ</small></div>
-    <div class="hdr-stat err"><b id="s_fail">0</b><small>fail</small></div>
-    <div class="hdr-stat"><b id="s_rate">0</b><small>/วินาที</small></div>
-    <div class="hdr-stat"><b id="s_day">0</b><small>/วัน</small></div>
-    <span class="status-dot" id="livedot"></span>
-  </header>
+    <div class="side-search">
+      <span class="ic">🔍</span>
+      <input placeholder="ค้นหาเมนู..." oninput="filterNav(this.value)">
+      <span class="kbd">Ctrl K</span>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-label">ฟังก์ชัน <span class="cnt">3</span></div>
+      <button class="navitem on" data-tab="reroll" data-name="Reroll Farm" onclick="switchTab('reroll',this)"><span class="em">🎲</span><span>Reroll Farm</span></button>
+      <button class="navitem" data-tab="link" data-name="KONAMI Link" onclick="switchTab('link',this)"><span class="em">🔗</span><span>KONAMI Link</span></button>
+      <button class="navitem" data-tab="gen" data-name="Gen Link" onclick="switchTab('gen',this)"><span class="em">📄</span><span>Gen Link (batch)</span></button>
+    </nav>
+    <div class="side-foot">credit: <a href="https://t.me/j3xdr" target="_blank">t.me/j3xdr</a></div>
+  </aside>
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="reroll" onclick="switchTab('reroll',this)">🎲 Reroll Farm</button>
-    <button class="tab-btn" data-tab="link" onclick="switchTab('link',this)">🔗 KONAMI Link</button>
-    <button class="tab-btn" data-tab="gen" onclick="switchTab('gen',this)">📄 Gen Link</button>
-  </div>
+  <!-- ===== MAIN ===== -->
+  <div class="main">
+    <div class="topbar">
+      <div class="pg-ic" id="pg-ic">🎲</div>
+      <div><div class="pg-tt">ฟังก์ชัน</div><div class="pg-h" id="pg-h">Reroll Farm</div></div>
+      <div class="pg-sub" id="pg-sub" style="margin-left:4px">— spray สร้างไอดี, เข้า MyClub, กระจาย device</div>
+      <div style="flex:1"></div>
+      <span class="pill" id="modepill">🌐 Direct IP</span>
+      <span class="pill"><span class="status-dot" id="livedot"></span><span id="livetxt">idle</span></span>
+    </div>
 
-  <div class="panels">
-    <!-- REROLL -->
-    <section id="panel-reroll" class="panel active">
-      <div style="padding:14px 14px 0">
-        <div class="card">
-          <div class="card-head"><span class="dot"></span>ตั้งค่า Reroll</div>
+    <div class="panels">
+      <!-- ===== REROLL ===== -->
+      <section id="panel-reroll" class="panel active">
+        <div class="reroll-body">
+          <!-- left: config -->
+          <div class="card">
+            <div class="card-head"><div class="l"><span class="dot"></span>Reroll &amp; Setup</div><span class="badge">STUDIO</span></div>
+            <div class="card-body">
+              <div class="field"><label>โหมด IP</label>
+                <select id="mode"><option value="direct">Direct — IP นี้ยิงตรง (spray)</option><option value="proxy">Proxy rotation — หลาย IP</option></select>
+              </div>
+              <div class="grid2">
+                <div class="field"><label>Workers</label><input id="workers" type="number" value="15" min="1" max="64"></div>
+                <div class="field"><label>เป้า (0=ไม่จำกัด)</label><input id="target" type="number" value="0" min="0"></div>
+              </div>
+              <label style="font-size:12px;color:var(--txt2)"><input id="setup" type="checkbox" style="width:auto;vertical-align:-1px"> ไอดีพร้อมใช้ (เข้า MyClub, ช้าลง)</label>
+              <div class="field proxywrap" id="proxywrap" style="display:none">
+                <label>Proxy list (1 บรรทัด 1 proxy)</label>
+                <textarea id="proxies" placeholder="http://user:pass@host:port&#10;socks5://host:port"></textarea>
+                <div class="hint">ใช้ <code>HTTP(S)</code>/<code>SOCKS5</code> · แนะนำ rotating residential/mobile · SOCKS ต้อง <code>pip install requests[socks]</code></div>
+              </div>
+              <div style="flex:1"></div>
+              <button class="btn btn-primary" id="start" style="width:100%">▶ เริ่ม Reroll</button>
+              <button class="btn btn-danger" id="stop" style="width:100%" disabled>■ หยุด</button>
+            </div>
+          </div>
+          <!-- right: stats + worker grid -->
+          <div class="card">
+            <div class="card-head"><div class="l"><span class="dot"></span>Live Workers</div>
+              <span id="ratetxt" style="color:var(--txt3);text-transform:none;letter-spacing:0">0/วิ · 0/วัน</span></div>
+            <div class="card-body" style="gap:12px">
+              <div class="stat-cards">
+                <div class="stat-card ok"><b id="s_ok">0</b><small>สร้างสำเร็จ</small></div>
+                <div class="stat-card err"><b id="s_fail">0</b><small>fail / throttle</small></div>
+                <div class="stat-card p"><b id="s_time">0s</b><small>เวลาที่รัน</small></div>
+              </div>
+              <div id="gridwrap"><div id="grid"></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== KONAMI LINK ===== -->
+      <section id="panel-link" class="panel">
+        <div class="wrap"><div class="card">
+          <div class="card-head"><div class="l"><span class="dot"></span>ขอ KONAMI ID Link (ทีละไอดี)</div></div>
           <div class="card-body">
             <div class="row">
-              <div class="field" style="min-width:230px"><label>โหมด</label>
-                <select id="mode">
-                  <option value="direct">Direct — IP นี้ยิงตรง (spray)</option>
-                  <option value="proxy">Proxy rotation — หลาย IP</option>
-                </select>
-              </div>
-              <div class="field"><label>Workers</label><input id="workers" type="number" value="15" min="1" max="64"></div>
-              <div class="field"><label>เป้า (0=ไม่จำกัด)</label><input id="target" type="number" value="0" min="0"></div>
-              <div class="field"><label>&nbsp;</label><label style="padding-top:7px"><input id="setup" type="checkbox" style="width:auto"> ไอดีพร้อมใช้ (เข้า MyClub)</label></div>
-              <div class="field"><label>&nbsp;</label><div class="row">
-                <button class="btn btn-primary" id="start">▶ START</button>
-                <button class="btn btn-danger" id="stop" disabled>■ STOP</button>
-              </div></div>
+              <input id="lk_acc" list="lk_list" placeholder="user_code (เช่น ASCV...)" style="width:240px">
+              <datalist id="lk_list"></datalist>
+              <button class="btn btn-outline btn-sm" id="lk_get">ขอ Link</button>
+              <input id="lk_url" readonly placeholder="link จะขึ้นที่นี่" style="flex:1;min-width:300px;color:var(--b)">
+              <button class="btn btn-ghost btn-sm" id="lk_copy">คัดลอก</button>
+              <span id="lk_cd" style="font-family:'JetBrains Mono',monospace"></span>
             </div>
-            <div class="field proxywrap" id="proxywrap" style="display:none">
-              <label>Proxy list (1 บรรทัด 1 proxy)</label>
-              <textarea id="proxies" placeholder="http://user:pass@host:port&#10;socks5://host:port"></textarea>
-              <div class="hint">ใช้ <code>HTTP(S)</code> หรือ <code>SOCKS5</code> · แนะนำ <b>rotating residential / mobile</b>
-                (datacenter โดนแบนง่าย) · SOCKS ต้อง <code>pip install requests[socks]</code> · worker หมุน proxy เองเมื่อโดนหน่วง</div>
+            <div class="hint">link พาไป my.konami.net ให้คนซื้อผูก KONAMI ID ของเขาเอง · อายุสั้น · ขอใหม่ได้เมื่อครบ 10 นาที</div>
+          </div>
+        </div></div>
+      </section>
+
+      <!-- ===== GEN LINK ===== -->
+      <section id="panel-gen" class="panel">
+        <div class="wrap"><div class="card">
+          <div class="card-head"><div class="l"><span class="dot"></span>Gen Link — อัปโหลด .txt หลายไฟล์ (1 ไฟล์ = 1 ไอดี)</div></div>
+          <div class="card-body">
+            <div class="row">
+              <input id="gl_files" type="file" accept=".txt" multiple style="padding:6px">
+              <span id="gl_cnt" style="color:var(--txt2)">ยังไม่เลือกไฟล์</span>
+              <button class="btn btn-primary btn-sm" id="gl_run" disabled>▶ ดึง Link ทั้งหมด</button>
+              <span class="hint">เรียงตามลำดับไฟล์ · ขอ Link ใหม่ได้เมื่อครบ 10 นาที · มีนับถอยหลัง</span>
             </div>
+            <div id="gl_tbl"></div>
           </div>
-        </div>
-      </div>
-      <div id="grid"></div>
-    </section>
-
-    <!-- KONAMI LINK -->
-    <section id="panel-link" class="panel">
-      <div class="wrap"><div class="card">
-        <div class="card-head"><span class="dot"></span>ขอ KONAMI ID Link (ทีละไอดี จากที่เก็บไว้)</div>
-        <div class="card-body">
-          <div class="row">
-            <input id="lk_acc" list="lk_list" placeholder="user_code (เช่น ASCV...)" style="width:240px">
-            <datalist id="lk_list"></datalist>
-            <button class="btn btn-primary btn-sm" id="lk_get">ขอ Link</button>
-            <input id="lk_url" readonly placeholder="link จะขึ้นที่นี่" style="flex:1;min-width:300px;color:var(--b)">
-            <button class="btn btn-ghost btn-sm" id="lk_copy">คัดลอก</button>
-            <span id="lk_cd" style="font-family:'JetBrains Mono',monospace"></span>
-          </div>
-          <div class="hint">link พาไป my.konami.net ให้คนซื้อผูก KONAMI ID ของเขาเอง · อายุสั้น · ขอใหม่ได้เมื่อครบ 10 นาที</div>
-        </div>
-      </div></div>
-    </section>
-
-    <!-- GEN LINK -->
-    <section id="panel-gen" class="panel">
-      <div class="wrap"><div class="card">
-        <div class="card-head"><span class="dot"></span>Gen Link — อัปโหลด .txt หลายไฟล์ (1 ไฟล์ = 1 ไอดี)</div>
-        <div class="card-body">
-          <div class="row">
-            <input id="gl_files" type="file" accept=".txt" multiple style="padding:6px">
-            <span id="gl_cnt" style="color:var(--txt2)">ยังไม่เลือกไฟล์</span>
-            <button class="btn btn-primary" id="gl_run" disabled>▶ ดึง Link ทั้งหมด</button>
-            <span class="hint">เรียงตามลำดับไฟล์ · ขอ Link ใหม่ได้เมื่อครบ 10 นาที · มีนับถอยหลัง</span>
-          </div>
-          <div id="gl_tbl"></div>
-        </div>
-      </div></div>
-    </section>
+        </div></div>
+      </section>
+    </div>
   </div>
 </div>
 
 <script>
 const $=id=>document.getElementById(id);
+const PGINFO={reroll:['🎲','Reroll Farm','— spray สร้างไอดี, เข้า MyClub, กระจาย device'],
+  link:['🔗','KONAMI Link','— ขอ account-link URL ทีละไอดี'],
+  gen:['📄','Gen Link','— อัปโหลด .txt หลายไฟล์ ดึง link ทั้งหมด']};
 function switchTab(name,btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   $('panel-'+name).classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  (btn||document.querySelector(`.tab-btn[data-tab="${name}"]`)).classList.add('active');
+  document.querySelectorAll('.navitem').forEach(b=>b.classList.remove('on'));
+  (btn||document.querySelector(`.navitem[data-tab="${name}"]`)).classList.add('on');
+  const [ic,h,sub]=PGINFO[name]; $('pg-ic').textContent=ic; $('pg-h').textContent=h; $('pg-sub').textContent=sub;
 }
+function filterNav(q){q=q.toLowerCase();document.querySelectorAll('.navitem').forEach(b=>{
+  b.style.display=b.dataset.name.toLowerCase().includes(q)?'flex':'none';});}
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();document.querySelector('.side-search input').focus();}});
 (()=>{const im=new Image();im.onload=()=>{$('logo').innerHTML=`<img src="logo.png?x=${Date.now()}">`;};im.src='logo.png?x='+Date.now();})();
 
 // REROLL
 let panes={},es=null;
-$('mode').onchange=()=>$('proxywrap').style.display=$('mode').value==='proxy'?'flex':'none';
+$('mode').onchange=()=>{const px=$('mode').value==='proxy';$('proxywrap').style.display=px?'flex':'none';
+  $('modepill').textContent=px?'🌐 Proxy rotation':'🌐 Direct IP';};
 function buildGrid(n){const g=$('grid');g.innerHTML='';panes={};
   for(let i=0;i<n;i++){const p=document.createElement('div');p.className='pane';
-    p.innerHTML=`<div class="ph"><span>PES API Worker #${i}</span><span>ok <b id="w${i}c">0</b></span></div><div class="log-area" id="w${i}"></div>`;
+    p.innerHTML=`<div class="ph"><span>Worker #${i}</span><span>ok <b id="w${i}c">0</b></span></div><div class="log-area" id="w${i}"></div>`;
     g.appendChild(p);panes[i]=$('w'+i);}}
 function addLine(w,lvl,t){const el=panes[w];if(!el)return;const d=document.createElement('div');d.className='log-line '+lvl;d.textContent=t;
-  el.appendChild(d);while(el.childNodes.length>200)el.removeChild(el.firstChild);el.scrollTop=el.scrollHeight;}
-function setLive(on){$('livedot').classList.toggle('active',on);$('start').disabled=on;$('stop').disabled=!on;}
+  el.appendChild(d);while(el.childNodes.length>160)el.removeChild(el.firstChild);el.scrollTop=el.scrollHeight;}
+function setLive(on){$('livedot').classList.toggle('active',on);$('livetxt').textContent=on?'RUNNING':'idle';$('start').disabled=on;$('stop').disabled=!on;}
 function connect(){if(es)es.close();es=new EventSource('/events');
   es.onmessage=e=>{const m=JSON.parse(e.data);
     if(m.type==='log'){addLine(m.w,m.lvl,m.t);const c=$('w'+m.w+'c');if(m.lvl==='ok'&&c)c.textContent=(+c.textContent+1);}
-    else if(m.type==='stats'){$('s_ok').textContent=m.ok;$('s_fail').textContent=m.fail;$('s_rate').textContent=m.rate;
-      $('s_day').textContent=m.perday.toLocaleString();setLive(m.running);}
+    else if(m.type==='stats'){$('s_ok').textContent=m.ok;$('s_fail').textContent=m.fail;$('s_time').textContent=m.elapsed+'s';
+      $('ratetxt').textContent=`${m.rate}/วิ · ${m.perday.toLocaleString()}/วัน`;setLive(m.running);}
     else if(m.type==='started'){buildGrid(m.workers);setLive(true);}
     else if(m.type==='stopped'){setLive(false);}};}
-$('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,
-    setup:$('setup').checked,proxies:$('proxies').value};buildGrid(body.workers);
-  await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
+$('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,setup:$('setup').checked,proxies:$('proxies').value};
+  buildGrid(body.workers);await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
 $('stop').onclick=()=>fetch('/api/stop',{method:'POST'});
 
-// KONAMI LINK (single)
+// KONAMI LINK
 let lkExp=0;
-async function loadAccounts(){try{const r=await (await fetch('/api/accounts')).json();
-  $('lk_list').innerHTML=(r.accounts||[]).map(a=>`<option value="${a}">`).join('');}catch(e){}}
+async function loadAccounts(){try{const r=await (await fetch('/api/accounts')).json();$('lk_list').innerHTML=(r.accounts||[]).map(a=>`<option value="${a}">`).join('');}catch(e){}}
 function lkTick(){const left=lkExp-Math.floor(Date.now()/1000);
-  if(lkExp&&left>0){const m=String(Math.floor(left/60)).padStart(2,'0'),s=String(left%60).padStart(2,'0');
-    $('lk_cd').innerHTML=`<span style="color:${left<60?'var(--r)':'var(--g)'}">valid ${m}:${s}</span>`;}
+  if(lkExp&&left>0){const m=String(Math.floor(left/60)).padStart(2,'0'),s=String(left%60).padStart(2,'0');$('lk_cd').innerHTML=`<span style="color:${left<60?'var(--r)':'var(--g)'}">valid ${m}:${s}</span>`;}
   else if(lkExp){$('lk_cd').innerHTML='<span style="color:var(--r)">หมดอายุ · ขอใหม่ได้</span>';}}
 async function getLink(){const uc=$('lk_acc').value.trim();if(!uc)return;$('lk_cd').textContent='กำลังขอ...';
-  try{const r=await (await fetch('/api/link?user_code='+encodeURIComponent(uc))).json();
-    if(r.error){$('lk_cd').textContent='ผิดพลาด: '+r.error;return;}
+  try{const r=await (await fetch('/api/link?user_code='+encodeURIComponent(uc))).json();if(r.error){$('lk_cd').textContent='ผิดพลาด: '+r.error;return;}
     $('lk_url').value=r.url;lkExp=r.expires;}catch(e){$('lk_cd').textContent='error '+e;}}
-$('lk_get').onclick=getLink;
-$('lk_copy').onclick=()=>{$('lk_url').select();document.execCommand('copy');};
+$('lk_get').onclick=getLink;$('lk_copy').onclick=()=>{$('lk_url').select();document.execCommand('copy');};
 
-// GEN LINK (batch)
+// GEN LINK
 const COOLDOWN=600;let glAccts=[],glState={};
 $('gl_files').onchange=async(e)=>{const files=[...e.target.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
-  glAccts=[];for(const f of files){try{const o=JSON.parse((await f.text()).trim());
-    if(o.user_id&&o.auth_code)glAccts.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),user_id:o.user_id,auth_code:o.auth_code,device_identifier:o.device_identifier||null});}catch(err){}}
+  glAccts=[];for(const f of files){try{const o=JSON.parse((await f.text()).trim());if(o.user_id&&o.auth_code)glAccts.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),user_id:o.user_id,auth_code:o.auth_code,device_identifier:o.device_identifier||null});}catch(err){}}
   $('gl_cnt').textContent=`โหลด ${glAccts.length} ไอดี`;$('gl_run').disabled=glAccts.length===0;renderGl(glAccts.map(a=>({user_code:a.user_code})));};
 function renderGl(rows){let h='<table><tr><th>#</th><th>user_code</th><th>Link</th><th>สถานะ/เวลา</th><th></th></tr>';
-  rows.forEach((r,i)=>{h+=`<tr><td>${i+1}</td><td style="color:#fff">${r.user_code}</td>
-    <td><input id="glu${i}" readonly value="${r.url||''}" style="width:100%;color:var(--b)" placeholder="—"></td>
-    <td id="glc${i}" style="white-space:nowrap">${r.error?'<span style="color:var(--r)">'+r.error+'</span>':''}</td>
-    <td class="row"><button data-i="${i}" class="btn btn-ghost btn-sm glcopy">คัดลอก</button>
-        <button data-i="${i}" class="btn btn-primary btn-sm glref">ขอใหม่</button></td></tr>`;});
+  rows.forEach((r,i)=>{h+=`<tr><td>${i+1}</td><td style="color:#fff">${r.user_code}</td><td><input id="glu${i}" readonly value="${r.url||''}" style="width:100%;color:var(--b)" placeholder="—"></td><td id="glc${i}" style="white-space:nowrap">${r.error?'<span style="color:var(--r)">'+r.error+'</span>':''}</td><td class="row"><button data-i="${i}" class="btn btn-ghost btn-sm glcopy">คัดลอก</button><button data-i="${i}" class="btn btn-outline btn-sm glref">ขอใหม่</button></td></tr>`;});
   h+='</table>';$('gl_tbl').innerHTML=h;
   document.querySelectorAll('.glcopy').forEach(b=>b.onclick=()=>{const el=$('glu'+b.dataset.i);el.select();document.execCommand('copy');});
   document.querySelectorAll('.glref').forEach(b=>b.onclick=()=>fetchOne(+b.dataset.i));}
 async function fetchOne(i){const a=glAccts[i],st=glState[a.user_code]||{};const since=(Date.now()/1000)-(st.lastFetch||0);
   if(st.lastFetch&&since<COOLDOWN){$('glc'+i).innerHTML=`<span style="color:var(--r)">ขอใหม่ได้ใน ${Math.ceil(COOLDOWN-since)}s</span>`;return;}
-  $('glc'+i).textContent='กำลังขอ...';
-  const r=await (await fetch('/api/genlink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accounts:[a]})})).json();
+  $('glc'+i).textContent='กำลังขอ...';const r=await (await fetch('/api/genlink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accounts:[a]})})).json();
   const res=(r.results||[])[0]||{};if(res.error){$('glc'+i).innerHTML='<span style="color:var(--r)">'+res.error+'</span>';return;}
   $('glu'+i).value=res.url||'';glState[a.user_code]={expires:res.expires,lastFetch:Date.now()/1000};}
 $('gl_run').onclick=async()=>{renderGl(glAccts.map(a=>({user_code:a.user_code})));for(let i=0;i<glAccts.length;i++){await fetchOne(i);}};
 
 setInterval(()=>{lkTick();glAccts.forEach((a,i)=>{const st=glState[a.user_code],c=$('glc'+i);if(!st||!c)return;
   const left=(st.expires||0)-Math.floor(Date.now()/1000),cd=COOLDOWN-((Date.now()/1000)-(st.lastFetch||0));
-  if(left>0){const m=String(Math.floor(left/60)).padStart(2,'0'),s=String(left%60).padStart(2,'0');
-    c.innerHTML=`<span style="color:${left<60?'var(--r)':'var(--g)'}">valid ${m}:${s}</span>`;}
+  if(left>0){const m=String(Math.floor(left/60)).padStart(2,'0'),s=String(left%60).padStart(2,'0');c.innerHTML=`<span style="color:${left<60?'var(--r)':'var(--g)'}">valid ${m}:${s}</span>`;}
   else{c.innerHTML=cd>0?`<span style="color:var(--r)">หมดอายุ · ขอใหม่ได้ใน ${Math.ceil(cd)}s</span>`:`<span style="color:var(--txt3)">หมดอายุ · กด "ขอใหม่"</span>`;}});},1000);
 
 buildGrid(15);connect();loadAccounts();
