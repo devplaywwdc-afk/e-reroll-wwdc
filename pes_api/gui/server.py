@@ -36,8 +36,8 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/" or self.path.startswith("/index"):
             with open(INDEX, "rb") as f:
                 self._send(200, f.read(), "text/html; charset=utf-8")
-        elif self.path.lstrip("/") in ("logo.png", "logo.jpg", "logo.webp"):
-            name = self.path.lstrip("/")
+        elif self.path.split("?")[0].lstrip("/") in ("logo.png", "logo.jpg", "logo.webp"):
+            name = self.path.split("?")[0].lstrip("/")
             fp = os.path.join(HERE, name)
             if os.path.exists(fp):
                 ctype = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}[name.split(".")[-1]]
