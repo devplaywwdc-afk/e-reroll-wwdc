@@ -48,3 +48,5 @@ reroll_toolkit/konami_wire/
 # pure-API tool runtime log
 pes_api/daily.log
 pes_api/efootbase_cache.json
+
+pes_api/gacha_hits/

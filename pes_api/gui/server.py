@@ -19,6 +19,7 @@ import flows
 import client as cl
 import accounts
 import efootbase
+import gacha
 
 PORT = int(os.environ.get("PORT") or os.environ.get("HOST_PORT") or 8080)
 INDEX = os.path.join(HERE, "index.html")
@@ -155,6 +156,39 @@ class H(BaseHTTPRequestHandler):
                 ENGINE.emit({"type": "cdone", "total": total})
 
             threading.Thread(target=run_check, args=(accs,), daemon=True).start()
+            self._send(200, json.dumps({"ok": True, "total": len(accs)})); return
+        if self.path == "/api/gacha/scan":
+            accs = data.get("accounts") or accounts.load_all()
+            if not accs:
+                self._send(200, json.dumps({"error": "no accounts"})); return
+            a = accs[0]
+            try:
+                c = cl.GateClient(user_code=a.get("user_code"))
+                lr = flows.login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
+                sid = lr.get("session_id")
+                if not sid:
+                    self._send(200, json.dumps({"error": "login failed"})); return
+                sc = gacha.scan_agents(c, int(a["user_id"]), sid)
+                sc["sample"] = a.get("user_code")
+                self._send(200, json.dumps(sc, ensure_ascii=False))
+            except Exception as e:
+                self._send(200, json.dumps({"error": f"{type(e).__name__}: {e}"}))
+            return
+        if self.path == "/api/gacha/run":
+            accs = data.get("accounts") or accounts.load_all()
+            wanted = [w.strip() for w in (data.get("wanted") or []) if w.strip()]
+
+            def run_gacha(accs, wanted):
+                total = len(accs)
+                ENGINE.emit({"type": "gstart", "total": total, "wanted": wanted})
+                done = 0
+                for a in accs:
+                    rep = gacha.run_account(a, wanted)
+                    done += 1
+                    ENGINE.emit({"type": "grow", "done": done, "total": total, "rep": rep})
+                ENGINE.emit({"type": "gdone", "total": total})
+
+            threading.Thread(target=run_gacha, args=(accs, wanted), daemon=True).start()
             self._send(200, json.dumps({"ok": True, "total": len(accs)})); return
         if self.path == "/api/daily/start":
             up = data.get("accounts")  # optional uploaded accounts

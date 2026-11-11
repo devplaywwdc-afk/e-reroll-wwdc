@@ -145,9 +145,10 @@
       <span class="kbd">Ctrl K</span>
     </div>
     <nav class="nav" id="nav">
-      <div class="nav-label">ฟังก์ชัน <span class="cnt">6</span></div>
+      <div class="nav-label">ฟังก์ชัน <span class="cnt">7</span></div>
       <button class="navitem on" data-tab="reroll" data-name="Reroll Farm" onclick="switchTab('reroll',this)"><span class="em">🎲</span><span>Reroll Farm</span></button>
       <button class="navitem" data-tab="daily" data-name="Daily Login" onclick="switchTab('daily',this)"><span class="em">📅</span><span>Daily Login</span></button>
+      <button class="navitem" data-tab="gacha" data-name="กาชา Gacha" onclick="switchTab('gacha',this)"><span class="em">🎰</span><span>กาชา</span></button>
       <button class="navitem" data-tab="players" data-name="นักเตะ Players" onclick="switchTab('players',this)"><span class="em">👤</span><span>นักเตะ</span></button>
       <button class="navitem" data-tab="check" data-name="เช็คไอดี Checker" onclick="switchTab('check',this)"><span class="em">🔎</span><span>เช็คไอดี</span></button>
       <button class="navitem" data-tab="link" data-name="KONAMI Link" onclick="switchTab('link',this)"><span class="em">🔗</span><span>KONAMI Link</span></button>
@@ -268,6 +269,35 @@
         </div>
       </section>
 
+      <!-- ===== GACHA ===== -->
+      <section id="panel-gacha" class="panel">
+        <div class="wrap" style="max-width:100%">
+          <div class="card">
+            <div class="card-head"><div class="l"><span class="dot"></span>กาชา — สแกน Agent pack ฟรี + เปิด + กรองนักเตะ</div></div>
+            <div class="card-body">
+              <div class="row">
+                <div class="field" style="min-width:200px"><label>แหล่งไอดี</label>
+                  <select id="gc_src"><option value="folder">จากโฟลเดอร์ (accounts/)</option><option value="upload">อัปโหลด .txt</option></select></div>
+                <div class="field" id="gc_upwrap" style="display:none"><label>ไฟล์ .txt</label><input id="gc_files" type="file" accept=".txt" multiple style="padding:6px"><span id="gc_cnt" class="hint"></span></div>
+                <div class="field"><label>&nbsp;</label><button class="btn btn-outline btn-sm" id="gc_scan">🔍 สแกน Pack ฟรี</button></div>
+                <span class="hint" id="gc_scaninfo"></span>
+              </div>
+              <div id="gc_scantbl" style="margin:4px 0 10px"></div>
+              <div class="field"><label>กรองนักเตะที่อยากได้ (1 บรรทัด 1 ชื่อ — เว้นว่าง = เปิดอย่างเดียวไม่กรอง)</label>
+                <textarea id="gc_wanted" placeholder="Jude Bellingham&#10;Lamine Yamal" style="min-height:70px"></textarea></div>
+              <div class="row">
+                <button class="btn btn-primary btn-sm" id="gc_run">▶ เปิดกาชาทั้งหมด + กรอง</button>
+                <span class="hint" id="gc_prog"></span>
+              </div>
+              <div id="gc_barwrap" style="display:none;height:8px;background:var(--glass);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin:2px 0 12px">
+                <div id="gc_bar" style="height:100%;width:0;background:linear-gradient(90deg,var(--g),var(--p));transition:width .25s"></div></div>
+              <div class="hint" style="margin-bottom:8px">ไอดีที่เปิดได้นักเตะตรงที่กรอง จะถูก copy เข้าโฟลเดอร์ <b style="color:var(--g)">pes_api/gacha_hits/&lt;ชื่อนักเตะ&gt;/</b> (ได้หลายตัว → <b>2_ชื่อ1_ชื่อ2</b>)</div>
+              <div id="gc_tbl"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== ACCOUNT CHECKER ===== -->
       <section id="panel-check" class="panel">
         <div class="wrap" style="max-width:100%">
@@ -330,6 +360,7 @@
 const $=id=>document.getElementById(id);
 const PGINFO={reroll:['🎲','Reroll Farm','— spray สร้างไอดี, เข้า MyClub, กระจาย device'],
   daily:['📅','Daily Login','— login + รับ daily reward ทุก 09:00 ไทย + ดู currency'],
+  gacha:['🎰','กาชา','— สแกน Agent pack ฟรี + เปิดกาชา + กรองนักเตะที่อยากได้'],
   players:['👤','นักเตะ','— ดู roster + การ์ดนักเตะในไอดี (efootbase art)'],
   check:['🔎','เช็คไอดี','— รายงานนักเตะ + currency ของแต่ละไอดี'],
   link:['🔗','KONAMI Link','— ขอ account-link URL ทีละไอดี'],
@@ -372,6 +403,9 @@ function connect(){if(es)es.close();es=new EventSource('/events');
     else if(m.type==='cstart'){ckStart(m.total);}
     else if(m.type==='crow'){ckRow(m.rep,m.done,m.total);}
     else if(m.type==='cdone'){ckDone(m.total);}
+    else if(m.type==='gstart'){gcStart(m.total);}
+    else if(m.type==='grow'){gcRow(m.rep,m.done,m.total);}
+    else if(m.type==='gdone'){gcDone(m.total);}
   };}
 $('start').onclick=async()=>{const body={mode:$('mode').value,workers:+$('workers').value,target:+$('target').value,setup:$('setup').checked,claim:$('claim').checked,proxies:$('proxies').value};
   buildGrid(body.workers);await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
@@ -427,6 +461,48 @@ function ckRow(rep,done,total){const i=window._ckres.length;window._ckres.push(r
 function ckDone(total){ckBar(total,total);$('ck_run').disabled=false;setTimeout(()=>{$('ck_barwrap').style.display='none';},1200);}
 function ckView(i){const dr=$('ckd'+i);const show=dr.style.display==='none';dr.style.display=show?'table-row':'none';
   if(show&&!$('ckg'+i).innerHTML){$('ckg'+i).innerHTML=((window._ckres[i]||{}).players||[]).map(playerCard).join('');}}
+
+// GACHA
+let gcUploaded=null;
+$('gc_src').onchange=()=>$('gc_upwrap').style.display=$('gc_src').value==='upload'?'flex':'none';
+$('gc_files').onchange=async(e)=>{const fs=[...e.target.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));gcUploaded=[];
+  for(const f of fs){try{const o=JSON.parse((await f.text()).trim());if(o.user_id&&o.auth_code)gcUploaded.push({user_code:o.user_code||f.name.replace(/\.txt$/i,''),user_id:o.user_id,auth_code:o.auth_code,device_identifier:o.device_identifier||null});}catch(err){}}
+  $('gc_cnt').textContent=`โหลด ${gcUploaded.length} ไอดี`;};
+function gcAccs(){return $('gc_src').value==='upload'?(gcUploaded||[]):null;}
+$('gc_scan').onclick=async()=>{
+  const accs=gcAccs(); $('gc_scaninfo').textContent='กำลังสแกน...'; $('gc_scantbl').innerHTML='';
+  const r=await (await fetch('/api/gacha/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(accs?{accounts:accs}:{})})).json();
+  if(r.error){$('gc_scaninfo').textContent='ผิดพลาด: '+r.error;return;}
+  const free=r.free||[], all=r.all||[];
+  $('gc_scaninfo').innerHTML=`พบ <b style="color:var(--g)">${r.free_count} pack ฟรี</b> (จาก ${all.length} pack · sample ${r.sample||''})`;
+  let h='<table><tr><th>Pack</th><th>ประเภท</th><th>ฟรี?</th><th>จำนวน/ครั้ง</th><th>เหลือ</th><th>หมดอายุ</th></tr>';
+  all.forEach(a=>{const fr=a.free?(a.needs_ad?'<span style="color:var(--y)">ฟรี(ต้องดูโฆษณา)</span>':'<span style="color:var(--g);font-weight:700">ฟรี</span>'):'<span style="color:var(--txt3)">เสียเงิน</span>';
+    const exp=a.expires?new Date(a.expires*1000).toLocaleDateString('th-TH'):'—';
+    h+=`<tr${a.free&&!a.needs_ad?' style="background:rgba(0,255,136,.05)"':''}><td style="color:#fff">${a.title||a.agent_id}</td><td style="color:var(--txt2)">${a.sub||''}</td><td>${fr}</td><td>${a.count||'—'}</td><td>${a.remaining}</td><td style="color:var(--txt3)">${exp}</td></tr>`;});
+  h+='</table>';$('gc_scantbl').innerHTML=h;};
+function gcBar(done,total){const pct=total?Math.round(done/total*100):0;$('gc_bar').style.width=pct+'%';
+  $('gc_prog').textContent=done>=total?`เปิดเสร็จ ${total} ไอดี`:`กำลังเปิด ${done}/${total}... (${pct}%)`;}
+$('gc_run').onclick=async()=>{
+  const accs=gcAccs(); const wanted=$('gc_wanted').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  window._gcres=[]; $('gc_tbl').innerHTML=''; $('gc_bar').style.width='0'; $('gc_barwrap').style.display='block';
+  $('gc_prog').textContent='เริ่มเปิด...'; $('gc_run').disabled=true;
+  await fetch('/api/gacha/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...(accs?{accounts:accs}:{}),wanted})});
+};
+function gcStart(total){window._gcres=[];
+  $('gc_tbl').innerHTML='<table><tr><th>user_code</th><th>pack ฟรี</th><th>เปิดได้</th><th>ตรงที่กรอง</th><th>โฟลเดอร์</th><th></th></tr><tbody id="gc_body"></tbody></table>';
+  gcBar(0,total);}
+function gcRowHtml(a,i){
+  if(a.error)return `<tr><td style="color:#fff">${a.user_code}</td><td colspan="5" style="color:var(--r)">${a.error}</td></tr>`;
+  const hits=(a.hits||[]);const hitTxt=hits.length?`<span style="color:var(--g);font-weight:700">${hits.join(', ')}</span>`:'<span style="color:var(--txt3)">—</span>';
+  const fol=a.folder?`<span style="color:var(--p)">${a.folder}</span>`:'<span style="color:var(--txt3)">—</span>';
+  return `<tr${hits.length?' style="background:rgba(0,255,136,.06)"':''}><td style="color:#fff">${a.user_code}</td><td>${a.free_count}</td><td>${a.drawn}</td><td>${hitTxt}</td><td>${fol}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="gcView(${i})">ดูที่ได้</button></td></tr>
+    <tr id="gcd${i}" style="display:none"><td colspan="6"><div id="gcg${i}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;padding:6px"></div></td></tr>`;}
+function gcRow(rep,done,total){const i=window._gcres.length;window._gcres.push(rep);
+  const b=$('gc_body');if(b)b.insertAdjacentHTML('beforeend',gcRowHtml(rep,i));gcBar(done,total);}
+function gcDone(total){gcBar(total,total);$('gc_run').disabled=false;setTimeout(()=>{$('gc_barwrap').style.display='none';},1200);}
+function gcView(i){const dr=$('gcd'+i);const show=dr.style.display==='none';dr.style.display=show?'table-row':'none';
+  if(show&&!$('gcg'+i).innerHTML){$('gcg'+i).innerHTML=((window._gcres[i]||{}).players||[]).map(playerCard).join('');}}
 
 // DAILY LOGIN
 let dRows={}, dUploaded=null;
