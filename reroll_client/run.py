@@ -47,8 +47,8 @@ def main() -> int:
     ap.add_argument("--prefix", help="reroll: in-game name prefix")
     ap.add_argument("--agent", type=int, default=0, help="gacha: only this agent_id")
     ap.add_argument("--local-engine", help="dev: exec this engine source instead of /module")
-    ap.add_argument("--discord", action="store_true",
-                    help="phase 2: sign in with Discord before the session")
+    ap.add_argument("--no-discord", action="store_true",
+                    help="dev only: skip the (mandatory) Discord login")
     ap.add_argument("--dry-run", action="store_true",
                     help="handshake + brain decrypt only, no engine exec")
     args = ap.parse_args()
@@ -61,17 +61,12 @@ def main() -> int:
     if not build_id:
         print("error: no build_id (pass --build or bundle build_id.txt)", file=sys.stderr)
         return 2
-    if not key:
-        try:
-            key = input("License key: ").strip()
-        except EOFError:
-            key = ""
-    if not key:
-        print("error: no license key", file=sys.stderr)
-        return 2
 
+    # Discord login is MANDATORY (person anchor). The key is bound to this Discord
+    # on first use and only works for it thereafter; no Discord = no run. The
+    # server enforces this too (a patched client still gets 403 without a token).
     discord_token = None
-    if args.discord:
+    if not args.no_discord:
         from loader import discord_auth
         try:
             info = discord_auth.login()
@@ -80,6 +75,15 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print(f"Discord login failed: {e}", file=sys.stderr)
             return 1
+
+    if not key:
+        try:
+            key = input("License key: ").strip()
+        except EOFError:
+            key = ""
+    if not key:
+        print("error: no license key", file=sys.stderr)
+        return 2
 
     params = {"count": args.count, "agent": args.agent}
     if args.prefix:
