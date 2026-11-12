@@ -88,11 +88,12 @@ def build_engine_artifact(k_brain: bytes, dist: str) -> str:
     return out
 
 
-def build_exe(module_id: str, dist: str) -> str:
+def build_exe(module_id: str, dist: str, gui: bool = False) -> str:
     name = {"reroll": "eFootballReroll", "gacha": "eFootballGacha",
             "daily": "eFootballDaily"}[module_id]
     brain_enc = os.path.join(dist, "brain.enc")
     sep = ";" if os.name == "nt" else ":"
+    entry = os.path.join(HERE, "gui.py" if gui else "run.py")
     cmd = [
         sys.executable, "-m", "PyInstaller", "--onefile", "--noconfirm",
         "--name", name,
@@ -105,8 +106,10 @@ def build_exe(module_id: str, dist: str) -> str:
         "--hidden-import", "requests",
         "--hidden-import", "msgpack",
         "--collect-all", "Crypto",
-        os.path.join(HERE, "run.py"),
     ]
+    if gui:
+        cmd += ["--windowed"]   # no console window for the customer GUI
+    cmd.append(entry)
     print("[*] building exe:", " ".join(cmd))
     subprocess.run(cmd, check=True)
     return os.path.join(dist, name + (".exe" if os.name == "nt" else ""))
@@ -139,6 +142,8 @@ def main() -> int:
     ap.add_argument("--brain-src", help="JSON file with the real brain dict")
     ap.add_argument("--dist", default=os.path.join(HERE, "dist"))
     ap.add_argument("--exe", action="store_true", help="also build the onefile exe")
+    ap.add_argument("--gui", action="store_true",
+                    help="build the windowed GUI exe (gui.py) instead of the CLI")
     ap.add_argument("--native", action="store_true",
                     help="L5: compile crypto modules to .pyd before freezing")
     ap.add_argument("--register", action="store_true",
@@ -165,9 +170,9 @@ def main() -> int:
         if args.native:
             build_native_modules()
             with _native_only():
-                exe_path = build_exe(args.module, args.dist)
+                exe_path = build_exe(args.module, args.dist, gui=args.gui)
         else:
-            exe_path = build_exe(args.module, args.dist)
+            exe_path = build_exe(args.module, args.dist, gui=args.gui)
         m_hex = integrity.measure(exe_path).hex()   # measure the FROZEN exe
     else:
         print("[!] --exe not set: brain.enc written but M not measured "

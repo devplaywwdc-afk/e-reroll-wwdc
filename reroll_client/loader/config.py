@@ -28,3 +28,9 @@ BRAIN_MAGIC = b"RRB1"
 # Discord OAuth2 (phase 2). PUBLIC client id only — the client secret lives on
 # the server. Empty = this build runs key+HWID only (phase 1). Fill per build.
 DISCORD_CLIENT_ID = "1570347324885180516"
+
+# App version + the public GitHub repo used for the (soft) auto-update check.
+# Bump APP_VERSION each release and publish a GitHub Release tagged v<version>
+# with the exe attached. This is a NOTICE-only check (not forced).
+APP_VERSION = "1.0.0"
+GITHUB_REPO = "cookiewikiadmin-hub/efootball-reroll"
