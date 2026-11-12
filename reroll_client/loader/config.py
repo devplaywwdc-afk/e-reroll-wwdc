@@ -27,4 +27,4 @@ BRAIN_MAGIC = b"RRB1"
 
 # Discord OAuth2 (phase 2). PUBLIC client id only — the client secret lives on
 # the server. Empty = this build runs key+HWID only (phase 1). Fill per build.
-DISCORD_CLIENT_ID = ""
+DISCORD_CLIENT_ID = "1570347324885180516"
