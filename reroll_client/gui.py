@@ -12,7 +12,7 @@ import sys
 import threading
 import webbrowser
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from loader import config
 from loader.loader import VALID_MODULES, run_module
@@ -31,6 +31,20 @@ def _bundled_build_id() -> str:
         return os.environ.get("REROLL_BUILD", "")
 
 
+def _locked_module() -> str | None:
+    """A per-function exe (eFootballGacha.exe) locks the GUI to that one module.
+    Returns None for the generic dev build (gui.py / run.py)."""
+    stem = os.path.splitext(os.path.basename(
+        sys.executable if getattr(sys, "frozen", False) else sys.argv[0]))[0].lower()
+    for m in VALID_MODULES:
+        if m in stem:
+            return m
+    return None
+
+
+_MODULE_TH = {"reroll": "รีโรล", "gacha": "กาชา", "daily": "เช็คอินรายวัน"}
+
+
 class _QueueWriter:
     """Redirect engine print() into the GUI log queue."""
     def __init__(self, q): self.q = q
@@ -47,9 +61,14 @@ class App:
         self.discord_token: str | None = None
         self.discord_name: str | None = None
         self.build_id = _bundled_build_id()
+        self.locked_module = _locked_module()
         self.worker: threading.Thread | None = None
+        self.out_dir: str | None = None
 
-        root.title("eFootball Reroll")
+        _title = "eFootball Reroll"
+        if self.locked_module:
+            _title += f" — {_MODULE_TH.get(self.locked_module, self.locked_module)}"
+        root.title(_title)
         root.geometry("640x520")
         root.minsize(560, 460)
         root.option_add("*Font", FONT)
@@ -99,14 +118,21 @@ class App:
             row=0, column=1, columnspan=3, sticky="we", padx=6, pady=6)
 
         ttk.Label(cfr, text="โหมด").grid(row=1, column=0, sticky="w", padx=10, pady=6)
-        self.module_var = tk.StringVar(value="reroll")
+        self.module_var = tk.StringVar(value=self.locked_module or "reroll")
         ttk.Combobox(cfr, textvariable=self.module_var, values=list(VALID_MODULES),
-                     state="readonly", width=12, font=FONT).grid(
-            row=1, column=1, sticky="w", padx=6, pady=6)
+                     state=("disabled" if self.locked_module else "readonly"),
+                     width=12, font=FONT).grid(row=1, column=1, sticky="w", padx=6, pady=6)
         ttk.Label(cfr, text="จำนวน").grid(row=1, column=2, sticky="e", padx=6, pady=6)
         self.count_var = tk.IntVar(value=5)
         ttk.Spinbox(cfr, from_=1, to=9999, textvariable=self.count_var, width=8,
                     font=FONT).grid(row=1, column=3, sticky="w", padx=6, pady=6)
+
+        # account folder (gacha/daily read saved .txt from here; reroll saves here)
+        ttk.Label(cfr, text="โฟลเดอร์บัญชี").grid(row=2, column=0, sticky="w", padx=10, pady=6)
+        self.folder_lbl = ttk.Label(cfr, text="(ค่าเริ่มต้น — ข้างตัวโปรแกรม)", foreground="#888")
+        self.folder_lbl.grid(row=2, column=1, columnspan=2, sticky="w", padx=6, pady=6)
+        ttk.Button(cfr, text="เลือก...", command=self._pick_folder).grid(
+            row=2, column=3, sticky="w", padx=6, pady=6)
         cfr.columnconfigure(1, weight=1)
 
         # Buttons
@@ -127,6 +153,18 @@ class App:
         sb.pack(side="right", fill="y", pady=8)
         self.log.configure(yscrollcommand=sb.set, state="disabled")
 
+        # credit / contact (clickable)
+        cred = ttk.Frame(self.root)
+        cred.pack(fill="x", padx=12, pady=(0, 8))
+        tg = ttk.Label(cred, text="ติดต่อ / อัปเดต: t.me/j3xdr", foreground="#4a90d9",
+                       cursor="hand2")
+        tg.pack(side="left")
+        tg.bind("<Button-1>", lambda e: webbrowser.open("https://t.me/j3xdr"))
+        shop = ttk.Label(cred, text="สั่งซื้อ: crgwwdc.shop", foreground="#4a90d9",
+                         cursor="hand2")
+        shop.pack(side="right")
+        shop.bind("<Button-1>", lambda e: webbrowser.open("https://crgwwdc.shop"))
+
     # ------------------------------------------------------------------ log
     def _append(self, text: str):
         self.log.configure(state="normal")
@@ -138,6 +176,14 @@ class App:
         self.log.configure(state="normal")
         self.log.delete("1.0", "end")
         self.log.configure(state="disabled")
+
+    def _pick_folder(self):
+        d = filedialog.askdirectory(title="เลือกโฟลเดอร์ที่เก็บไฟล์บัญชี (.txt)")
+        if d:
+            self.out_dir = d
+            n = len([f for f in os.listdir(d) if f.endswith(".txt")])
+            self.folder_lbl.configure(text=f"{d}  ({n} บัญชี)", foreground="#1e7e34")
+            self._log(f"โฟลเดอร์บัญชี: {d} ({n} ไฟล์ .txt)")
 
     def _drain_log(self):
         try:
@@ -217,8 +263,11 @@ class App:
             self._log("ไม่พบ build id (ไฟล์เสียหาย?)")
             return
 
-        module = self.module_var.get()
+        module = self.locked_module or self.module_var.get()
         count = max(1, int(self.count_var.get() or 1))
+        params = {"count": count, "module": module}
+        if self.out_dir:
+            params["out_dir"] = self.out_dir
         self.btn_start.configure(state="disabled", text="กำลังทำงาน...")
         self._log(f"เริ่ม {module} จำนวน {count} — build {self.build_id}")
 
@@ -226,8 +275,7 @@ class App:
             old = sys.stdout
             sys.stdout = _QueueWriter(self.logq)
             try:
-                run_module(module, key, self.build_id,
-                           params={"count": count, "module": module},
+                run_module(module, key, self.build_id, params=params,
                            discord_token=self.discord_token)
                 self.logq.put("\n[เสร็จ]\n")
             except Exception as e:  # noqa: BLE001
