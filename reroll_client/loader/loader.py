@@ -47,13 +47,14 @@ def fetch_engine(ctx: SessionCtx, module_id: str) -> str:
 
 def run_module(module_id: str, key: str, build_id: str,
                brain_enc_path: str | None = None, exec_engine: bool = True,
-               params: dict | None = None, local_engine: str | None = None):
+               params: dict | None = None, local_engine: str | None = None,
+               discord_token: str | None = None):
     if module_id not in VALID_MODULES:
         raise ValueError(f"bad module_id {module_id!r}")
 
     antidebug.enforce()  # L6: refuse under debugger/injector (soft gate, not in M)
     brain_enc = load_brain_enc(brain_enc_path)
-    ctx = open_session(key, build_id, module_id, brain_enc)
+    ctx = open_session(key, build_id, module_id, brain_enc, discord_token=discord_token)
     ctx.start_heartbeat(on_revoked=lambda: os._exit(2))
 
     if not exec_engine:

@@ -80,7 +80,8 @@ class SessionCtx:
             self._hb_thread.join(timeout=2)
 
 
-def open_session(key: str, build_id: str, module_id: str, brain_enc: bytes) -> SessionCtx:
+def open_session(key: str, build_id: str, module_id: str, brain_enc: bytes,
+                 discord_token: str | None = None) -> SessionCtx:
     cl = _client()
     eph = X25519PrivateKey.generate()
     eph_pub_hex = eph.public_key().public_bytes(
@@ -91,6 +92,8 @@ def open_session(key: str, build_id: str, module_id: str, brain_enc: bytes) -> S
         "key": key, "hwid": hwid(), "build_id": build_id, "module_id": module_id,
         "client_eph_pub": eph_pub_hex, "m": m.hex(),
     }
+    if discord_token:
+        body["prod_access_token"] = discord_token  # phase 2: person anchor
     status, r = cl.json("POST", "/session", body)
     if status == 426:
         raise UpdateRequired("build stale — update required")

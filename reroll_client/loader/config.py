@@ -24,3 +24,7 @@ X25519_PUB = "a7cc3b2dd07ee0abc5023f62df2cbf616757a3add9ed2c6bb4e8a759f6015573"
 
 # brain magic (packing format tag).
 BRAIN_MAGIC = b"RRB1"
+
+# Discord OAuth2 (phase 2). PUBLIC client id only — the client secret lives on
+# the server. Empty = this build runs key+HWID only (phase 1). Fill per build.
+DISCORD_CLIENT_ID = ""

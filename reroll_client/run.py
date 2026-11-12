@@ -47,6 +47,8 @@ def main() -> int:
     ap.add_argument("--prefix", help="reroll: in-game name prefix")
     ap.add_argument("--agent", type=int, default=0, help="gacha: only this agent_id")
     ap.add_argument("--local-engine", help="dev: exec this engine source instead of /module")
+    ap.add_argument("--discord", action="store_true",
+                    help="phase 2: sign in with Discord before the session")
     ap.add_argument("--dry-run", action="store_true",
                     help="handshake + brain decrypt only, no engine exec")
     args = ap.parse_args()
@@ -68,13 +70,25 @@ def main() -> int:
         print("error: no license key", file=sys.stderr)
         return 2
 
+    discord_token = None
+    if args.discord:
+        from loader import discord_auth
+        try:
+            info = discord_auth.login()
+            discord_token = info.get("prod_access_token")
+            print(f"Discord: {info.get('username')} ({info.get('discord_id')})")
+        except Exception as e:  # noqa: BLE001
+            print(f"Discord login failed: {e}", file=sys.stderr)
+            return 1
+
     params = {"count": args.count, "agent": args.agent}
     if args.prefix:
         params["prefix"] = args.prefix
     try:
         result = run_module(module_id, key, build_id,
                             brain_enc_path=args.brain, exec_engine=not args.dry_run,
-                            params=params, local_engine=args.local_engine)
+                            params=params, local_engine=args.local_engine,
+                            discord_token=discord_token)
     except Exception as e:  # noqa: BLE001 — top-level: show one clean line
         print(f"[{module_id}] FAILED: {e}", file=sys.stderr)
         return 1
