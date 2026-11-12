@@ -165,9 +165,11 @@
       <div><div class="pg-tt">ฟังก์ชัน</div><div class="pg-h" id="pg-h">Reroll Farm</div></div>
       <div class="pg-sub" id="pg-sub" style="margin-left:4px">— spray สร้างไอดี, เข้า MyClub, กระจาย device</div>
       <div style="flex:1"></div>
+      <span class="pill" id="srvpill" onclick="srvCheck()" style="cursor:pointer" title="เช็คสถานะเกม/server">🛰 เช็คสถานะเกม</span>
       <span class="pill" id="modepill">🌐 Direct IP</span>
       <span class="pill"><span class="status-dot" id="livedot"></span><span id="livetxt">idle</span></span>
     </div>
+    <div id="srvbox" style="display:none;margin:0 20px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:rgba(5,5,8,.6);font-size:12px"></div>
 
     <div class="panels">
       <!-- ===== REROLL ===== -->
@@ -424,6 +426,23 @@ function buildGrid(n){const g=$('grid');g.innerHTML='';panes={};
 function addLine(w,lvl,t){const el=panes[w];if(!el)return;const d=document.createElement('div');d.className='log-line '+lvl;d.textContent=t;
   el.appendChild(d);while(el.childNodes.length>160)el.removeChild(el.firstChild);el.scrollTop=el.scrollHeight;}
 function setLive(on){$('livedot').classList.toggle('active',on);$('livetxt').textContent=on?'RUNNING':'idle';$('start').disabled=on;$('stop').disabled=!on;}
+const SRV={ok:['var(--g)','✅ ปกติ — เล่น+API ได้'],partial:['var(--y)','🛠 ปิดปรับปรุงบางส่วน (เล่นได้ แต่บางฟังก์ชันปิด)'],
+  down:['var(--r)','⛔ ปิดทั้งระบบ / ติดต่อ gate ไม่ได้'],issue:['var(--y)','⚠️ บาง command error — อาจต้องอัปเวอร์ชัน (version-gate)']};
+async function srvCheck(){
+  $('srvpill').innerHTML='🛰 กำลังเช็ค...'; const box=$('srvbox'); box.style.display='block'; box.innerHTML='กำลังเช็คสถานะ...';
+  try{
+    const r=await (await fetch('/api/server-status')).json();
+    const [col,txt]=SRV[r.status]||['var(--txt2)',r.status];
+    $('srvpill').innerHTML=`🛰 <span style="color:${col}">${r.status.toUpperCase()}</span>`;
+    let h=`<div style="font-weight:700;color:${col};margin-bottom:4px">${txt} <span style="color:var(--txt3);font-weight:400">· เช็ค ${r.checked} · client ${r.client_version}</span></div>`;
+    h+='<table style="width:auto"><tr><th>command</th><th>ผล</th><th>ปิดถึง</th><th>ข้อความ</th></tr>';
+    (r.checks||[]).forEach(c=>{const ok=c.result==='NOERR';
+      h+=`<tr><td style="color:#fff">${c.cmd}</td><td style="color:${ok?'var(--g)':'var(--r)'}">${c.result}</td>
+        <td style="color:var(--y)">${c.maintenance_end_str||(c.maintenance_end||'—')}</td>
+        <td style="color:var(--txt2);max-width:360px">${c.show_info?JSON.stringify(c.show_info).slice(0,200):'—'}</td></tr>`;});
+    box.innerHTML=h+'</table>';
+  }catch(e){$('srvpill').innerHTML='🛰 เช็คไม่ได้';box.innerHTML='<span style="color:var(--r)">เช็คไม่ได้: '+e+'</span>';}
+}
 function connect(){if(es)es.close();es=new EventSource('/events');
   es.onmessage=e=>{const m=JSON.parse(e.data);
     if(m.type==='log'){addLine(m.w,m.lvl,m.t);const c=$('w'+m.w+'c');if(m.lvl==='ok'&&c)c.textContent=(+c.textContent+1);}

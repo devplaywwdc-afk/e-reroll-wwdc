@@ -197,6 +197,63 @@ def get_konami_link(client, user_id, session_id, lang="th") -> dict:
     }
 
 
+def server_status(sample=None):
+    """Probe the gate to tell real maintenance from 'game works but a feature is gated'.
+    Pings an unauth command, and (if `sample` account given) login + mainmenu + agentlist.
+    Returns {status, checked, client_version, checks:[{cmd,result,maintenance_end,show_info}]}."""
+    import os as _os, datetime as _dt
+    c = cl.GateClient(max_retries=0)
+    checks = []
+
+    def rec(name, r):
+        d = {"cmd": name,
+             "result": r.get("result") if isinstance(r, dict) else str(r),
+             "maintenance_end": (r.get("maintenance_end_time") or None) if isinstance(r, dict) else None,
+             "show_info": (r.get("show_info") or None) if isinstance(r, dict) else None}
+        if d["maintenance_end"]:
+            try:
+                d["maintenance_end_str"] = _dt.datetime.fromtimestamp(int(d["maintenance_end"])).strftime("%d/%m %H:%M")
+            except Exception:
+                pass
+        checks.append(d)
+        return d
+
+    try:
+        b = _commons("CMD_CHECK_STRING", 0, "", DEVICE_HASH)
+        b["device"] = {"device_identifier": _os.urandom(32).hex()}
+        b["str_list"] = ["efb_" + "".join(random.choices(string.ascii_letters, k=6))]
+        rec("CHECK_STRING", c.send("CMD_CHECK_STRING", b))
+    except Exception as e:
+        checks.append({"cmd": "CHECK_STRING", "result": f"EXC {type(e).__name__}: {e}"})
+
+    if sample:
+        try:
+            lr = login(c, int(sample["user_id"]), sample["auth_code"], sample.get("device_identifier"))
+            rec("LOGIN", lr)
+            sid = lr.get("session_id")
+            if sid:
+                rec("MAINMENU", get_mainmenu(c, int(sample["user_id"]), sid))
+                rec("AGENTLIST (กาชา)", c.send("CMD_GET_MYCLUB_AGENTLIST",
+                    _commons("CMD_GET_MYCLUB_AGENTLIST", int(sample["user_id"]), sid, LOGIN_HASH)))
+        except Exception as e:
+            checks.append({"cmd": "LOGIN", "result": f"EXC {type(e).__name__}: {e}"})
+
+    oks = [x for x in checks if x["result"] == "NOERR"]
+    maint = [x for x in checks if x.get("maintenance_end") or x.get("show_info")]
+    core = next((x for x in checks if x["cmd"] == "CHECK_STRING"), None)
+    if core and core["result"] != "NOERR" and (core.get("maintenance_end") or "EXC" in str(core["result"])):
+        status = "down"       # gate ปิดทั้งระบบ / ติดต่อไม่ได้
+    elif maint:
+        status = "partial"    # เล่นได้แต่บาง feature ปิด
+    elif len(oks) == len(checks):
+        status = "ok"
+    else:
+        status = "issue"      # บาง command error (ไม่ใช่ maintenance) — อาจ version-gate
+    return {"status": status, "checked": _dt.datetime.now().strftime("%H:%M:%S"),
+            "client_version": _commons("x", 0, "", "")["client_version"],
+            "checks": checks}
+
+
 def get_mailbox(client, user_id, session_id):
     return client.send("CMD_GET_MAILBOX_INFO",
                        _commons("CMD_GET_MAILBOX_INFO", user_id, session_id, LOGIN_HASH))

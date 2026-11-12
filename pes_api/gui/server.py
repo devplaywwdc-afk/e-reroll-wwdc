@@ -56,6 +56,12 @@ class H(BaseHTTPRequestHandler):
         elif self.path == "/api/status":
             self._send(200, json.dumps({"running": ENGINE.running, "cfg": ENGINE.cfg,
                                         "ok": ENGINE.stats["ok"], "fail": ENGINE.stats["fail"]}))
+        elif self.path == "/api/server-status":
+            sample = next(iter(accounts.load_all()), None)
+            try:
+                self._send(200, json.dumps(flows.server_status(sample), ensure_ascii=False))
+            except Exception as e:
+                self._send(200, json.dumps({"status": "issue", "error": f"{type(e).__name__}: {e}", "checks": []}))
         elif self.path == "/api/accounts":
             accs = [a["user_code"] for a in accounts.load_all()]
             self._send(200, json.dumps({"accounts": accs, "count": len(accs)}))
