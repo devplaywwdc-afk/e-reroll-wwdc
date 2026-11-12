@@ -1,0 +1,20 @@
+# build artifacts (contain exe + per-build k_brain in build.blob)
+dist/
+build/
+*.spec
+
+# runtime output
+accounts/
+*.enc
+module.bin
+*.b64
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# never commit real secrets
+.env
+brain_src.json

@@ -1,0 +1,90 @@
+"""Entry point for the 3 exes (one loader, module_id selects behavior).
+
+module_id resolution order:
+  1. REROLL_MODULE env   2. exe/script stem (eFootballReroll -> reroll, ...)
+  3. --module <id>       4. default "reroll"
+
+build_id + key come from --build / --key or env (REROLL_BUILD / REROLL_KEY) or,
+for a shipped build, a bundled `build_id.txt` next to the exe and an interactive
+key prompt. Phase-1 = key + HWID (no Discord).
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+from loader.loader import VALID_MODULES, run_module
+
+
+def _module_from_name() -> str | None:
+    stem = os.path.splitext(os.path.basename(sys.executable
+                            if getattr(sys, "frozen", False) else sys.argv[0]))[0]
+    low = stem.lower()
+    for m in VALID_MODULES:
+        if m in low:
+            return m
+    return None
+
+
+def _bundled_build_id() -> str | None:
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    p = os.path.join(base, "build_id.txt")
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="eFootball reroll client loader")
+    ap.add_argument("--module", choices=VALID_MODULES)
+    ap.add_argument("--key")
+    ap.add_argument("--build")
+    ap.add_argument("--brain", help="path to brain.enc (default: bundled)")
+    ap.add_argument("--count", type=int, default=1, help="reroll: how many accounts")
+    ap.add_argument("--prefix", help="reroll: in-game name prefix")
+    ap.add_argument("--agent", type=int, default=0, help="gacha: only this agent_id")
+    ap.add_argument("--local-engine", help="dev: exec this engine source instead of /module")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="handshake + brain decrypt only, no engine exec")
+    args = ap.parse_args()
+
+    module_id = (os.environ.get("REROLL_MODULE") or _module_from_name()
+                 or args.module or "reroll")
+    build_id = args.build or os.environ.get("REROLL_BUILD") or _bundled_build_id()
+    key = args.key or os.environ.get("REROLL_KEY")
+
+    if not build_id:
+        print("error: no build_id (pass --build or bundle build_id.txt)", file=sys.stderr)
+        return 2
+    if not key:
+        try:
+            key = input("License key: ").strip()
+        except EOFError:
+            key = ""
+    if not key:
+        print("error: no license key", file=sys.stderr)
+        return 2
+
+    params = {"count": args.count, "agent": args.agent}
+    if args.prefix:
+        params["prefix"] = args.prefix
+    try:
+        result = run_module(module_id, key, build_id,
+                            brain_enc_path=args.brain, exec_engine=not args.dry_run,
+                            params=params, local_engine=args.local_engine)
+    except Exception as e:  # noqa: BLE001 — top-level: show one clean line
+        print(f"[{module_id}] FAILED: {e}", file=sys.stderr)
+        return 1
+
+    if args.dry_run:
+        ctx = result
+        print(f"[{module_id}] handshake OK — sid={ctx.sid} "
+              f"brain_keys={sorted(ctx.brain)} heartbeat={ctx.heartbeat}s")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
