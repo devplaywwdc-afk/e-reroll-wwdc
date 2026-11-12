@@ -16,6 +16,7 @@ import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from . import antidebug
 from . import config  # noqa: F401  (kept for symmetry / future embedded brain)
 from .session import SessionCtx, open_session
 
@@ -50,6 +51,7 @@ def run_module(module_id: str, key: str, build_id: str,
     if module_id not in VALID_MODULES:
         raise ValueError(f"bad module_id {module_id!r}")
 
+    antidebug.enforce()  # L6: refuse under debugger/injector (soft gate, not in M)
     brain_enc = load_brain_enc(brain_enc_path)
     ctx = open_session(key, build_id, module_id, brain_enc)
     ctx.start_heartbeat(on_revoked=lambda: os._exit(2))

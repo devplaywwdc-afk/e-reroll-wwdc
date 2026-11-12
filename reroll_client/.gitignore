@@ -15,6 +15,11 @@ __pycache__/
 .venv/
 venv/
 
+# native build artifacts (L5): built from the .py sources at release time
+*.pyd
+*.hidden
+loader/*.build/
+
 # never commit real secrets
 .env
 brain_src.json

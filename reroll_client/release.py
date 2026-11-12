@@ -43,6 +43,35 @@ def load_brain(path: str | None) -> dict:
         return json.load(f)
 
 
+def build_native_modules() -> None:
+    """L5: compile sensitive modules to .pyd before freezing (see build_native.py)."""
+    subprocess.run([sys.executable, os.path.join(HERE, "build_native.py")], check=True)
+
+
+class _native_only:
+    """Temporarily hide the .py of any module that now has a .pyd, so PyInstaller
+    freezes the native version. Restores the .py afterward."""
+    def __init__(self):
+        import glob
+        self.moved = []
+        loader = os.path.join(HERE, "loader")
+        for pyd in glob.glob(os.path.join(loader, "*.pyd")):
+            base = os.path.basename(pyd).split(".")[0]
+            py = os.path.join(loader, base + ".py")
+            if os.path.exists(py):
+                self.moved.append((py, py + ".hidden"))
+
+    def __enter__(self):
+        for py, hidden in self.moved:
+            os.replace(py, hidden)
+        return self
+
+    def __exit__(self, *exc):
+        for py, hidden in self.moved:
+            if os.path.exists(hidden):
+                os.replace(hidden, py)
+
+
 def build_engine_artifact(k_brain: bytes, dist: str) -> str:
     """module_<id>.bin = nonce(12) || AES-256-GCM(k_brain).encrypt(engine_src).
 
@@ -110,6 +139,8 @@ def main() -> int:
     ap.add_argument("--brain-src", help="JSON file with the real brain dict")
     ap.add_argument("--dist", default=os.path.join(HERE, "dist"))
     ap.add_argument("--exe", action="store_true", help="also build the onefile exe")
+    ap.add_argument("--native", action="store_true",
+                    help="L5: compile crypto modules to .pyd before freezing")
     ap.add_argument("--register", action="store_true",
                     help="register build on the server (needs REROLL_ADMIN_TOKEN)")
     args = ap.parse_args()
@@ -131,7 +162,12 @@ def main() -> int:
     m_hex = None
     exe_path = None
     if args.exe:
-        exe_path = build_exe(args.module, args.dist)
+        if args.native:
+            build_native_modules()
+            with _native_only():
+                exe_path = build_exe(args.module, args.dist)
+        else:
+            exe_path = build_exe(args.module, args.dist)
         m_hex = integrity.measure(exe_path).hex()   # measure the FROZEN exe
     else:
         print("[!] --exe not set: brain.enc written but M not measured "
