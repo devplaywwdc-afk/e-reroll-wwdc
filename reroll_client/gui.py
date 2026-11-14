@@ -64,6 +64,8 @@ class App:
         self.locked_module = _locked_module()
         self.worker: threading.Thread | None = None
         self.out_dir: str | None = None
+        self.wanted_ids: list[int] = []
+        self._imgrefs: list = []   # keep PhotoImage refs alive
 
         _title = "eFootball Reroll"
         if self.locked_module:
@@ -141,6 +143,13 @@ class App:
         self.btn_start = ttk.Button(bfr, text="เริ่ม", command=self._on_start,
                                     style="Accent.TButton")
         self.btn_start.pack(side="left")
+        # pack picker (gacha): scan free packs -> tick wanted players
+        if (self.locked_module or "reroll") == "gacha":
+            self.btn_scan = ttk.Button(bfr, text="สแกนแพ็ค / เลือกนักเตะ",
+                                       command=self._on_scan_packs)
+            self.btn_scan.pack(side="left", padx=8)
+            self.want_lbl = ttk.Label(bfr, text="ยังไม่เลือกนักเตะ", foreground="#888")
+            self.want_lbl.pack(side="left", padx=4)
         ttk.Button(bfr, text="ล้าง log", command=self._clear_log).pack(side="right")
 
         # Log
@@ -195,6 +204,108 @@ class App:
 
     def _log(self, msg: str):
         self.logq.put(msg + "\n")
+
+    # ------------------------------------------------------------------ pack picker (gacha)
+    def _on_scan_packs(self):
+        if not self.discord_token:
+            self._log("ต้องเข้าสู่ระบบ Discord ก่อน"); return
+        key = self.key_var.get().strip()
+        if not key:
+            self._log("ใส่ License Key ก่อน"); return
+        if not self.out_dir:
+            self._log("เลือกโฟลเดอร์บัญชี (.txt) ก่อนสแกนแพ็ค"); return
+        self.btn_scan.configure(state="disabled", text="กำลังสแกน...")
+        self._log("กำลังสแกนแพ็คจากบัญชีแรกในโฟลเดอร์...")
+
+        def work():
+            try:
+                res = run_module("gacha", key, self.build_id,
+                                 params={"action": "scan", "out_dir": self.out_dir},
+                                 discord_token=self.discord_token)
+                packs = (res or {}).get("packs", [])
+            except Exception as e:  # noqa: BLE001
+                packs = []
+                self.logq.put(f"สแกนแพ็คล้มเหลว: {e}\n")
+            self.root.after(0, lambda: self._scan_done(packs))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _scan_done(self, packs):
+        self.btn_scan.configure(state="normal", text="สแกนแพ็ค / เลือกนักเตะ")
+        if not packs:
+            self._log("ไม่พบแพ็คฟรี (หรือบัญชียังไม่พร้อม)"); return
+        self._show_pack_picker(packs)
+
+    def _load_thumb(self, url, label):
+        def work():
+            try:
+                from io import BytesIO
+                from PIL import Image, ImageTk
+                import requests as rq
+                data = rq.get(url, timeout=8).content
+                im = Image.open(BytesIO(data)).convert("RGBA")
+                im.thumbnail((56, 56))
+                ph = ImageTk.PhotoImage(im)
+                self._imgrefs.append(ph)
+                self.root.after(0, lambda: label.configure(image=ph, text=""))
+            except Exception:
+                pass
+        threading.Thread(target=work, daemon=True).start()
+
+    def _show_pack_picker(self, packs):
+        win = tk.Toplevel(self.root)
+        win.title("เลือกนักเตะที่ต้องการ")
+        win.geometry("520x560")
+        win.transient(self.root)
+        vars_by_id: dict[int, tk.BooleanVar] = {}
+
+        canvas = tk.Canvas(win, highlightthickness=0)
+        sb = ttk.Scrollbar(win, orient="vertical", command=canvas.yview)
+        inner = ttk.Frame(canvas)
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-e.delta / 120), "units"))
+
+        for pack in packs:
+            tag = "  [ฟรี]" if pack.get("free") else ""
+            ttk.Label(inner, text=f"— {pack.get('title') or pack['agent_id']} —{tag}",
+                      font=FONT_B,
+                      foreground=("#1e7e34" if pack.get("free") else "#4a90d9")).pack(
+                          anchor="w", padx=8, pady=(10, 2))
+            for pl in pack["players"]:
+                pid = pl["id"]
+                row = ttk.Frame(inner)
+                row.pack(fill="x", padx=10, pady=2)
+                img = tk.Label(row, width=56, height=56, background="#2a2a2a")
+                img.pack(side="left")
+                if pl.get("art"):
+                    self._load_thumb(pl["art"], img)
+                var = tk.BooleanVar(value=(pid in self.wanted_ids))
+                vars_by_id[pid] = var
+                ov = pl.get("overall") or "?"
+                nm = pl.get("name") or f"#{pid}"
+                pos = pl.get("position") or ""
+                ttk.Checkbutton(row, text=f"  {nm}   {ov} {pos}", variable=var).pack(
+                    side="left", padx=8)
+
+        bar = ttk.Frame(win)
+        bar.pack(side="bottom", fill="x")
+
+        def done():
+            self.wanted_ids = [pid for pid, v in vars_by_id.items() if v.get()]
+            self.want_lbl.configure(
+                text=(f"เลือก {len(self.wanted_ids)} คน" if self.wanted_ids
+                      else "ยังไม่เลือกนักเตะ"),
+                foreground=("#1e7e34" if self.wanted_ids else "#888"))
+            self._log(f"เลือกนักเตะ {len(self.wanted_ids)} คน")
+            canvas.unbind_all("<MouseWheel>")
+            win.destroy()
+
+        ttk.Button(bar, text="เลือกเสร็จ", command=done,
+                   style="Accent.TButton").pack(side="right", padx=10, pady=8)
 
     # ------------------------------------------------------------------ update
     def _check_update(self, manual: bool):
@@ -268,6 +379,8 @@ class App:
         params = {"count": count, "module": module}
         if self.out_dir:
             params["out_dir"] = self.out_dir
+        if module == "gacha" and self.wanted_ids:
+            params["wanted_ids"] = self.wanted_ids
         self.btn_start.configure(state="disabled", text="กำลังทำงาน...")
         self._log(f"เริ่ม {module} จำนวน {count} — build {self.build_id}")
 

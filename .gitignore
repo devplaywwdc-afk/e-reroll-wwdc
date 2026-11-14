@@ -55,3 +55,7 @@ injector_app/build/
 injector_app/dist/
 injector_app/backups/
 injector_app/__pycache__/
+
+# server secrets — never commit
+server/.env.example
+**/.env

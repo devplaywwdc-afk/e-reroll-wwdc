@@ -418,6 +418,107 @@ def draw_all_free(client, uid, sid, scan=None, only_agent=0):
     return drawn
 
 
+# --- efootbase enrichment (public player data: name / overall / art image) ---
+_EFB_CACHE: dict = {}
+
+
+def efb_lookup(pid, timeout=7):
+    import re
+    import html as _html
+    key = str(pid)
+    if key in _EFB_CACHE:
+        return _EFB_CACHE[key]
+    info = {"id": key, "name": None, "overall": None, "position": None, "art": None}
+    try:
+        s = requests.Session()
+        s.headers["User-Agent"] = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                   "AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
+        r = s.get(f"https://efootbase.com/players/{key}", timeout=timeout,
+                  allow_redirects=False)
+        hops = 0
+        while r.status_code in (301, 302, 307, 308) and hops < 3:
+            loc = (r.headers.get("Location") or "").split(",")[0].strip()
+            if not loc:
+                break
+            if loc.startswith("/"):
+                loc = "https://efootbase.com" + loc
+            r = s.get(loc, timeout=timeout, allow_redirects=False)
+            hops += 1
+        if r.status_code == 200:
+            h = r.text
+            m = re.search(r"<title>([^<]+)</title>", h)
+            if m:
+                title = _html.unescape(m.group(1)).split("—")[0].split("|")[0].strip()
+                parts = [p.strip() for p in title.split("·")]
+                if parts:
+                    info["name"] = parts[0]
+                if len(parts) >= 2:
+                    mm = re.match(r"(\d{2,3})\s+([A-Z]{1,3})", parts[1])
+                    if mm:
+                        info["overall"] = int(mm.group(1))
+                        info["position"] = mm.group(2)
+            arts = re.findall(
+                r"cdn\.assets\.efootbase\.com/eFPlayers/players/\d+/v2/art-[0-9a-f]+\.webp", h)
+            if arts:
+                info["art"] = "https://" + arts[0]
+    except Exception:
+        pass
+    _EFB_CACHE[key] = info
+    return info
+
+
+def efb_many(ids, workers=12):
+    import concurrent.futures as cf
+    out = {}
+    todo = [str(i) for i in ids if str(i) not in _EFB_CACHE]
+    for i in ids:
+        if str(i) in _EFB_CACHE:
+            out[str(i)] = _EFB_CACHE[str(i)]
+    if todo:
+        with cf.ThreadPoolExecutor(max_workers=workers) as ex:
+            for info in ex.map(efb_lookup, todo):
+                out[info["id"]] = info
+    return out
+
+
+def pack_players(client, uid, sid, agent_ids):
+    """For each agent, return its showcase players enriched with name/overall/art,
+    split into pickup (top featured) + more (the rest of the notable cards)."""
+    b = _commons("CMD_GET_MYCLUB_AGENTLIST", uid, sid, _B["login_hash"])
+    r = client.send("CMD_GET_MYCLUB_AGENTLIST", b)
+    if not isinstance(r, dict) or r.get("result") != "NOERR":
+        return []
+    want = {int(x) for x in agent_ids}
+    byid = {a.get("agent_id"): a for a in r.get("agent_list", [])}
+    allids = []
+    for aid in want:
+        a = byid.get(aid, {})
+        allids += [p.get("gameplayer_id", {}).get("id") for p in (a.get("pickup_list") or [])]
+        allids += [x.get("id") for x in (a.get("pickup_cardtype_list") or [])]
+    info = efb_many([i for i in allids if i])
+
+    def card(gid):
+        e = info.get(str(gid), {})
+        return {"id": gid, "name": e.get("name"), "overall": e.get("overall"),
+                "position": e.get("position"), "art": e.get("art")}
+
+    packs = []
+    for aid in want:
+        a = byid.get(aid)
+        if not a:
+            continue
+        pickup_ids = [p.get("gameplayer_id", {}).get("id") for p in (a.get("pickup_list") or [])]
+        pickup = [card(i) for i in pickup_ids if i]
+        seen = set(pickup_ids)
+        more = [card(x["id"]) for x in (a.get("pickup_cardtype_list") or [])
+                if x.get("id") and x["id"] not in seen]
+        allp = pickup + more
+        allp.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
+        if allp:
+            packs.append({"agent_id": aid, "title": a.get("title"), "players": allp})
+    return packs
+
+
 # ---------------------------------------------------------------- persistence
 def _acc_dir(params):
     d = (params or {}).get("out_dir") or os.path.join(
@@ -475,8 +576,36 @@ def _reroll(params, log):
     return {"module": "reroll", "created": made, "out_dir": acc_dir}
 
 
+def _gacha_scan(params, log):
+    """Login ONE saved account, scan free packs, return pack players (+art) to pick from."""
+    acc_dir = _acc_dir(params)
+    files = sorted(f for f in os.listdir(acc_dir) if f.endswith(".txt"))
+    if not files:
+        log("ไม่พบไฟล์บัญชีในโฟลเดอร์ (เลือกโฟลเดอร์ที่มี .txt ก่อน)")
+        return {"module": "gacha", "action": "scan", "packs": []}
+    a = json.load(open(os.path.join(acc_dir, files[0]), encoding="utf-8"))
+    c = GateClient(user_code=a["user_code"])
+    lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
+    sid = lr.get("session_id")
+    if not sid:
+        log("login บัญชีแรกไม่สำเร็จ")
+        return {"module": "gacha", "action": "scan", "packs": []}
+    scan = scan_agents(c, int(a["user_id"]), sid)
+    all_ids = [x["agent_id"] for x in scan["all"]]
+    free_ids = {x["agent_id"] for x in scan["free"]}
+    log(f"เจอ {len(all_ids)} แพ็ค (ฟรีกดได้ {len(free_ids)}) — กำลังดึงรายชื่อนักเตะ")
+    packs = pack_players(c, int(a["user_id"]), sid, all_ids) if all_ids else []
+    for p in packs:
+        p["free"] = p["agent_id"] in free_ids
+    packs.sort(key=lambda p: (not p["free"], -(p["players"][0]["overall"] or 0) if p["players"] else 0))
+    log(f"ได้ {sum(len(p['players']) for p in packs)} นักเตะจาก {len(packs)} แพ็ค")
+    return {"module": "gacha", "action": "scan", "packs": packs}
+
+
 def _gacha(params, log):
     """Open free packs on saved accounts (filter by wanted player ids)."""
+    if (params or {}).get("action") == "scan":
+        return _gacha_scan(params, log)
     acc_dir = _acc_dir(params)
     only = int((params or {}).get("agent", 0))
     wanted_ids = {int(x) for x in (params or {}).get("wanted_ids", [])}

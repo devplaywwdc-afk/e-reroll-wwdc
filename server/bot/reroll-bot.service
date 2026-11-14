@@ -1,0 +1,18 @@
+[Unit]
+Description=Reroll License Discord Bot
+After=network-online.target reroll-license.service
+Wants=network-online.target
+
+[Service]
+User=reroll
+WorkingDirectory=/opt/reroll-license/bot
+EnvironmentFile=/opt/reroll-license/bot/.env
+ExecStart=/opt/reroll-license/venv/bin/python bot.py
+Restart=on-failure
+RestartSec=5
+# harden
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
