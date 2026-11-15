@@ -213,7 +213,8 @@ class App:
         self.logq.put(msg + "\n")
 
     def _on_module_change(self):
-        """Show the gacha pack-picker controls only when gacha is the active mode."""
+        """Show the gacha pack-picker controls only when gacha is the active mode,
+        and re-verify entitlement with the server on every mode switch."""
         is_gacha = (self.locked_module or self.module_var.get()) == "gacha"
         if is_gacha:
             self.btn_scan.pack(side="left", padx=8)
@@ -221,6 +222,8 @@ class App:
         else:
             self.btn_scan.pack_forget()
             self.want_lbl.pack_forget()
+        if getattr(self, "discord_token", None):
+            self._refresh_entitlement()   # fresh server check each switch
 
     # ------------------------------------------------------------------ pack picker (gacha)
     def _on_scan_packs(self):
@@ -438,6 +441,16 @@ class App:
             old = sys.stdout
             sys.stdout = _QueueWriter(self.logq)
             try:
+                # re-verify entitlement with the server right before running (not
+                # just the cached value) — extra friction for a patched client.
+                from loader import session
+                ent = session.check_entitlement(self.discord_token)
+                self.entitlement = ent
+                if not (ent.get("has_access") and module in (ent.get("modules") or [])):
+                    self.logq.put("\n[ตรวจสิทธิ์ไม่ผ่าน] ไม่มีสิทธิ์โหมดนี้ — ไปเช่าที่เว็บ\n")
+                    self.root.after(0, self._ent_done, ent)
+                    self.root.after(0, self._open_shop)
+                    return
                 run_module(module, self.build_id, discord_token=self.discord_token,
                            params=params)
                 self.logq.put("\n[เสร็จ]\n")
