@@ -135,15 +135,16 @@ async def mykeys(inter: discord.Interaction):
 @app_commands.describe(user="ลูกค้า (Discord)", days="จำนวนวัน (0=ไม่หมดอายุ)",
                        seats="จำนวนเครื่อง", entitlements="สิทธิ์ เช่น reroll,gacha,daily")
 async def genkey(inter: discord.Interaction, user: discord.Member,
-                 days: int = 0, seats: int = 1, entitlements: str = ""):
+                 days: int = -1, seats: int = 1, entitlements: str = ""):
     await inter.response.defer(ephemeral=True)
     if not _is_admin(inter):
         await inter.followup.send("❌ เฉพาะแอดมิน", ephemeral=True)
         return
-    days = days or DEFAULT_DAYS
+    if days < 0:                 # omitted -> default rental length
+        days = DEFAULT_DAYS
     ent = (entitlements or DEFAULT_ENT).strip()
     key = _gen_key()
-    expires_at = None if days <= 0 else int(time.time()) + days * 86400
+    expires_at = None if days == 0 else int(time.time()) + days * 86400  # 0 = permanent
     await _api("POST", "/admin/key", json={
         "key": key, "seats": max(1, seats), "entitlements": ent,
         "tier": "rental", "expires_at": expires_at, "discord_id": str(user.id)})
