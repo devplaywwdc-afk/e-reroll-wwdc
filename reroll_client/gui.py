@@ -127,9 +127,11 @@ class App:
 
         ttk.Label(cfr, text="โหมด").grid(row=1, column=0, sticky="w", padx=10, pady=6)
         self.module_var = tk.StringVar(value=self.locked_module or "reroll")
-        ttk.Combobox(cfr, textvariable=self.module_var, values=list(VALID_MODULES),
+        self.module_cb = ttk.Combobox(cfr, textvariable=self.module_var, values=list(VALID_MODULES),
                      state=("disabled" if self.locked_module else "readonly"),
-                     width=12, font=FONT).grid(row=1, column=1, sticky="w", padx=6, pady=6)
+                     width=12, font=FONT)
+        self.module_cb.grid(row=1, column=1, sticky="w", padx=6, pady=6)
+        self.module_cb.bind("<<ComboboxSelected>>", lambda e: self._on_module_change())
         ttk.Label(cfr, text="จำนวน").grid(row=1, column=2, sticky="e", padx=6, pady=6)
         self.count_var = tk.IntVar(value=5)
         ttk.Spinbox(cfr, from_=1, to=9999, textvariable=self.count_var, width=8,
@@ -149,14 +151,13 @@ class App:
         self.btn_start = ttk.Button(bfr, text="เริ่ม", command=self._on_start,
                                     style="Accent.TButton")
         self.btn_start.pack(side="left")
-        # pack picker (gacha): scan free packs -> tick wanted players
-        if (self.locked_module or "reroll") == "gacha":
-            self.btn_scan = ttk.Button(bfr, text="สแกนแพ็ค / เลือกนักเตะ",
-                                       command=self._on_scan_packs)
-            self.btn_scan.pack(side="left", padx=8)
-            self.want_lbl = ttk.Label(bfr, text="ยังไม่เลือกนักเตะ", foreground="#888")
-            self.want_lbl.pack(side="left", padx=4)
+        # pack picker (gacha): scan free packs -> tick wanted players.
+        # Created always; shown/hidden by _on_module_change (combined exe picks mode).
+        self.btn_scan = ttk.Button(bfr, text="สแกนแพ็ค / เลือกนักเตะ",
+                                   command=self._on_scan_packs)
+        self.want_lbl = ttk.Label(bfr, text="ยังไม่เลือกนักเตะ", foreground="#888")
         ttk.Button(bfr, text="ล้าง log", command=self._clear_log).pack(side="right")
+        self._on_module_change()
 
         # Log
         lfr = ttk.LabelFrame(self.root, text="บันทึก")
@@ -210,6 +211,16 @@ class App:
 
     def _log(self, msg: str):
         self.logq.put(msg + "\n")
+
+    def _on_module_change(self):
+        """Show the gacha pack-picker controls only when gacha is the active mode."""
+        is_gacha = (self.locked_module or self.module_var.get()) == "gacha"
+        if is_gacha:
+            self.btn_scan.pack(side="left", padx=8)
+            self.want_lbl.pack(side="left", padx=4)
+        else:
+            self.btn_scan.pack_forget()
+            self.want_lbl.pack_forget()
 
     # ------------------------------------------------------------------ pack picker (gacha)
     def _on_scan_packs(self):

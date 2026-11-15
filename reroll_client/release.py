@@ -88,9 +88,9 @@ def build_engine_artifact(k_brain: bytes, dist: str) -> str:
     return out
 
 
-def build_exe(module_id: str, dist: str, gui: bool = False) -> str:
-    name = {"reroll": "eFootballReroll", "gacha": "eFootballGacha",
-            "daily": "eFootballDaily"}[module_id]
+def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = None) -> str:
+    name = name or {"reroll": "eFootballReroll", "gacha": "eFootballGacha",
+                    "daily": "eFootballDaily"}[module_id]
     brain_enc = os.path.join(dist, "brain.enc")
     sep = ";" if os.name == "nt" else ":"
     entry = os.path.join(HERE, "gui.py" if gui else "run.py")
@@ -139,8 +139,12 @@ def register(server_url: str, token: str, build_id: str, module_id: str,
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--module", required=True,
-                    choices=["reroll", "gacha", "daily"])
+    ap.add_argument("--module", choices=["reroll", "gacha", "daily"],
+                    help="single-module build (omit with --combined)")
+    ap.add_argument("--combined", action="store_true",
+                    help="ONE exe serving all 3 modes; registers the build for all "
+                         "3 module_ids with the same k_brain + M")
+    ap.add_argument("--name", help="exe name override (e.g. E-WWDC for a combined build)")
     ap.add_argument("--build", required=True, help="build_id, e.g. reroll-2026.11.1")
     ap.add_argument("--brain-src", help="JSON file with the real brain dict")
     ap.add_argument("--dist", default=os.path.join(HERE, "dist"))
@@ -152,6 +156,10 @@ def main() -> int:
     ap.add_argument("--register", action="store_true",
                     help="register build on the server (needs REROLL_ADMIN_TOKEN)")
     args = ap.parse_args()
+    if not args.combined and not args.module:
+        ap.error("need --module <id> or --combined")
+    modules = ["reroll", "gacha", "daily"] if args.combined else [args.module]
+    name_for_build = args.name or ("E-WWDC" if args.combined else None)
 
     os.makedirs(args.dist, exist_ok=True)
     k_brain = os.urandom(32)
@@ -167,28 +175,28 @@ def main() -> int:
     print(f"[*] engine artifact -> {engine_artifact} "
           f"({os.path.getsize(engine_artifact)} bytes, encrypted with this build's k_brain)")
 
+    name_mod = args.module or "reroll"   # only used for the default exe name
     m_hex = None
     exe_path = None
     if args.exe:
         if args.native:
             build_native_modules()
             with _native_only():
-                exe_path = build_exe(args.module, args.dist, gui=args.gui)
+                exe_path = build_exe(name_mod, args.dist, gui=args.gui, name=name_for_build)
         else:
-            exe_path = build_exe(args.module, args.dist, gui=args.gui)
+            exe_path = build_exe(name_mod, args.dist, gui=args.gui, name=name_for_build)
         m_hex = integrity.measure(exe_path).hex()   # measure the FROZEN exe
     else:
         print("[!] --exe not set: brain.enc written but M not measured "
               "(M must come from the frozen exe before registering).")
 
-    blob = {"build_id": args.build, "module_id": args.module,
-            "m_expected": m_hex, "k_brain": k_brain.hex(),
-            "exe": exe_path}
+    blob = {"build_id": args.build, "modules": modules,
+            "m_expected": m_hex, "k_brain": k_brain.hex(), "exe": exe_path}
     blob_path = os.path.join(args.dist, f"build.blob.{args.build}.json")
     with open(blob_path, "w", encoding="utf-8") as f:
         json.dump(blob, f, indent=2)
     print(f"[*] wrote {blob_path}")
-    print(f"    build_id={args.build} module={args.module} "
+    print(f"    build_id={args.build} modules={modules} "
           f"m_expected={m_hex} k_brain={k_brain.hex()}")
 
     if args.register:
@@ -199,8 +207,9 @@ def main() -> int:
         if not m_hex:
             print("error: cannot register without M (use --exe)", file=sys.stderr)
             return 2
-        register("https://140.99.254.10:8787", token, args.build, args.module,
-                 m_hex, k_brain.hex())
+        for mod in modules:   # combined: one build_id/k_brain/M, 3 module rows
+            register("https://140.99.254.10:8787", token, args.build, mod,
+                     m_hex, k_brain.hex())
     else:
         print("\n[next] register on the server (or hand build_id/m_expected/k_brain "
               "to server side to run):")
