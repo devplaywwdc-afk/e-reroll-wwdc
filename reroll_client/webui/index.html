@@ -116,7 +116,7 @@
 <!-- LOGIN GATE -->
 <div class="gate" id="gate">
   <div class="box">
-    <span class="logo" id="glogo"><svg viewBox="0 0 48 48" width="56" height="56"><circle cx="24" cy="24" r="20" fill="none" stroke="#050508" stroke-width="4"/><rect x="12" y="21.5" width="24" height="5" rx="2.5" fill="#050508"/></svg></span>
+    <span class="logo" id="glogo"><img src="logo.png" alt="" onerror="this.remove()"></span>
     <h2>E-FOOTBALL REROLL</h2>
     <p>เข้าสู่ระบบด้วย Discord เพื่อตรวจสิทธิ์การเช่า<br>แล้วเริ่มใช้งานได้เลย</p>
     <button class="btn btn-primary" id="gbtn" style="width:100%" onclick="doLogin()">เข้าสู่ระบบด้วย Discord</button>
@@ -128,7 +128,7 @@
 <div class="app" id="app" style="visibility:hidden">
   <aside class="side">
     <div class="side-brand">
-      <span class="logo" id="slogo"><svg viewBox="0 0 48 48" width="38" height="38"><circle cx="24" cy="24" r="20" fill="none" stroke="#050508" stroke-width="4"/><rect x="12" y="21.5" width="24" height="5" rx="2.5" fill="#050508"/></svg></span>
+      <span class="logo" id="slogo"><img src="logo.png" alt="" onerror="this.remove()"></span>
       <div><h1>E-FOOTBALL</h1><small>REROLL · ระบบอัตโนมัติ</small></div>
     </div>
     <nav class="nav" id="nav">
@@ -274,9 +274,7 @@ function logln(box,lvl,t){const d=document.createElement('span');d.className='ll
 
 // ---- pywebview bridge ----
 function api(fn,...args){return (window.pywebview&&window.pywebview.api[fn])?window.pywebview.api[fn](...args):Promise.resolve({error:'no bridge'});}
-window.addEventListener('pywebviewready',()=>{READY=true;refreshEnt();loadLogo();});
-
-function loadLogo(){api('logo_data').then(d=>{if(d&&d.uri){document.querySelectorAll('.logo').forEach(l=>l.innerHTML=`<img src="${d.uri}">`);}}).catch(()=>{});}
+window.addEventListener('pywebviewready',()=>{READY=true;refreshEnt();});
 
 function doLogin(){$('gbtn').disabled=true;$('gst').textContent='กำลังเปิดเบราว์เซอร์ — อนุญาตใน Discord…';
   api('login').then(r=>{$('gbtn').disabled=false;

@@ -71,7 +71,9 @@ class _StdoutPush:
 
 class Api:
     def __init__(self):
-        self.window = None
+        self._window = None   # underscore: pywebview must NOT expose/serialize it
+                              # (it wraps the native WebView2 control -> infinite
+                              # property recursion -> the window freezes)
         self.token = None
         self.name = None
         self.build_id = _bundled_build_id()
@@ -80,7 +82,7 @@ class Api:
 
     # ---- push an event to the page (any thread) ----
     def _push(self, ev):
-        w = self.window
+        w = self._window
         if not w:
             return
         try:
@@ -110,7 +112,7 @@ class Api:
 
     def pick_folder(self):
         try:
-            res = self.window.create_file_dialog(webview.FOLDER_DIALOG)
+            res = self._window.create_file_dialog(webview.FOLDER_DIALOG)
             if res:
                 return {"path": res[0] if isinstance(res, (list, tuple)) else res}
         except Exception as e:  # noqa: BLE001
@@ -210,7 +212,7 @@ def main():
     win = webview.create_window(
         "eFootball Reroll", url=idx, js_api=api,
         width=1180, height=772, min_size=(980, 648), background_color="#050508")
-    api.window = win
+    api._window = win
     webview.start()
 
 
