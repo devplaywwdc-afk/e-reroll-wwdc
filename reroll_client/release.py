@@ -106,6 +106,9 @@ def build_exe(module_id: str, dist: str, gui: bool = False) -> str:
         "--hidden-import", "requests",
         "--hidden-import", "msgpack",
         "--collect-all", "Crypto",
+        # the loader's crypto (X25519/HKDF/AES-GCM) lives in native .pyd (L5) that
+        # PyInstaller can't scan, so collect `cryptography` submodules explicitly.
+        "--collect-all", "cryptography",
     ]
     if gui:
         cmd += ["--windowed"]   # no console window for the customer GUI

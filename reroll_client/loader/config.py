@@ -33,7 +33,7 @@ DISCORD_CLIENT_ID = "1570347324885180516"
 # Bump APP_VERSION each release and publish a GitHub Release tagged v<version>
 # with the exe attached. This is a NOTICE-only check (not forced).
 APP_VERSION = "1.0.0"
-GITHUB_REPO = "cookiewikiadmin-hub/efootball-reroll"
+GITHUB_REPO = "devplaywwdc-afk/e-reroll-wwdc"
 
 # Where a user with no active rental is sent to buy/rent (Discord-first bounce).
 SHOP_URL = "https://crgwwdc.shop/efootball"
