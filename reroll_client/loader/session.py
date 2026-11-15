@@ -29,6 +29,10 @@ class UpdateRequired(SessionError):
     """Server returned 426 — the running build is stale (force auto-update)."""
 
 
+class NoRental(SessionError):
+    """Discord has no active rental — the user must rent on the web (402)."""
+
+
 class AccessDenied(SessionError):
     """Server returned 403 — bad/expired key, seat full, or not entitled."""
 
@@ -80,8 +84,23 @@ class SessionCtx:
             self._hb_thread.join(timeout=2)
 
 
-def open_session(key: str, build_id: str, module_id: str, brain_enc: bytes,
-                 discord_token: str | None = None) -> SessionCtx:
+def check_entitlement(discord_token: str) -> dict:
+    """Ask the server whether this Discord has an active rental (before the full
+    handshake). Returns {has_access, modules, expires_at, ...}. Raises on auth error."""
+    cl = _client()
+    status, r = cl.json("POST", "/auth/entitlement",
+                        {"prod_access_token": discord_token, "hwid": hwid()})
+    if status == 403:
+        raise AccessDenied((r or {}).get("detail", "discord required"))
+    if status != 200 or not isinstance(r, dict):
+        raise SessionError(f"/auth/entitlement {status}: {r}")
+    return r
+
+
+def open_session(build_id: str, module_id: str, brain_enc: bytes,
+                 discord_token: str | None = None, key: str | None = None) -> SessionCtx:
+    """Discord-first: with no key, the server resolves the account's active key
+    from the Discord token. `key` stays as a dev/admin override."""
     cl = _client()
     eph = X25519PrivateKey.generate()
     eph_pub_hex = eph.public_key().public_bytes(
@@ -89,14 +108,18 @@ def open_session(key: str, build_id: str, module_id: str, brain_enc: bytes,
     m = integrity.measure()
 
     body = {
-        "key": key, "hwid": hwid(), "build_id": build_id, "module_id": module_id,
+        "hwid": hwid(), "build_id": build_id, "module_id": module_id,
         "client_eph_pub": eph_pub_hex, "m": m.hex(),
     }
+    if key:
+        body["key"] = key
     if discord_token:
         body["prod_access_token"] = discord_token  # phase 2: person anchor
     status, r = cl.json("POST", "/session", body)
     if status == 426:
         raise UpdateRequired("build stale — update required")
+    if status == 402:
+        raise NoRental((r or {}).get("detail", "no active rental"))
     if status == 403:
         raise AccessDenied((r or {}).get("detail", "access denied"))
     if status != 200 or not r:

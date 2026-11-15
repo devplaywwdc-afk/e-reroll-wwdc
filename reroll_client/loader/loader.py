@@ -45,16 +45,17 @@ def fetch_engine(ctx: SessionCtx, module_id: str) -> str:
     return src.decode("utf-8")
 
 
-def run_module(module_id: str, key: str, build_id: str,
-               brain_enc_path: str | None = None, exec_engine: bool = True,
-               params: dict | None = None, local_engine: str | None = None,
-               discord_token: str | None = None):
+def run_module(module_id: str, build_id: str, discord_token: str | None = None,
+               key: str | None = None, brain_enc_path: str | None = None,
+               exec_engine: bool = True, params: dict | None = None,
+               local_engine: str | None = None):
     if module_id not in VALID_MODULES:
         raise ValueError(f"bad module_id {module_id!r}")
 
     antidebug.enforce()  # L6: refuse under debugger/injector (soft gate, not in M)
     brain_enc = load_brain_enc(brain_enc_path)
-    ctx = open_session(key, build_id, module_id, brain_enc, discord_token=discord_token)
+    # Discord-first: no key -> server resolves it from the Discord token.
+    ctx = open_session(build_id, module_id, brain_enc, discord_token=discord_token, key=key)
     ctx.start_heartbeat(on_revoked=lambda: os._exit(2))
 
     if not exec_engine:

@@ -34,3 +34,6 @@ DISCORD_CLIENT_ID = "1570347324885180516"
 # with the exe attached. This is a NOTICE-only check (not forced).
 APP_VERSION = "1.0.0"
 GITHUB_REPO = "cookiewikiadmin-hub/efootball-reroll"
+
+# Where a user with no active rental is sent to buy/rent (Discord-first bounce).
+SHOP_URL = "https://crgwwdc.shop/efootball"

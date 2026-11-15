@@ -1,6 +1,7 @@
 """eFootball Reroll — customer GUI (Tkinter, stdlib only).
 
-Flow: Login with Discord (mandatory) -> enter License key -> Start.
+Flow: Login with Discord (only) -> server resolves rental -> Start. No key field;
+if the Discord has no active rental the user is sent to the web shop to rent.
 Thai-safe: everything uses Tahoma (Segoe UI / Consolas + emoji do NOT render
 Thai in Tkinter). No emoji anywhere.
 """
@@ -60,6 +61,7 @@ class App:
         self.logq: queue.Queue = queue.Queue()
         self.discord_token: str | None = None
         self.discord_name: str | None = None
+        self.entitlement: dict | None = None
         self.build_id = _bundled_build_id()
         self.locked_module = _locked_module()
         self.worker: threading.Thread | None = None
@@ -114,10 +116,14 @@ class App:
         # Key + options
         cfr = ttk.LabelFrame(self.root, text="ตั้งค่า")
         cfr.pack(fill="x", **pad)
-        ttk.Label(cfr, text="License Key").grid(row=0, column=0, sticky="w", padx=10, pady=6)
-        self.key_var = tk.StringVar()
-        ttk.Entry(cfr, textvariable=self.key_var, width=34, font=FONT).grid(
-            row=0, column=1, columnspan=3, sticky="we", padx=6, pady=6)
+        # Discord-first: no key field — the server resolves the rental from Discord.
+        ttk.Label(cfr, text="สิทธิ์การเช่า").grid(row=0, column=0, sticky="w", padx=10, pady=6)
+        self.ent_lbl = ttk.Label(cfr, text="เข้าสู่ระบบ Discord เพื่อตรวจสิทธิ์",
+                                 foreground="#888")
+        self.ent_lbl.grid(row=0, column=1, columnspan=2, sticky="w", padx=6, pady=6)
+        self.btn_buy = ttk.Button(cfr, text="ไปเช่าที่เว็บ", command=self._open_shop)
+        self.btn_buy.grid(row=0, column=3, sticky="e", padx=6, pady=6)
+        self.btn_buy.grid_remove()
 
         ttk.Label(cfr, text="โหมด").grid(row=1, column=0, sticky="w", padx=10, pady=6)
         self.module_var = tk.StringVar(value=self.locked_module or "reroll")
@@ -209,9 +215,8 @@ class App:
     def _on_scan_packs(self):
         if not self.discord_token:
             self._log("ต้องเข้าสู่ระบบ Discord ก่อน"); return
-        key = self.key_var.get().strip()
-        if not key:
-            self._log("ใส่ License Key ก่อน"); return
+        if not (self.entitlement and self.entitlement.get("has_access")):
+            self._log("ยังไม่มีสิทธิ์ใช้งาน — กด 'ไปเช่าที่เว็บ' ก่อน"); return
         if not self.out_dir:
             self._log("เลือกโฟลเดอร์บัญชี (.txt) ก่อนสแกนแพ็ค"); return
         self.btn_scan.configure(state="disabled", text="กำลังสแกน...")
@@ -219,9 +224,9 @@ class App:
 
         def work():
             try:
-                res = run_module("gacha", key, self.build_id,
-                                 params={"action": "scan", "out_dir": self.out_dir},
-                                 discord_token=self.discord_token)
+                res = run_module("gacha", self.build_id,
+                                 discord_token=self.discord_token,
+                                 params={"action": "scan", "out_dir": self.out_dir})
                 packs = (res or {}).get("packs", [])
             except Exception as e:  # noqa: BLE001
                 packs = []
@@ -353,10 +358,44 @@ class App:
             text=f"เข้าสู่ระบบแล้ว: {self.discord_name}", foreground="#1e7e34")
         self.btn_login.configure(state="normal", text="เปลี่ยนบัญชี Discord")
         self._log(f"เข้าสู่ระบบ Discord สำเร็จ: {self.discord_name}")
+        self._refresh_entitlement()
 
     def _login_fail(self, err: str):
         self.btn_login.configure(state="normal", text="เข้าสู่ระบบด้วย Discord")
         self._log(f"เข้าสู่ระบบ Discord ไม่สำเร็จ: {err}")
+
+    def _open_shop(self):
+        import webbrowser
+        webbrowser.open(config.SHOP_URL)
+
+    def _refresh_entitlement(self):
+        if not self.discord_token:
+            return
+        self.ent_lbl.configure(text="กำลังตรวจสิทธิ์...", foreground="#888")
+
+        def work():
+            try:
+                from loader import session
+                ent = session.check_entitlement(self.discord_token)
+            except Exception as e:  # noqa: BLE001
+                ent = {"has_access": False, "reason": str(e)}
+            self.root.after(0, lambda: self._ent_done(ent))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _ent_done(self, ent: dict):
+        self.entitlement = ent
+        if ent.get("has_access"):
+            mods = ",".join(ent.get("modules", [])) or "ครบทุกโมดูล"
+            exp = ent.get("expires_at")
+            tail = "ถาวร" if not exp else f"หมดอายุ {str(exp)[:10]}"
+            self.ent_lbl.configure(text=f"✓ มีสิทธิ์ ({mods}) · {tail}", foreground="#1e7e34")
+            self.btn_buy.grid_remove()
+        else:
+            reason = {"no active rental": "ยังไม่ได้เช่า",
+                      "account banned": "บัญชีถูกแบน"}.get(ent.get("reason"), ent.get("reason") or "ไม่มีสิทธิ์")
+            self.ent_lbl.configure(text=f"✗ {reason}", foreground="#c0392b")
+            self.btn_buy.grid()
 
     # ------------------------------------------------------------------ run
     def _on_start(self):
@@ -366,9 +405,9 @@ class App:
         if not self.discord_token:
             self._log("ต้องเข้าสู่ระบบ Discord ก่อน")
             return
-        key = self.key_var.get().strip()
-        if not key:
-            self._log("ใส่ License Key ก่อน")
+        if not (self.entitlement and self.entitlement.get("has_access")):
+            self._log("ยังไม่มีสิทธิ์ใช้งาน — กด 'ไปเช่าที่เว็บ' เพื่อเช่าก่อน")
+            self._open_shop()
             return
         if not self.build_id:
             self._log("ไม่พบ build id (ไฟล์เสียหาย?)")
@@ -388,11 +427,16 @@ class App:
             old = sys.stdout
             sys.stdout = _QueueWriter(self.logq)
             try:
-                run_module(module, key, self.build_id, params=params,
-                           discord_token=self.discord_token)
+                run_module(module, self.build_id, discord_token=self.discord_token,
+                           params=params)
                 self.logq.put("\n[เสร็จ]\n")
             except Exception as e:  # noqa: BLE001
-                self.logq.put(f"\n[ผิดพลาด] {e}\n")
+                from loader.session import NoRental
+                if isinstance(e, NoRental):
+                    self.logq.put("\n[ยังไม่มีสิทธิ์] กรุณาเช่าที่เว็บก่อน\n")
+                    self.root.after(0, self._open_shop)
+                else:
+                    self.logq.put(f"\n[ผิดพลาด] {e}\n")
             finally:
                 sys.stdout = old
                 self.root.after(0, lambda: self.btn_start.configure(

@@ -62,9 +62,9 @@ def main() -> int:
         print("error: no build_id (pass --build or bundle build_id.txt)", file=sys.stderr)
         return 2
 
-    # Discord login is MANDATORY (person anchor). The key is bound to this Discord
-    # on first use and only works for it thereafter; no Discord = no run. The
-    # server enforces this too (a patched client still gets 403 without a token).
+    # Discord-first: Login with Discord ONLY. The server resolves the rental key
+    # from the Discord identity; no manual key. A patched client still gets 403/402
+    # from the server. `--key` stays as a dev/admin override.
     discord_token = None
     if not args.no_discord:
         from loader import discord_auth
@@ -76,24 +76,45 @@ def main() -> int:
             print(f"Discord login failed: {e}", file=sys.stderr)
             return 1
 
-    if not key:
+    # Pre-check entitlement -> bounce to the web shop if no active rental.
+    if discord_token and not key:
+        from loader import session, config
         try:
-            key = input("License key: ").strip()
-        except EOFError:
-            key = ""
-    if not key:
-        print("error: no license key", file=sys.stderr)
-        return 2
+            ent = session.check_entitlement(discord_token)
+        except Exception as e:  # noqa: BLE001
+            print(f"entitlement check failed: {e}", file=sys.stderr)
+            return 1
+        if not ent.get("has_access"):
+            reason = ent.get("reason", "no active rental")
+            print(f"ยังไม่มีสิทธิ์ใช้งาน ({reason}) — เปิดหน้าเว็บให้เช่า: {config.SHOP_URL}")
+            try:
+                import webbrowser
+                webbrowser.open(config.SHOP_URL)
+            except Exception:  # noqa: BLE001
+                pass
+            return 3
+        exp = ent.get("expires_at")
+        print(f"สิทธิ์: {','.join(ent.get('modules', []))}"
+              + (f" · หมดอายุ {exp}" if exp else " · ถาวร"))
 
     params = {"count": args.count, "agent": args.agent}
     if args.prefix:
         params["prefix"] = args.prefix
     try:
-        result = run_module(module_id, key, build_id,
+        result = run_module(module_id, build_id, discord_token=discord_token, key=key,
                             brain_enc_path=args.brain, exec_engine=not args.dry_run,
-                            params=params, local_engine=args.local_engine,
-                            discord_token=discord_token)
+                            params=params, local_engine=args.local_engine)
     except Exception as e:  # noqa: BLE001 — top-level: show one clean line
+        from loader.session import NoRental
+        if isinstance(e, NoRental):
+            from loader import config
+            print(f"ยังไม่มีสิทธิ์ใช้งาน — เปิดหน้าเว็บให้เช่า: {config.SHOP_URL}")
+            try:
+                import webbrowser
+                webbrowser.open(config.SHOP_URL)
+            except Exception:  # noqa: BLE001
+                pass
+            return 3
         print(f"[{module_id}] FAILED: {e}", file=sys.stderr)
         return 1
 
