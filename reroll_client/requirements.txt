@@ -1,1 +1,5 @@
 cryptography>=43.0.0
+requests
+msgpack
+pycryptodome
+pywebview>=5.0        ; sys_platform == "win32"   # web dashboard (webgui.py)
