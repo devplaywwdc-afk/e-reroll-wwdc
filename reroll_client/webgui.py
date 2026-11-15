@@ -122,6 +122,25 @@ class Api:
     def server_status(self):
         return {"status": "unknown"}   # v1: real gate probe is a fast-follow
 
+    def app_version(self):
+        return {"version": config.APP_VERSION}
+
+    def check_update(self):
+        """Soft update check vs the latest GitHub release tag (notice only)."""
+        try:
+            from loader import updater
+            return updater.check_latest()
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e), "newer": False, "current": config.APP_VERSION}
+
+    def open_url(self, url):
+        try:
+            if url:
+                webbrowser.open(url)
+        except Exception:  # noqa: BLE001
+            pass
+        return {"ok": True}
+
     # ---- auth ----
     def login(self):
         try:

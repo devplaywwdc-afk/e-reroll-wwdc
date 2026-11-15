@@ -687,22 +687,18 @@ def _reroll(params, log):
     """Create `count` accounts across `workers` parallel threads (speed scales with
     the user's machine + network). Cooperative stop via the _STOP event; a result
     summary reports ok/fail counts and a sample of the errors."""
-    import concurrent.futures as cf
     import threading
-    count = int((params or {}).get("count", 1))
+    count = int((params or {}).get("count", 0) or 0)   # <=0 = unlimited (run until หยุด)
     workers = max(1, min(64, int((params or {}).get("workers", 1) or 1)))
+    unlimited = count <= 0
     prefix = (params or {}).get("prefix") or _B.get("default_prefix", "j3xdr")
     claim = bool((params or {}).get("claim", True))
     out = _out_dir(params)
     made, errors = [], []
     lock = threading.Lock()
     counter = {"n": 0}
-    slots = {}
     t0 = time.time()
-
-    def _wid():
-        with lock:   # stable, unique 0..workers-1 slot per pool thread (no race)
-            return slots.setdefault(threading.get_ident(), len(slots))
+    tgt = "∞" if unlimited else count
 
     def _stats():
         dt = max(0.001, time.time() - t0)
@@ -711,63 +707,67 @@ def _reroll(params, log):
                 "rate": round(ok / dt, 2), "perday": int(ok / dt * 86400),
                 "running": not _stopped()})
 
-    def one(_slot):
-        if _stopped():
-            return
-        w = _wid()
-        with lock:
-            counter["n"] += 1
-            i = counter["n"]
-        try:
-            c = GateClient()   # own session per worker (thread-safe)
-            resp = create_user(c, prefix=prefix)
-            if not isinstance(resp, dict) or "auth_code" not in resp:
-                msg = (resp or {}).get("result", "?") if isinstance(resp, dict) else "?"
-                with lock:
-                    errors.append(f"#{i} CREATE_USER {msg}")
-                log(f"[{i}/{count}] FAIL: {msg}")
-                _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] FAIL {msg}"})
-                return
-            uc, auth = resp["user_code"], resp["auth_code"]
-            uid = resp["pes_user_info"]["user_id"]
-            devid = resp.get("_device_identifier")
-            coins = gp = 0
-            setup = "skipped"
+    def worker(w):
+        while not _stopped():
+            with lock:
+                if not unlimited and counter["n"] >= count:
+                    return
+                counter["n"] += 1
+                i = counter["n"]
             try:
-                lr = login(c, uid, auth, devid)
-                sid = lr.get("session_id")
-                if sid:
-                    setup = finish_setup(c, uid, sid).get("result", "?")
-                    if claim and not _stopped():
-                        cs = claim_starter(uid, auth, devid, uc)
-                        coins, gp = cs.get("coins", 0), cs.get("gp", 0)
+                c = GateClient()   # own session per worker (thread-safe)
+                resp = create_user(c, prefix=prefix)
+                if not isinstance(resp, dict) or "auth_code" not in resp:
+                    msg = (resp or {}).get("result", "?") if isinstance(resp, dict) else "?"
+                    with lock:
+                        errors.append(f"#{i} CREATE_USER {msg}")
+                    log(f"[{i}/{tgt}] FAIL: {msg}")
+                    _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] FAIL {msg}"})
+                    _report(len(made), len(errors), count); _stats()
+                    continue
+                uc, auth = resp["user_code"], resp["auth_code"]
+                uid = resp["pes_user_info"]["user_id"]
+                devid = resp.get("_device_identifier")
+                coins = gp = 0
+                setup = "skipped"
+                try:
+                    lr = login(c, uid, auth, devid)
+                    sid = lr.get("session_id")
+                    if sid:
+                        setup = finish_setup(c, uid, sid).get("result", "?")
+                        if claim and not _stopped():
+                            cs = claim_starter(uid, auth, devid, uc)
+                            coins, gp = cs.get("coins", 0), cs.get("gp", 0)
+                except Exception as e:
+                    setup = f"err:{e}"
+                rec = {"user_code": uc, "user_id": uid, "auth_code": auth,
+                       "device_identifier": devid, "coins": coins, "gp": gp,
+                       "players": [], "module": "reroll"}
+                with lock:
+                    write_record(out, rec, "reroll", params)
+                    made.append(uc)
+                log(f"[{i}/{tgt}] OK {uc} uid={uid} coins={coins} myclub={setup}")
+                _event({"type": "log", "w": w, "lvl": "ok", "t": f"[{i}] OK {uc} coins={coins}"})
             except Exception as e:
-                setup = f"err:{e}"
-            rec = {"user_code": uc, "user_id": uid, "auth_code": auth,
-                   "device_identifier": devid, "coins": coins, "gp": gp,
-                   "players": [], "module": "reroll"}
-            with lock:
-                write_record(out, rec, "reroll", params)
-                made.append(uc)
-            log(f"[{i}/{count}] OK {uc} uid={uid} coins={coins} myclub={setup}")
-            _event({"type": "log", "w": w, "lvl": "ok", "t": f"[{i}] OK {uc} coins={coins}"})
-        except Exception as e:
-            with lock:
-                errors.append(f"#{i} {type(e).__name__}: {e}")
-            log(f"[{i}/{count}] ERROR: {e}")
-            _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] ERR {e}"})
-        finally:
+                with lock:
+                    errors.append(f"#{i} {type(e).__name__}: {e}")
+                log(f"[{i}/{tgt}] ERROR: {e}")
+                _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] ERR {e}"})
             _report(len(made), len(errors), count)
             _stats()
 
     _report(0, 0, count)
     _event({"type": "started", "workers": workers})
-    log(f"เริ่ม reroll {count} บัญชี · {workers} worker พร้อมกัน")
-    with cf.ThreadPoolExecutor(max_workers=workers) as ex:
-        for _ in ex.map(one, range(count)):
-            pass
+    log(f"เริ่ม reroll {tgt} บัญชี · {workers} worker พร้อมกัน"
+        + (" (0=ไม่จำกัด จนกว่าจะกดหยุด)" if unlimited else ""))
+    threads = [threading.Thread(target=worker, args=(w,), daemon=True) for w in range(workers)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
     stopped = _stopped()
-    lines = [f"สร้างสำเร็จ {len(made)}/{count}  ล้มเหลว {len(errors)}"]
+    lines = [f"สร้างสำเร็จ {len(made)}  ล้มเหลว {len(errors)}"
+             + ("" if unlimited else f"  (เป้า {count})")]
     if stopped:
         lines.append("** หยุดโดยผู้ใช้ **")
     lines.append(f"โฟลเดอร์: {out}")

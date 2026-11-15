@@ -113,6 +113,13 @@
 <body>
 <div class="orb2"></div>
 
+<!-- update notice banner -->
+<div id="updbar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:60;align-items:center;gap:12px;justify-content:center;font-size:13px;padding:9px 16px;background:linear-gradient(90deg,rgba(0,255,136,.16),rgba(168,85,247,.12));border-bottom:1px solid rgba(0,255,136,.4)">
+  <span id="updtxt" style="color:var(--txt)"></span>
+  <button class="btn btn-primary btn-sm" onclick="api('open_url',window._updurl)">โหลดเวอร์ชันใหม่</button>
+  <button class="btn btn-ghost btn-sm" onclick="document.getElementById('updbar').style.display='none'">ภายหลัง</button>
+</div>
+
 <!-- LOGIN GATE -->
 <div class="gate" id="gate">
   <div class="box">
@@ -150,6 +157,7 @@
       <span class="pill click" id="srvpill" onclick="srv()">🛰 เช็คสถานะเกม</span>
       <span class="pill"><span class="dot" id="livedot"></span><span id="livetxt">idle</span></span>
       <span class="pill" id="userpill">—</span>
+      <span class="pill click" id="verpill" onclick="checkUpd(true)" title="ตรวจเวอร์ชันใหม่">v… · ตรวจอัปเดต</span>
     </div>
 
     <div class="panels">
@@ -160,8 +168,8 @@
             <div class="chead"><div class="l"><span class="d"></span>Reroll &amp; Setup</div></div>
             <div class="cbody">
               <div class="grid2">
-                <div class="field"><label>จำนวนไอดี</label><input id="r_count" type="number" value="20" min="1"></div>
-                <div class="field"><label>Workers (พร้อมกัน)</label><input id="r_workers" type="number" value="8" min="1" max="64"></div>
+                <div class="field"><label>จำนวนไอดี (0=ไม่จำกัด)</label><input id="r_count" type="number" value="20" min="0"></div>
+                <div class="field"><label title="จำนวนไอดีที่สร้างพร้อมกัน — มากขึ้น = เร็วขึ้น แต่เสี่ยงโดน Konami throttle (ERR_SERVERNOTREADY) มากขึ้น · แนะนำ 5–15 ต่อ 1 IP · ขึ้นกับสเปกเครื่อง + เน็ตด้วย" style="cursor:help">Workers (พร้อมกัน) &#9432;</label><input id="r_workers" type="number" value="8" min="1" max="64" title="มากขึ้น = เร็วขึ้น แต่โดน throttle ง่ายขึ้น · แนะนำ 5–15 ต่อ IP"></div>
               </div>
               <div class="field"><label>Prefix ชื่อในเกม</label><input id="r_prefix" value="j3xdr" maxlength="10"></div>
               <div class="field"><label>โฟลเดอร์เก็บผล</label>
@@ -274,7 +282,18 @@ function logln(box,lvl,t){const d=document.createElement('span');d.className='ll
 
 // ---- pywebview bridge ----
 function api(fn,...args){return (window.pywebview&&window.pywebview.api[fn])?window.pywebview.api[fn](...args):Promise.resolve({error:'no bridge'});}
-window.addEventListener('pywebviewready',()=>{READY=true;refreshEnt();});
+window.addEventListener('pywebviewready',()=>{READY=true;refreshEnt();setVer();checkUpd(false);});
+
+let APPVER='';
+function setVer(){api('app_version').then(r=>{if(r&&r.version){APPVER=r.version;$('verpill').textContent='v'+r.version+' · ตรวจอัปเดต';}});}
+function checkUpd(manual){if(manual)$('verpill').textContent='กำลังตรวจ…';
+  api('check_update').then(r=>{setVer();
+    if(r&&r.newer){window._updurl=r.url;$('updtxt').textContent='มีเวอร์ชันใหม่ '+r.latest+' — คุณใช้ v'+(r.current||APPVER);
+      $('updbar').style.display='flex';}
+    else if(manual){$('updtxt').textContent='ใช้เวอร์ชันล่าสุดแล้ว (v'+APPVER+')';
+      const b=$('updbar').querySelector('.btn-primary');b.style.display='none';$('updbar').style.display='flex';
+      setTimeout(()=>{$('updbar').style.display='none';b.style.display='';},2500);}
+  });}
 
 function doLogin(){$('gbtn').disabled=true;$('gst').textContent='กำลังเปิดเบราว์เซอร์ — อนุญาตใน Discord…';
   api('login').then(r=>{$('gbtn').disabled=false;
