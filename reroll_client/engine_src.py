@@ -146,10 +146,13 @@ def new_rqid() -> int:
 
 class GateClient:
     def __init__(self, user_code="0", timeout=20, session=None,
-                 max_retries=4, backoff=1.5):
+                 max_retries=4, backoff=1.5, proxy=None):
         self.user_code = user_code
         self.timeout = timeout
         self.http = session or requests.Session()
+        if proxy:
+            self.http.proxies = {"http": proxy, "https": proxy}
+        self.proxy = proxy
         self.max_retries = max_retries
         self.backoff = backoff
 
@@ -207,6 +210,34 @@ class GateClient:
             return json.loads(data.decode("utf-8", "replace"))
         except Exception:
             return {"_status": r.status_code, "_raw_hex": raw[:64].hex(), "_len": len(raw)}
+
+
+class Governor:
+    """AIMD rate pacing shared by all reroll workers: additive-ish speed-up,
+    multiplicative back-off. Keeps ONE source IP at its safe max — the server
+    soft-throttles CREATE_USER per IP (ERR_TEMP_UNAVAILABLE)."""
+    def __init__(self, start=0.3, lo=0.0, hi=15.0):
+        import threading as _t
+        self.delay = max(float(lo), float(start))
+        self.lo, self.hi = float(lo), float(hi)
+        self.lock = _t.Lock()
+        self.ok = 0
+        self.throttled = 0
+
+    def on_success(self):
+        with self.lock:
+            self.ok += 1
+            self.delay = max(self.lo, self.delay * 0.90)
+
+    def on_throttle(self):
+        with self.lock:
+            self.throttled += 1
+            self.delay = min(self.hi, self.delay * 2.0 + 0.3)
+
+    def wait(self):
+        with self.lock:
+            d = self.delay
+        _isleep(d)
 
 
 # ---------------------------------------------------------------- flows
@@ -705,13 +736,22 @@ def _reroll(params, log):
     unlimited = count <= 0
     prefix = (params or {}).get("prefix") or _B.get("default_prefix", "j3xdr")
     claim = bool((params or {}).get("claim", True))
-    delay = float((params or {}).get("delay", 0) or 0)   # หน่วงต่อไอดี/worker (วิ)
+    delay = float((params or {}).get("delay", 0) or 0)      # floor หน่วง (วิ) — governor คุมต่อเอง
+    show_errors = bool((params or {}).get("show_errors", True))
+    # proxy pool (optional): one IP per worker, round-robin; empty = this machine's IP
+    raw_px = (params or {}).get("proxies")
+    if isinstance(raw_px, str):
+        raw_px = raw_px.splitlines()
+    proxies = [str(p).strip() for p in (raw_px or [])
+               if str(p).strip() and not str(p).strip().startswith("#")] or [None]
     out = _out_dir(params)
     made, errors = [], []
     lock = threading.Lock()
     counter = {"n": 0}
+    done = {"f": False}
     t0 = time.time()
     tgt = "∞" if unlimited else count
+    gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: keeps 1 IP at its safe max
 
     def _stats():
         dt = max(0.001, time.time() - t0)
@@ -721,6 +761,7 @@ def _reroll(params, log):
                 "running": not _stopped()})
 
     def worker(w):
+        c = GateClient(proxy=proxies[w % len(proxies)])   # own session + IP per worker
         while not _stopped():
             with lock:
                 if not unlimited and counter["n"] >= count:
@@ -728,15 +769,16 @@ def _reroll(params, log):
                 counter["n"] += 1
                 i = counter["n"]
             try:
-                c = GateClient()   # own session per worker (thread-safe)
-                resp = create_user(c, prefix=prefix)
+                resp = create_user(c, prefix=prefix)   # client.py already retries soft throttles
                 if not isinstance(resp, dict) or "auth_code" not in resp:
                     msg = (resp or {}).get("result", "?") if isinstance(resp, dict) else "?"
+                    if msg in RETRYABLE or msg == "ERR_NETWORK":
+                        gov.on_throttle()
                     with lock:
                         errors.append(f"#{i} CREATE_USER {msg}")
-                    log(f"[{i}/{tgt}] FAIL: {msg}")
-                    _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] FAIL {msg}"})
-                    _report(len(made), len(errors), count); _stats()
+                    if show_errors:
+                        _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] FAIL {msg}"})
+                    gov.wait()
                     continue
                 uc, auth = resp["user_code"], resp["auth_code"]
                 uid = resp["pes_user_info"]["user_id"]
@@ -759,27 +801,37 @@ def _reroll(params, log):
                 with lock:
                     write_record(out, rec, "reroll", params)
                     made.append(uc)
-                log(f"[{i}/{tgt}] OK {uc} uid={uid} coins={coins} myclub={setup}")
+                gov.on_success()
                 _event({"type": "log", "w": w, "lvl": "ok", "t": f"[{i}] OK {uc} coins={coins}"})
             except Exception as e:
+                gov.on_throttle()
                 with lock:
                     errors.append(f"#{i} {type(e).__name__}: {e}")
-                log(f"[{i}/{tgt}] ERROR: {e}")
-                _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] ERR {e}"})
+                if show_errors:
+                    _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] ERR {e}"})
+            gov.wait()
+
+    def monitor():   # one stats/progress pulse ~2x/s (decoupled from per-account → no UI flood)
+        while not done["f"]:
             _report(len(made), len(errors), count)
             _stats()
-            _isleep(delay)
+            time.sleep(0.4)
 
     _report(0, 0, count)
     _event({"type": "started", "workers": workers})
-    log(f"เริ่ม reroll {tgt} บัญชี · {workers} worker พร้อมกัน"
+    px_note = (" · proxy " + str(len(proxies)) + " IP") if proxies != [None] else " · IP เครื่อง"
+    log(f"เริ่ม reroll {tgt} บัญชี · {workers} worker{px_note}"
         + (" (0=ไม่จำกัด จนกว่าจะกดหยุด)" if unlimited else ""))
+    mon = threading.Thread(target=monitor, daemon=True)
+    mon.start()
     threads = [threading.Thread(target=worker, args=(w,), daemon=True) for w in range(workers)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
+    done["f"] = True
     stopped = _stopped()
+    log(f"governor: ok={gov.ok} throttled={gov.throttled} final_delay={gov.delay:.2f}s")
     lines = [f"สร้างสำเร็จ {len(made)}  ล้มเหลว {len(errors)}"
              + ("" if unlimited else f"  (เป้า {count})")]
     if stopped:

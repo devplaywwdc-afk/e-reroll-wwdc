@@ -180,6 +180,13 @@
               <div class="field"><label>รูปแบบไฟล์</label><select id="r_fmt"><option value="txt">.txt</option><option value="dat">.dat</option></select></div>
               <label class="chk"><input id="r_claim" type="checkbox" checked> รับของเริ่มต้น + Daily (ช้าลง)</label>
               <label class="chk"><input id="r_verbose" type="checkbox"> Log ดิบ (แสดงรัว ๆ ทุก request)</label>
+              <label class="chk"><input id="r_showerr" type="checkbox" checked> แสดง log error ด้วย (ปิด = โชว์เฉพาะสำเร็จ · ลื่นกว่าตอน worker เยอะ)</label>
+              <div class="grid2">
+                <div class="field"><label>Log สูงสุด (บรรทัด/worker)</label><input id="r_logmax" type="number" value="100" min="20" max="1000"></div>
+                <div class="field"><label>&nbsp;</label><span class="hint" style="padding-top:8px">กันโปรแกรมค้างตอน log เยอะ</span></div>
+              </div>
+              <div class="field"><label title="ใส่ 1 proxy ต่อบรรทัด (http://user:pass@host:port หรือ socks5://host:port) — ว่าง = ใช้ IP เครื่อง · หลาย IP = กระจาย worker ข้าม IP ดันทะลุเพดาน throttle ต่อ IP" style="cursor:help">Proxy — ว่าง = IP เครื่อง &#9432;</label>
+                <textarea id="r_proxies" rows="2" placeholder="(ว่างไว้ = ใช้ IP เครื่องนี้)&#10;http://user:pass@host:port" style="resize:vertical;width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"></textarea></div>
               <div style="flex:1"></div>
               <button class="btn btn-primary" id="r_start" style="width:100%" onclick="startReroll()">▶ เริ่ม Reroll</button>
               <button class="btn btn-danger" id="r_stop" style="width:100%" disabled onclick="api('stop')">■ หยุด</button>
@@ -267,7 +274,7 @@
 
 <script>
 const $=id=>document.getElementById(id);
-let READY=false, RUNNING=false, PACKS=[], MERGE=[];
+let READY=false, RUNNING=false, PACKS=[], MERGE=[], LOGMAX=100;
 const PG={reroll:['🎲','Reroll','spray สร้างไอดี + เข้า MyClub'],
   daily:['📅','Daily Login','login + รับ daily ทุกบัญชี'],
   gacha:['🎰','กาชา','สแกน pack ฟรี + เปิด + กรองนักเตะ'],
@@ -281,7 +288,7 @@ function tab(name,btn){document.querySelectorAll('.panel').forEach(p=>p.classLis
   const [ic,h,s]=PG[name];$('pgic').textContent=ic;$('pgh').textContent=h;$('pgsub').textContent=s;}
 
 function logln(box,lvl,t){const d=document.createElement('span');d.className='ll '+(lvl||'info');d.textContent=t;
-  box.appendChild(d);while(box.childNodes.length>600)box.removeChild(box.firstChild);box.scrollTop=box.scrollHeight;}
+  box.appendChild(d);while(box.childNodes.length>LOGMAX)box.removeChild(box.firstChild);box.scrollTop=box.scrollHeight;}
 
 // ---- pywebview bridge ----
 function api(fn,...args){return (window.pywebview&&window.pywebview.api[fn])?window.pywebview.api[fn](...args):Promise.resolve({error:'no bridge'});}
@@ -323,10 +330,12 @@ function setLive(on){RUNNING=on;$('livedot').classList.toggle('live',on);$('live
   ['r_stop','d_stop','g_stop','c_stop'].forEach(i=>{if($(i))$(i).disabled=!on;});}
 
 // ---- start actions ----
-function startReroll(){const p={module:'reroll',count:+$('r_count').value,workers:+$('r_workers').value,
+function startReroll(){LOGMAX=Math.max(20,+$('r_logmax').value||100);
+  const p={module:'reroll',count:+$('r_count').value,workers:+$('r_workers').value,
   prefix:$('r_prefix').value.trim()||'j3xdr',claim:$('r_claim').checked,verbose:$('r_verbose').checked,
-  delay:+$('r_delay').value||0,fmt:$('r_fmt').value,out_dir:$('r_out').value||null};
-  buildGrid(p.workers);$('grid').dataset.n=p.workers;go(p);}
+  delay:+$('r_delay').value||0,show_errors:$('r_showerr').checked,proxies:$('r_proxies').value,
+  fmt:$('r_fmt').value,out_dir:$('r_out').value||null};
+  buildGrid(p.workers);go(p);}
 function startMod(mod){
   const dir=$(mod[0]+'_out').value||null;
   const p={module:mod,workers:5,verbose:false,fmt:'txt',delay:0.5,out_dir:dir,src_dir:dir};

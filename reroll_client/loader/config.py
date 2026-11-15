@@ -32,7 +32,7 @@ DISCORD_CLIENT_ID = "1570347324885180516"
 # App version + the public GitHub repo used for the (soft) auto-update check.
 # Bump APP_VERSION each release and publish a GitHub Release tagged v<version>
 # with the exe attached. This is a NOTICE-only check (not forced).
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 GITHUB_REPO = "devplaywwdc-afk/e-reroll-wwdc"
 
 # Where a user with no active rental is sent to buy/rent (Discord-first bounce).

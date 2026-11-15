@@ -135,7 +135,8 @@ def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = N
                 "--collect-all", "pythonnet",
                 "--hidden-import", "clr",
                 "--hidden-import", "bottle",
-                "--hidden-import", "proxy_tools"]
+                "--hidden-import", "proxy_tools",
+                "--hidden-import", "socks"]   # PySocks: socks5:// proxy support
     if gui or web:
         cmd += ["--windowed"]   # no console window for the customer GUI
     cmd.append(entry)
