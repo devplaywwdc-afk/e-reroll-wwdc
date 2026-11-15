@@ -63,6 +63,18 @@ def _stopped() -> bool:
     return bool(_STOP is not None and _STOP.is_set())
 
 
+def _isleep(secs):
+    """Sleep up to `secs`, but wake immediately on stop (so a big delay doesn't
+    make the หยุด button feel dead)."""
+    try:
+        secs = float(secs or 0)
+    except (TypeError, ValueError):
+        return
+    end = time.time() + secs
+    while secs > 0 and not _stopped() and time.time() < end:
+        time.sleep(min(0.2, end - time.time()))
+
+
 def _aes_key() -> bytes:
     return bytes.fromhex(_B["aes_key"])
 
@@ -689,10 +701,11 @@ def _reroll(params, log):
     summary reports ok/fail counts and a sample of the errors."""
     import threading
     count = int((params or {}).get("count", 0) or 0)   # <=0 = unlimited (run until หยุด)
-    workers = max(1, min(64, int((params or {}).get("workers", 1) or 1)))
+    workers = max(1, min(500, int((params or {}).get("workers", 1) or 1)))
     unlimited = count <= 0
     prefix = (params or {}).get("prefix") or _B.get("default_prefix", "j3xdr")
     claim = bool((params or {}).get("claim", True))
+    delay = float((params or {}).get("delay", 0) or 0)   # หน่วงต่อไอดี/worker (วิ)
     out = _out_dir(params)
     made, errors = [], []
     lock = threading.Lock()
@@ -755,6 +768,7 @@ def _reroll(params, log):
                 _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] ERR {e}"})
             _report(len(made), len(errors), count)
             _stats()
+            _isleep(delay)
 
     _report(0, 0, count)
     _event({"type": "started", "workers": workers})
@@ -835,6 +849,7 @@ def _gacha(params, log):
         return _gacha_scan(params, log)
     src = _src_dir(params)
     only = int((params or {}).get("agent", 0))
+    delay = float((params or {}).get("delay", 0) or 0)
     wanted_order = [int(x) for x in (params or {}).get("wanted_ids", [])]
     wanted_set = set(wanted_order)
     recs = _acc_records(src)
@@ -876,7 +891,7 @@ def _gacha(params, log):
         except Exception as e:
             log(f"{uc}: ERROR {e}"); fails += 1
         _report(hit_accounts, fails, len(recs))
-        time.sleep(1.0)
+        _isleep(delay)
     _summary(log, "GACHA", [f"บัญชีที่ได้นักเตะเป้าหมาย {hit_accounts}/{len(recs)}  "
                             f"(พลาด {fails})", f"โฟลเดอร์: {src}"])
     return {"module": "gacha", "results": results,
@@ -887,6 +902,7 @@ def _daily(params, log):
     src = _src_dir(params)
     recs = _acc_records(src)
     show_players = bool((params or {}).get("daily_show_players"))
+    delay = float((params or {}).get("delay", 0) or 0)
     log(f"daily pass: {len(recs)} accounts @ {src}")
     ok = claimed_total = fails = 0
     _report(0, 0, len(recs))
@@ -920,7 +936,7 @@ def _daily(params, log):
         except Exception as e:
             log(f"  {uc}: ERROR {e}"); fails += 1
         _report(ok, fails, len(recs))
-        time.sleep(1.0)
+        _isleep(delay)
     _summary(log, "DAILY", [f"ล็อกอินสำเร็จ {ok}/{len(recs)}  พลาด {fails}  "
                             f"รับของรวม {claimed_total} ชิ้น", f"โฟลเดอร์: {src}"])
     return {"module": "daily", "ok": ok, "total": len(recs), "claimed": claimed_total,

@@ -169,9 +169,12 @@
             <div class="cbody">
               <div class="grid2">
                 <div class="field"><label>จำนวนไอดี (0=ไม่จำกัด)</label><input id="r_count" type="number" value="20" min="0"></div>
-                <div class="field"><label title="จำนวนไอดีที่สร้างพร้อมกัน — มากขึ้น = เร็วขึ้น แต่เสี่ยงโดน Konami throttle (ERR_SERVERNOTREADY) มากขึ้น · แนะนำ 5–15 ต่อ 1 IP · ขึ้นกับสเปกเครื่อง + เน็ตด้วย" style="cursor:help">Workers (พร้อมกัน) &#9432;</label><input id="r_workers" type="number" value="8" min="1" max="64" title="มากขึ้น = เร็วขึ้น แต่โดน throttle ง่ายขึ้น · แนะนำ 5–15 ต่อ IP"></div>
+                <div class="field"><label title="จำนวนไอดีที่สร้างพร้อมกัน — มากขึ้น = เร็วขึ้น แต่เสี่ยงโดน Konami throttle (ERR_SERVERNOTREADY) มากขึ้น · แนะนำ 5–15 ต่อ 1 IP · ขึ้นกับสเปกเครื่อง + เน็ตด้วย" style="cursor:help">Workers (พร้อมกัน) &#9432;</label><input id="r_workers" type="number" value="8" min="1" max="500" title="มากขึ้น = เร็วขึ้น แต่โดน throttle ง่ายขึ้น · สูงสุด 500 · จาก IP เดียวเกิน ~15–30 จะตันที่ IP (ต้องใช้ proxy ถึงดันทะลุ)"></div>
               </div>
-              <div class="field"><label>Prefix ชื่อในเกม</label><input id="r_prefix" value="j3xdr" maxlength="10"></div>
+              <div class="grid2">
+                <div class="field"><label>Prefix ชื่อในเกม</label><input id="r_prefix" value="j3xdr" maxlength="10"></div>
+                <div class="field"><label title="หน่วงเวลาแต่ละไอดีต่อ worker (วินาที) — 0 = เร็วสุด · เพิ่มเลขถ้าโดน throttle (ERR_SERVERNOTREADY) จะยิงนุ่มขึ้น" style="cursor:help">ความไว · หน่วง วิ/ไอดี &#9432;</label><input id="r_delay" type="number" value="0" min="0" step="0.5"></div>
+              </div>
               <div class="field"><label>โฟลเดอร์เก็บผล</label>
                 <div class="row"><input id="r_out" placeholder="(ค่าเริ่มต้น ข้างโปรแกรม)" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('r_out')">เลือก…</button></div></div>
               <div class="field"><label>รูปแบบไฟล์</label><select id="r_fmt"><option value="txt">.txt</option><option value="dat">.dat</option></select></div>
@@ -322,16 +325,16 @@ function setLive(on){RUNNING=on;$('livedot').classList.toggle('live',on);$('live
 // ---- start actions ----
 function startReroll(){const p={module:'reroll',count:+$('r_count').value,workers:+$('r_workers').value,
   prefix:$('r_prefix').value.trim()||'j3xdr',claim:$('r_claim').checked,verbose:$('r_verbose').checked,
-  fmt:$('r_fmt').value,out_dir:$('r_out').value||null};
+  delay:+$('r_delay').value||0,fmt:$('r_fmt').value,out_dir:$('r_out').value||null};
   buildGrid(p.workers);$('grid').dataset.n=p.workers;go(p);}
 function startMod(mod){
   const dir=$(mod[0]+'_out').value||null;
-  const p={module:mod,workers:5,verbose:false,fmt:'txt',out_dir:dir,src_dir:dir};
+  const p={module:mod,workers:5,verbose:false,fmt:'txt',delay:0.5,out_dir:dir,src_dir:dir};
   if(mod==='daily'){p.workers=+$('d_workers').value;p.daily_show_players=$('d_show').checked;$('d_log').innerHTML='';}
   if(mod==='gacha'){p.wanted_ids=window._wanted||[];$('g_log').innerHTML='';}
   go(p);}
 function startCheck(){$('c_body').innerHTML='';$('c_bar').style.width='0';
-  go({action:'check',module:'reroll',workers:+$('c_workers').value,src_dir:$('c_out').value||null,out_dir:$('c_out').value||null});}
+  go({action:'check',module:'reroll',workers:+$('c_workers').value,delay:0.5,src_dir:$('c_out').value||null,out_dir:$('c_out').value||null});}
 function startMerge(){if(!MERGE.length){logln($('m_log'),'err','เลือกอย่างน้อย 1 โฟลเดอร์');return;}
   $('m_log').innerHTML='';go({action:'merge',module:'reroll',merge_dirs:MERGE,out_dir:$('m_out').value||MERGE[0],fmt:$('m_fmt').value});}
 function go(p){setLive(true);api('start',JSON.stringify(p)).then(r=>{if(r&&r.error){setLive(false);alert(r.error);}});}
