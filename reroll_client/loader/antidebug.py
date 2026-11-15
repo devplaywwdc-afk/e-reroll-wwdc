@@ -107,6 +107,60 @@ def _module_flags() -> list[str]:
     return flags
 
 
+def _peb_flags() -> list[str]:
+    """PEB.BeingDebugged (+NtGlobalFlag heap markers) read via NtQueryInformationProcess
+    ProcessBasicInformation, so a NOP'd kernel32!IsDebuggerPresent is still caught."""
+    flags: list[str] = []
+    try:
+        ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+        class _PBI(ctypes.Structure):
+            _fields_ = [("Reserved1", ctypes.c_void_p),
+                        ("PebBaseAddress", ctypes.c_void_p),
+                        ("Reserved2", ctypes.c_void_p * 2),
+                        ("UniqueProcessId", ctypes.c_void_p),
+                        ("Reserved3", ctypes.c_void_p)]
+        pbi = _PBI()
+        rl = ctypes.c_ulong(0)
+        if ntdll.NtQueryInformationProcess(k32.GetCurrentProcess(), 0,
+                ctypes.byref(pbi), ctypes.sizeof(pbi), ctypes.byref(rl)) == 0 and pbi.PebBaseAddress:
+            being = ctypes.c_ubyte(0)
+            # PEB.BeingDebugged is at offset 0x02 on both x86/x64
+            ctypes.memmove(ctypes.byref(being),
+                           ctypes.c_void_p(pbi.PebBaseAddress + 0x02), 1)
+            if being.value:
+                flags.append("PEB.BeingDebugged")
+    except Exception:
+        pass
+    return flags
+
+
+def _hwbp_flags() -> list[str]:
+    """Hardware breakpoints (DR0-DR3) on the current thread => a debugger set them."""
+    flags: list[str] = []
+    try:
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        CONTEXT_DEBUG_REGISTERS = 0x00100000 | 0x00000010
+
+        class _CTX(ctypes.Structure):
+            _fields_ = [("pad0", ctypes.c_byte * 48),
+                        ("ContextFlags", ctypes.c_ulong),
+                        ("pad1", ctypes.c_byte * 24),
+                        ("Dr0", ctypes.c_ulonglong), ("Dr1", ctypes.c_ulonglong),
+                        ("Dr2", ctypes.c_ulonglong), ("Dr3", ctypes.c_ulonglong),
+                        ("Dr6", ctypes.c_ulonglong), ("Dr7", ctypes.c_ulonglong),
+                        ("rest", ctypes.c_byte * 1200)]
+        ctx = _CTX()
+        ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS
+        if k32.GetThreadContext(k32.GetCurrentThread(), ctypes.byref(ctx)):
+            if ctx.Dr0 or ctx.Dr1 or ctx.Dr2 or ctx.Dr3 or ctx.Dr7:
+                flags.append("HardwareBreakpoint")
+    except Exception:
+        pass
+    return flags
+
+
 def detect_threats() -> list[str]:
     """Return a list of threat flags (empty = clean). Never raises."""
     if not _is_windows():
@@ -116,6 +170,8 @@ def detect_threats() -> list[str]:
     out: list[str] = []
     out += _basic_debugger_flags()
     out += _ntquery_flags()
+    out += _peb_flags()
+    out += _hwbp_flags()
     out += _module_flags()
     return out
 
@@ -126,3 +182,20 @@ def enforce() -> None:
     if threats:
         print(f"[security] refusing to run — {', '.join(threats)}", file=sys.stderr)
         os._exit(3)
+
+
+def watch(stop_event, interval: float = 7.0) -> None:
+    """Background re-check: catches a debugger/injector ATTACHED mid-run (after the
+    one-shot enforce() at start). Exits the process on detection. Daemon-safe."""
+    import threading
+
+    def _loop():
+        while not stop_event.wait(interval):
+            threats = detect_threats()
+            if threats:
+                print(f"[security] threat mid-run — {', '.join(threats)}", file=sys.stderr)
+                os._exit(3)
+
+    t = threading.Thread(target=_loop, daemon=True)
+    t.start()
+    return t

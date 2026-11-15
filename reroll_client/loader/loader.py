@@ -57,6 +57,7 @@ def run_module(module_id: str, build_id: str, discord_token: str | None = None,
     # Discord-first: no key -> server resolves it from the Discord token.
     ctx = open_session(build_id, module_id, brain_enc, discord_token=discord_token, key=key)
     ctx.start_heartbeat(on_revoked=lambda: os._exit(2))
+    antidebug.watch(ctx._hb_stop)  # L6: re-check for a debugger ATTACHED mid-run
 
     if not exec_engine:
         return ctx  # dry-run: handshake proven, caller inspects ctx.brain
