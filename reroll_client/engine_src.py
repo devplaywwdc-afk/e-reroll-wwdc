@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import string
 import struct
 import sys
@@ -520,22 +521,127 @@ def pack_players(client, uid, sid, agent_ids):
 
 
 # ---------------------------------------------------------------- persistence
-def _acc_dir(params):
-    d = (params or {}).get("out_dir") or os.path.join(
-        os.path.dirname(os.path.abspath(sys.argv[0])), "accounts")
+# EPIC/legendary highest; falls back to overall when rarities tie or are unknown.
+_RARITY_RANK = {"EPIC": 4, "LEGENDARY": 4, "HIGHLIGHT": 3, "FEATURED": 3,
+                "SPECIAL": 3, "RARE": 2, "NORMAL": 1, "STANDARD": 1}
+_BAD = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
+
+
+def _default_dir():
+    return os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "accounts")
+
+
+def _out_dir(params):
+    """Where results are written (reroll output; merge destination)."""
+    d = (params or {}).get("out_dir") or _default_dir()
     os.makedirs(d, exist_ok=True)
     return d
 
 
-def save_account(acc_dir, user_code, auth_code, user_id, device_identifier=None):
-    rec = {"auth_code": auth_code, "user_code": user_code,
-           "user_id": user_id, "version": "2.0.0"}
-    if device_identifier:
-        rec["device_identifier"] = device_identifier
-    path = os.path.join(acc_dir, f"{user_code}.txt")
+def _src_dir(params):
+    """Source folder of saved accounts (gacha/daily read from here, write back here)."""
+    d = (params or {}).get("src_dir") or (params or {}).get("out_dir") or _default_dir()
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _ext(params):
+    f = str((params or {}).get("fmt", "txt")).lstrip(".").lower()
+    return ".dat" if f == "dat" else ".txt"
+
+
+def _san(s, maxlen=40):
+    s = _BAD.sub("", str(s if s is not None else "")).strip().strip(".")
+    return (s[:maxlen]).strip() or "x"
+
+
+def _acc_records(folder):
+    """Read every saved account record in a folder (any .txt/.dat), keyed by user_code.
+    Filename scheme is irrelevant — the record JSON carries user_code."""
+    recs = {}
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return recs
+    for fn in names:
+        if not fn.lower().endswith((".txt", ".dat")):
+            continue
+        fp = os.path.join(folder, fn)
+        try:
+            r = json.load(open(fp, encoding="utf-8"))
+        except Exception:
+            continue
+        uc = r.get("user_code")
+        if uc:
+            r["_file"] = fp
+            recs[uc] = r
+    return recs
+
+
+def _epic(players):
+    """The standout card: highest rarity, then overall."""
+    if not players:
+        return None
+    return sorted(players, key=lambda p: (_RARITY_RANK.get(str(p.get("rarity") or "").upper(), 0),
+                                          p.get("overall") or 0), reverse=True)[0]
+
+
+def _filename(scheme, rec, params):
+    uc = _san(rec.get("user_code"), 24)
+    coins = rec.get("coins", 0)
+    players = rec.get("players") or []
+    if scheme == "daily":
+        if (params or {}).get("daily_show_players") and players:
+            ep = _epic(players)
+            base = f"{_san(ep.get('name'))}_{coins}_{uc}"
+        else:
+            base = f"{coins}_{uc}"
+    elif scheme == "gacha":
+        names = "+".join(_san(p.get("name"), 18) for p in players) if players else "none"
+        base = f"{_san(names, 60)}_{coins}_{uc}"
+    elif scheme == "merge":
+        ep = _epic(players)
+        base = f"{_san(ep.get('name')) if ep else 'none'}(epic)_coin{coins}_{uc}"
+    else:  # reroll (+ fallback)
+        base = uc
+    return base + _ext(params)
+
+
+def write_record(folder, rec, scheme, params, replace_old_uc=True):
+    """Write an account record; delete any previous file for the same user_code so
+    one account never leaves stale copies behind when it gets re-named."""
+    os.makedirs(folder, exist_ok=True)
+    rec = {k: v for k, v in rec.items() if k != "_file"}
+    rec.setdefault("version", "2.1.0")
+    path = os.path.join(folder, _filename(scheme, rec, params))
+    if replace_old_uc:
+        uc = rec.get("user_code")
+        for fn in os.listdir(folder):
+            if not fn.lower().endswith((".txt", ".dat")):
+                continue
+            fp = os.path.join(folder, fn)
+            if os.path.abspath(fp) == os.path.abspath(path):
+                continue
+            try:
+                old = json.load(open(fp, encoding="utf-8"))
+            except Exception:
+                continue
+            if old.get("user_code") == uc:
+                try:
+                    os.remove(fp)
+                except OSError:
+                    pass
     with open(path, "w", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False))
     return path
+
+
+def _summary(log, title, lines):
+    log("")
+    log("====== สรุปผล " + title + " ======")
+    for ln in lines:
+        log("  " + ln)
+    log("=" * 30)
 
 
 # ---------------------------------------------------------------- module entrypoints
@@ -544,18 +650,19 @@ def _reroll(params, log):
     prefix = (params or {}).get("prefix") or _B.get("default_prefix", "j3xdr")
     claim = bool((params or {}).get("claim", True))
     delay = float((params or {}).get("delay", 1.0))
-    acc_dir = _acc_dir(params)
-    made = []
+    out = _out_dir(params)
+    made, fail = [], 0
     c = GateClient()
     for i in range(count):
         try:
             resp = create_user(c, prefix=prefix)
             if "auth_code" not in resp:
-                log(f"[{i+1}/{count}] FAIL: {resp.get('result')}")
+                log(f"[{i+1}/{count}] FAIL: {resp.get('result')}"); fail += 1
                 time.sleep(delay); continue
             uc, auth = resp["user_code"], resp["auth_code"]
             uid = resp["pes_user_info"]["user_id"]
             devid = resp.get("_device_identifier")
+            coins = gp = 0
             setup = "skipped"
             try:
                 lr = login(c, uid, auth, devid)
@@ -563,27 +670,33 @@ def _reroll(params, log):
                 if sid:
                     setup = finish_setup(c, uid, sid).get("result", "?")
                     if claim:
-                        claim_starter(uid, auth, devid, uc)
+                        cs = claim_starter(uid, auth, devid, uc)
+                        coins, gp = cs.get("coins", 0), cs.get("gp", 0)
             except Exception as e:
                 setup = f"err:{e}"
-            save_account(acc_dir, uc, auth, uid, devid)
+            rec = {"user_code": uc, "user_id": uid, "auth_code": auth,
+                   "device_identifier": devid, "coins": coins, "gp": gp,
+                   "players": [], "module": "reroll"}
+            write_record(out, rec, "reroll", params)
             made.append(uc)
-            log(f"[{i+1}/{count}] OK {uc} uid={uid} myclub={setup}")
+            log(f"[{i+1}/{count}] OK {uc} uid={uid} coins={coins} myclub={setup}")
         except Exception as e:
-            log(f"[{i+1}/{count}] ERROR: {e}")
+            log(f"[{i+1}/{count}] ERROR: {e}"); fail += 1
         time.sleep(delay + random.random())
-    log(f"created {len(made)}/{count} -> {acc_dir}")
-    return {"module": "reroll", "created": made, "out_dir": acc_dir}
+    _summary(log, "REROLL", [f"สร้างสำเร็จ {len(made)}/{count}  ล้มเหลว {fail}",
+                             f"โฟลเดอร์: {out}"])
+    return {"module": "reroll", "created": made, "failed": fail, "out_dir": out,
+            "summary": {"ok": len(made), "fail": fail, "total": count}}
 
 
 def _gacha_scan(params, log):
     """Login ONE saved account, scan free packs, return pack players (+art) to pick from."""
-    acc_dir = _acc_dir(params)
-    files = sorted(f for f in os.listdir(acc_dir) if f.endswith(".txt"))
-    if not files:
-        log("ไม่พบไฟล์บัญชีในโฟลเดอร์ (เลือกโฟลเดอร์ที่มี .txt ก่อน)")
+    src = _src_dir(params)
+    recs = _acc_records(src)
+    if not recs:
+        log("ไม่พบไฟล์บัญชีในโฟลเดอร์ (เลือกโฟลเดอร์ที่มีไฟล์บัญชีก่อน)")
         return {"module": "gacha", "action": "scan", "packs": []}
-    a = json.load(open(os.path.join(acc_dir, files[0]), encoding="utf-8"))
+    a = next(iter(recs.values()))
     c = GateClient(user_code=a["user_code"])
     lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
     sid = lr.get("session_id")
@@ -603,16 +716,18 @@ def _gacha_scan(params, log):
 
 
 def _gacha(params, log):
-    """Open free packs on saved accounts (filter by wanted player ids)."""
+    """Open free packs on saved accounts; name files by the hit players in the
+    user's filter order + coins + user_code, and store the players in the record."""
     if (params or {}).get("action") == "scan":
         return _gacha_scan(params, log)
-    acc_dir = _acc_dir(params)
+    src = _src_dir(params)
     only = int((params or {}).get("agent", 0))
-    wanted_ids = {int(x) for x in (params or {}).get("wanted_ids", [])}
-    results = []
-    for fn in sorted(f for f in os.listdir(acc_dir) if f.endswith(".txt")):
-        a = json.load(open(os.path.join(acc_dir, fn), encoding="utf-8"))
-        uc = a["user_code"]
+    wanted_order = [int(x) for x in (params or {}).get("wanted_ids", [])]
+    wanted_set = set(wanted_order)
+    recs = _acc_records(src)
+    results, hit_accounts = [], 0
+    log(f"gacha pass: {len(recs)} accounts @ {src}")
+    for uc, a in recs.items():
         try:
             c = GateClient(user_code=uc)
             lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
@@ -620,23 +735,44 @@ def _gacha(params, log):
             if not sid:
                 log(f"{uc}: login failed"); continue
             drawn = draw_all_free(c, int(a["user_id"]), sid, only_agent=only)
-            hits = [p["id"] for p in drawn if not wanted_ids or p["id"] in wanted_ids]
-            log(f"{uc}: drawn={len(drawn)} hits={len(hits)}")
-            results.append({"user_code": uc, "drawn": len(drawn), "hits": hits})
+            info = efb_many([p["id"] for p in drawn if p.get("id")])
+            by_id = {}
+            for p in drawn:
+                e = info.get(str(p.get("id")), {})
+                by_id[p["id"]] = {"id": p["id"], "name": e.get("name") or str(p.get("id")),
+                                  "overall": e.get("overall"), "rarity": p.get("rarity")}
+            if wanted_set:
+                # keep only wanted, in the exact order the user ticked them
+                ordered = [by_id[i] for i in wanted_order if i in by_id]
+            else:
+                ordered = sorted(by_id.values(), key=lambda x: x.get("overall") or 0, reverse=True)
+            st = account_status(c, int(a["user_id"]), sid)
+            rec = dict(a); rec.pop("_file", None)
+            rec.update({"coins": st["coins"], "gp": st["gp"],
+                        "players": ordered, "module": "gacha"})
+            write_record(src, rec, "gacha", params)
+            if ordered:
+                hit_accounts += 1
+            log(f"{uc}: drawn={len(drawn)} hits={len(ordered)} coins={st['coins']}")
+            results.append({"user_code": uc, "drawn": len(drawn),
+                            "hits": [p["id"] for p in ordered]})
         except Exception as e:
             log(f"{uc}: ERROR {e}")
         time.sleep(1.0)
-    return {"module": "gacha", "results": results}
+    _summary(log, "GACHA", [f"บัญชีที่ได้นักเตะเป้าหมาย {hit_accounts}/{len(recs)}",
+                            f"โฟลเดอร์: {src}"])
+    return {"module": "gacha", "results": results,
+            "summary": {"hit_accounts": hit_accounts, "total": len(recs)}}
 
 
 def _daily(params, log):
-    acc_dir = _acc_dir(params)
-    accs = [json.load(open(os.path.join(acc_dir, f), encoding="utf-8"))
-            for f in sorted(os.listdir(acc_dir)) if f.endswith(".txt")]
-    log(f"daily pass: {len(accs)} accounts")
-    ok = 0
-    for a in accs:
-        uc, uid, auth = a["user_code"], a["user_id"], a["auth_code"]
+    src = _src_dir(params)
+    recs = _acc_records(src)
+    show_players = bool((params or {}).get("daily_show_players"))
+    log(f"daily pass: {len(recs)} accounts @ {src}")
+    ok = claimed_total = 0
+    for uc, a in recs.items():
+        uid, auth = a["user_id"], a["auth_code"]
         c = GateClient(user_code=uc)
         try:
             lr = login(c, uid, auth, a.get("device_identifier"))
@@ -649,13 +785,57 @@ def _daily(params, log):
             if ids:
                 rr = recv_present(c, uid, sid, ids)
                 claimed = len(rr.get("receive_result_list", [])) if rr.get("result") == "NOERR" else 0
-            log(f"  {uc}: login OK mailbox={len(ids)} claimed={claimed}")
-            ok += 1
+            st = account_status(c, uid, sid)
+            rec = dict(a); rec.pop("_file", None)
+            rec.update({"coins": st["coins"], "gp": st["gp"], "efp": st["efp"],
+                        "module": "daily"})
+            write_record(src, rec, "daily", params)
+            pl = ""
+            if show_players and rec.get("players"):
+                pl = " | นักเตะ: " + ", ".join(p.get("name", "?") for p in rec["players"][:3])
+            log(f"  {uc}: OK coins={st['coins']} claimed={claimed}{pl}")
+            ok += 1; claimed_total += claimed
         except Exception as e:
             log(f"  {uc}: ERROR {e}")
         time.sleep(1.0)
-    log(f"done: {ok}/{len(accs)} logged in")
-    return {"module": "daily", "ok": ok, "total": len(accs)}
+    _summary(log, "DAILY", [f"ล็อกอินสำเร็จ {ok}/{len(recs)}  รับของรวม {claimed_total} ชิ้น",
+                            f"โฟลเดอร์: {src}"])
+    return {"module": "daily", "ok": ok, "total": len(recs), "claimed": claimed_total,
+            "summary": {"ok": ok, "total": len(recs), "claimed": claimed_total}}
+
+
+def _merge(params, log):
+    """Collect saved files across several folders, group by user_code, union the
+    players, and write one combined file per account named
+    <epicPlayer>(epic)_coin<coins>_<user_code>."""
+    dirs = list((params or {}).get("merge_dirs") or [])
+    if not dirs:
+        d = (params or {}).get("src_dir") or (params or {}).get("out_dir")
+        dirs = [d] if d else []
+    dirs = [d for d in dirs if d and os.path.isdir(d)]
+    out = _out_dir(params)
+    merged = {}
+    for d in dirs:
+        for uc, r in _acc_records(d).items():
+            m = merged.setdefault(uc, {"user_code": uc, "players": [], "coins": 0})
+            for k in ("user_id", "auth_code", "device_identifier", "gp", "efp"):
+                v = r.get(k)
+                if v not in (None, "", 0) or k not in m:
+                    m[k] = v if v is not None else m.get(k)
+            m["coins"] = max(m.get("coins", 0) or 0, r.get("coins", 0) or 0)
+            seen = {p.get("id") for p in m["players"]}
+            for p in (r.get("players") or []):
+                if p.get("id") not in seen:
+                    m["players"].append(p); seen.add(p.get("id"))
+    n = 0
+    for uc, m in merged.items():
+        m["module"] = "merge"
+        write_record(out, m, "merge", params, replace_old_uc=False)
+        n += 1
+    _summary(log, "MERGE", [f"รวม {n} บัญชี จาก {len(dirs)} โฟลเดอร์",
+                            f"โฟลเดอร์ปลายทาง: {out}"])
+    return {"module": "merge", "merged": n, "out_dir": out,
+            "summary": {"merged": n, "dirs": len(dirs)}}
 
 
 _DISPATCH = {"reroll": _reroll, "gacha": _gacha, "daily": _daily}
@@ -669,6 +849,12 @@ def run(brain: dict, session=None, params: dict | None = None):
 
     def log(msg):
         print(msg, flush=True)
+
+    action = (params or {}).get("action")
+    if action == "merge":
+        return _merge(params, log)
+    if action == "scan":
+        return _gacha_scan(params, log)
 
     fn = _DISPATCH.get(module_id)
     if not fn:

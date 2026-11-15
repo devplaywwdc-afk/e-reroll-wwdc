@@ -67,6 +67,9 @@ class App:
         self.worker: threading.Thread | None = None
         self.out_dir: str | None = None
         self.wanted_ids: list[int] = []
+        self.merge_dirs: list[str] = []
+        self.fmt_var = tk.StringVar(value="txt")        # .txt / .dat
+        self.daily_show_var = tk.BooleanVar(value=False)  # daily: show player in name
         self._imgrefs: list = []   # keep PhotoImage refs alive
 
         _title = "eFootball Reroll"
@@ -137,12 +140,22 @@ class App:
         ttk.Spinbox(cfr, from_=1, to=9999, textvariable=self.count_var, width=8,
                     font=FONT).grid(row=1, column=3, sticky="w", padx=6, pady=6)
 
-        # account folder (gacha/daily read saved .txt from here; reroll saves here)
-        ttk.Label(cfr, text="โฟลเดอร์บัญชี").grid(row=2, column=0, sticky="w", padx=10, pady=6)
+        # account folder — reroll: where files are SAVED; gacha/daily: SOURCE folder.
+        self.folder_cap = ttk.Label(cfr, text="โฟลเดอร์เก็บผล")
+        self.folder_cap.grid(row=2, column=0, sticky="w", padx=10, pady=6)
         self.folder_lbl = ttk.Label(cfr, text="(ค่าเริ่มต้น — ข้างตัวโปรแกรม)", foreground="#888")
         self.folder_lbl.grid(row=2, column=1, columnspan=2, sticky="w", padx=6, pady=6)
         ttk.Button(cfr, text="เลือก...", command=self._pick_folder).grid(
             row=2, column=3, sticky="w", padx=6, pady=6)
+
+        # file format + daily show-player toggle
+        ttk.Label(cfr, text="รูปแบบไฟล์").grid(row=3, column=0, sticky="w", padx=10, pady=6)
+        ttk.Combobox(cfr, textvariable=self.fmt_var, values=["txt", "dat"],
+                     state="readonly", width=6, font=FONT).grid(
+                         row=3, column=1, sticky="w", padx=6, pady=6)
+        self.daily_chk = ttk.Checkbutton(
+            cfr, text="เช็คอิน: ใส่ชื่อนักเตะในชื่อไฟล์", variable=self.daily_show_var)
+        self.daily_chk.grid(row=3, column=2, columnspan=2, sticky="w", padx=6, pady=6)
         cfr.columnconfigure(1, weight=1)
 
         # Buttons
@@ -157,6 +170,8 @@ class App:
                                    command=self._on_scan_packs)
         self.want_lbl = ttk.Label(bfr, text="ยังไม่เลือกนักเตะ", foreground="#888")
         ttk.Button(bfr, text="ล้าง log", command=self._clear_log).pack(side="right")
+        ttk.Button(bfr, text="รวมไฟล์ (Merge)", command=self._on_merge).pack(
+            side="right", padx=6)
         self._on_module_change()
 
         # Log
@@ -194,12 +209,12 @@ class App:
         self.log.configure(state="disabled")
 
     def _pick_folder(self):
-        d = filedialog.askdirectory(title="เลือกโฟลเดอร์ที่เก็บไฟล์บัญชี (.txt)")
+        d = filedialog.askdirectory(title="เลือกโฟลเดอร์ (เก็บผล / บัญชีต้นทาง)")
         if d:
             self.out_dir = d
-            n = len([f for f in os.listdir(d) if f.endswith(".txt")])
+            n = len([f for f in os.listdir(d) if f.lower().endswith((".txt", ".dat"))])
             self.folder_lbl.configure(text=f"{d}  ({n} บัญชี)", foreground="#1e7e34")
-            self._log(f"โฟลเดอร์บัญชี: {d} ({n} ไฟล์ .txt)")
+            self._log(f"โฟลเดอร์: {d} ({n} ไฟล์บัญชี)")
 
     def _drain_log(self):
         try:
@@ -215,13 +230,18 @@ class App:
     def _on_module_change(self):
         """Show the gacha pack-picker controls only when gacha is the active mode,
         and re-verify entitlement with the server on every mode switch."""
-        is_gacha = (self.locked_module or self.module_var.get()) == "gacha"
+        mode = self.locked_module or self.module_var.get()
+        is_gacha = mode == "gacha"
         if is_gacha:
             self.btn_scan.pack(side="left", padx=8)
             self.want_lbl.pack(side="left", padx=4)
         else:
             self.btn_scan.pack_forget()
             self.want_lbl.pack_forget()
+        # folder means "save results here" for reroll, "source accounts" otherwise
+        self.folder_cap.configure(
+            text="โฟลเดอร์เก็บผล" if mode == "reroll" else "โฟลเดอร์บัญชีต้นทาง")
+        self.daily_chk.configure(state=("normal" if mode == "daily" else "disabled"))
         if getattr(self, "discord_token", None):
             self._refresh_entitlement()   # fresh server check each switch
 
@@ -240,7 +260,8 @@ class App:
             try:
                 res = run_module("gacha", self.build_id,
                                  discord_token=self.discord_token,
-                                 params={"action": "scan", "out_dir": self.out_dir})
+                                 params={"action": "scan", "out_dir": self.out_dir,
+                                         "src_dir": self.out_dir})
                 packs = (res or {}).get("packs", [])
             except Exception as e:  # noqa: BLE001
                 packs = []
@@ -325,6 +346,72 @@ class App:
 
         ttk.Button(bar, text="เลือกเสร็จ", command=done,
                    style="Accent.TButton").pack(side="right", padx=10, pady=8)
+
+    # ------------------------------------------------------------------ merge
+    def _on_merge(self):
+        if not self.discord_token:
+            self._log("ต้องเข้าสู่ระบบ Discord ก่อน"); return
+        if not (self.entitlement and self.entitlement.get("has_access")):
+            self._log("ยังไม่มีสิทธิ์ใช้งาน — กด 'ไปเช่าที่เว็บ' ก่อน"); self._open_shop(); return
+
+        win = tk.Toplevel(self.root)
+        win.title("รวมไฟล์ (Merge)")
+        win.geometry("560x420")
+        win.transient(self.root)
+        self.merge_dirs = []
+
+        ttk.Label(win, text="เลือกหลายโฟลเดอร์ที่จะรวม (จับคู่ด้วย user_code เดียวกัน)",
+                  font=FONT_B).pack(anchor="w", padx=12, pady=(12, 4))
+        lb = tk.Listbox(win, height=8, font=FONT_MONO)
+        lb.pack(fill="both", expand=True, padx=12, pady=4)
+
+        out_var = tk.StringVar(value="")
+
+        def add_dir():
+            d = filedialog.askdirectory(title="เพิ่มโฟลเดอร์ต้นทาง", parent=win)
+            if d and d not in self.merge_dirs:
+                self.merge_dirs.append(d)
+                n = len([f for f in os.listdir(d) if f.lower().endswith((".txt", ".dat"))])
+                lb.insert("end", f"{d}  ({n})")
+
+        def pick_out():
+            d = filedialog.askdirectory(title="โฟลเดอร์ปลายทาง (ผลลัพธ์ merge)", parent=win)
+            if d:
+                out_var.set(d)
+
+        row = ttk.Frame(win); row.pack(fill="x", padx=12, pady=4)
+        ttk.Button(row, text="เพิ่มโฟลเดอร์...", command=add_dir).pack(side="left")
+        ttk.Button(row, text="โฟลเดอร์ปลายทาง...", command=pick_out).pack(side="left", padx=6)
+        ttk.Label(row, textvariable=out_var, foreground="#1e7e34").pack(side="left", padx=6)
+
+        def start_merge():
+            if not self.merge_dirs:
+                self._log("เลือกอย่างน้อย 1 โฟลเดอร์ก่อน merge"); return
+            dest = out_var.get() or self.merge_dirs[0]
+            dirs = list(self.merge_dirs)
+            fmt = self.fmt_var.get()
+            win.destroy()
+            self._log(f"เริ่ม merge {len(dirs)} โฟลเดอร์ -> {dest}")
+
+            def work():
+                old = sys.stdout
+                sys.stdout = _QueueWriter(self.logq)
+                try:
+                    gate = (self.entitlement.get("modules")
+                            or [self.module_var.get()])[0]
+                    run_module(gate, self.build_id, discord_token=self.discord_token,
+                               params={"action": "merge", "module": gate,
+                                       "merge_dirs": dirs, "out_dir": dest, "fmt": fmt})
+                    self.logq.put("\n[merge เสร็จ]\n")
+                except Exception as e:  # noqa: BLE001
+                    self.logq.put(f"\n[merge ผิดพลาด] {e}\n")
+                finally:
+                    sys.stdout = old
+
+            threading.Thread(target=work, daemon=True).start()
+
+        ttk.Button(win, text="เริ่มรวม", command=start_merge,
+                   style="Accent.TButton").pack(side="bottom", pady=10)
 
     # ------------------------------------------------------------------ update
     def _check_update(self, manual: bool):
@@ -429,9 +516,12 @@ class App:
 
         module = self.locked_module or self.module_var.get()
         count = max(1, int(self.count_var.get() or 1))
-        params = {"count": count, "module": module}
+        params = {"count": count, "module": module, "fmt": self.fmt_var.get()}
         if self.out_dir:
-            params["out_dir"] = self.out_dir
+            params["out_dir"] = self.out_dir   # reroll output
+            params["src_dir"] = self.out_dir   # gacha/daily source
+        if module == "daily":
+            params["daily_show_players"] = bool(self.daily_show_var.get())
         if module == "gacha" and self.wanted_ids:
             params["wanted_ids"] = self.wanted_ids
         self.btn_start.configure(state="disabled", text="กำลังทำงาน...")
