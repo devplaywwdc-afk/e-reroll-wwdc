@@ -32,6 +32,7 @@ _LOG = None          # run()'s logger (print → GUI queue)
 _VERBOSE = False     # raw per-request logging (GUI "Log ดิบ" switch)
 _STOP = None         # threading.Event set by the GUI "หยุด" button
 _PROGRESS = None     # GUI live-summary callback: progress(ok, fail, total)
+_EMIT = None         # dashboard event sink: emit({"type": ..., ...}) → SSE
 
 
 def _emit(msg):
@@ -45,6 +46,15 @@ def _report(ok, fail, total):
     if _PROGRESS:
         try:
             _PROGRESS(ok, fail, total)
+        except Exception:
+            pass
+
+
+def _event(ev):
+    """Push a structured event to the web dashboard (worker grid / tables)."""
+    if _EMIT:
+        try:
+            _EMIT(ev)
         except Exception:
             pass
 
@@ -687,10 +697,24 @@ def _reroll(params, log):
     made, errors = [], []
     lock = threading.Lock()
     counter = {"n": 0}
+    slots = {}
+    t0 = time.time()
+
+    def _wid():
+        with lock:   # stable, unique 0..workers-1 slot per pool thread (no race)
+            return slots.setdefault(threading.get_ident(), len(slots))
+
+    def _stats():
+        dt = max(0.001, time.time() - t0)
+        ok = len(made)
+        _event({"type": "stats", "ok": ok, "fail": len(errors), "elapsed": int(dt),
+                "rate": round(ok / dt, 2), "perday": int(ok / dt * 86400),
+                "running": not _stopped()})
 
     def one(_slot):
         if _stopped():
             return
+        w = _wid()
         with lock:
             counter["n"] += 1
             i = counter["n"]
@@ -702,6 +726,7 @@ def _reroll(params, log):
                 with lock:
                     errors.append(f"#{i} CREATE_USER {msg}")
                 log(f"[{i}/{count}] FAIL: {msg}")
+                _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] FAIL {msg}"})
                 return
             uc, auth = resp["user_code"], resp["auth_code"]
             uid = resp["pes_user_info"]["user_id"]
@@ -725,14 +750,18 @@ def _reroll(params, log):
                 write_record(out, rec, "reroll", params)
                 made.append(uc)
             log(f"[{i}/{count}] OK {uc} uid={uid} coins={coins} myclub={setup}")
+            _event({"type": "log", "w": w, "lvl": "ok", "t": f"[{i}] OK {uc} coins={coins}"})
         except Exception as e:
             with lock:
                 errors.append(f"#{i} {type(e).__name__}: {e}")
             log(f"[{i}/{count}] ERROR: {e}")
+            _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] ERR {e}"})
         finally:
             _report(len(made), len(errors), count)
+            _stats()
 
     _report(0, 0, count)
+    _event({"type": "started", "workers": workers})
     log(f"เริ่ม reroll {count} บัญชี · {workers} worker พร้อมกัน")
     with cf.ThreadPoolExecutor(max_workers=workers) as ex:
         for _ in ex.map(one, range(count)):
@@ -746,6 +775,10 @@ def _reroll(params, log):
         lines.append(f"error ({min(len(errors), 10)} ตัวอย่างล่าสุด):")
         lines += ["- " + e for e in errors[-10:]]
     _summary(log, "REROLL", lines)
+    _stats()
+    _event({"type": "stopped"})
+    _event({"type": "done", "module": "reroll",
+            "summary": {"ok": len(made), "fail": len(errors), "total": count, "stopped": stopped}})
     return {"module": "reroll", "created": made, "failed": len(errors), "out_dir": out,
             "stopped": stopped, "errors": errors,
             "summary": {"ok": len(made), "fail": len(errors), "total": count}}
@@ -928,12 +961,60 @@ def _merge(params, log):
             "summary": {"merged": n, "dirs": len(dirs)}}
 
 
+def _check(params, log):
+    """Audit saved accounts: login each + report currency (GP/coins/EFP). Emits
+    rows to the dashboard check table. Read-only — never writes the records."""
+    import concurrent.futures as cf
+    import threading
+    src = _src_dir(params)
+    recs = _acc_records(src)
+    total = len(recs)
+    workers = max(1, min(32, int((params or {}).get("workers", 5) or 5)))
+    _event({"type": "cstart", "total": total})
+    log(f"เช็คไอดี {total} บัญชี @ {src} · {workers} worker")
+    done = {"n": 0}
+    lock = threading.Lock()
+    out = []
+
+    def chk(item):
+        uc, a = item
+        if _stopped():
+            return
+        rep = {"user_code": uc}
+        try:
+            c = GateClient(user_code=uc)
+            lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
+            sid = lr.get("session_id")
+            if not sid:
+                rep["error"] = "login failed"
+            else:
+                st = account_status(c, int(a["user_id"]), sid)
+                rep.update({"gp": st["gp"], "coins": st["coins"], "efp": st["efp"],
+                            "mailbox": st["mailbox"], "players": len(a.get("players") or [])})
+        except Exception as e:
+            rep["error"] = f"{type(e).__name__}: {e}"
+        with lock:
+            done["n"] += 1
+            d = done["n"]
+            out.append(rep)
+        log("  " + uc + ": " + (rep.get("error")
+            or f"GP {rep.get('gp')} · เหรียญ {rep.get('coins')} · EFP {rep.get('efp')}"))
+        _event({"type": "crow", "rep": rep, "done": d, "total": total})
+
+    with cf.ThreadPoolExecutor(max_workers=workers) as ex:
+        for _ in ex.map(chk, list(recs.items())):
+            pass
+    _event({"type": "cdone", "total": total})
+    _summary(log, "CHECK", [f"เช็ค {len(out)}/{total} บัญชี", f"โฟลเดอร์: {src}"])
+    return {"module": "check", "results": out, "summary": {"total": total, "checked": len(out)}}
+
+
 _DISPATCH = {"reroll": _reroll, "gacha": _gacha, "daily": _daily}
 
 
 def run(brain: dict, session=None, params: dict | None = None):
     """Loader entrypoint. `session` is the live SessionCtx (heartbeat/lease)."""
-    global _B, _LOG, _VERBOSE, _STOP, _PROGRESS
+    global _B, _LOG, _VERBOSE, _STOP, _PROGRESS, _EMIT
     _B = brain
     module_id = (params or {}).get("module") or os.environ.get("REROLL_MODULE", "reroll")
 
@@ -944,12 +1025,15 @@ def run(brain: dict, session=None, params: dict | None = None):
     _VERBOSE = bool((params or {}).get("verbose"))
     _STOP = (params or {}).get("stop")
     _PROGRESS = (params or {}).get("progress")
+    _EMIT = (params or {}).get("emit")
 
     action = (params or {}).get("action")
     if action == "merge":
         return _merge(params, log)
     if action == "scan":
         return _gacha_scan(params, log)
+    if action == "check":
+        return _check(params, log)
 
     fn = _DISPATCH.get(module_id)
     if not fn:

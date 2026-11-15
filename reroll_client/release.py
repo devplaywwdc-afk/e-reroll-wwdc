@@ -88,12 +88,13 @@ def build_engine_artifact(k_brain: bytes, dist: str) -> str:
     return out
 
 
-def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = None) -> str:
+def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = None,
+              web: bool = False) -> str:
     name = name or {"reroll": "eFootballReroll", "gacha": "eFootballGacha",
                     "daily": "eFootballDaily"}[module_id]
     brain_enc = os.path.join(dist, "brain.enc")
     sep = ";" if os.name == "nt" else ":"
-    entry = os.path.join(HERE, "gui.py" if gui else "run.py")
+    entry = os.path.join(HERE, "webgui.py" if web else ("gui.py" if gui else "run.py"))
     cmd = [
         sys.executable, "-m", "PyInstaller", "--onefile", "--noconfirm",
         "--name", name,
@@ -118,7 +119,24 @@ def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = N
         cmd += ["--icon", _ico, "--add-data", f"{_ico}{sep}."]
     if os.path.exists(_png):
         cmd += ["--add-data", f"{_png}{sep}."]
-    if gui:
+    if web:
+        # bundle the HTML dashboard + pywebview (Edge WebView2) runtime
+        webui = os.path.join(HERE, "webui")
+        if os.path.exists(_png):   # keep the dashboard logo in sync with assets/
+            import shutil
+            try:
+                shutil.copyfile(_png, os.path.join(webui, "logo.png"))
+            except OSError:
+                pass
+        cmd += ["--add-data", f"{webui}{sep}webui",
+                "--collect-all", "webview",
+                "--collect-submodules", "webview",
+                "--collect-all", "clr_loader",
+                "--collect-all", "pythonnet",
+                "--hidden-import", "clr",
+                "--hidden-import", "bottle",
+                "--hidden-import", "proxy_tools"]
+    if gui or web:
         cmd += ["--windowed"]   # no console window for the customer GUI
     cmd.append(entry)
     print("[*] building exe:", " ".join(cmd))
@@ -158,7 +176,9 @@ def main() -> int:
     ap.add_argument("--dist", default=os.path.join(HERE, "dist"))
     ap.add_argument("--exe", action="store_true", help="also build the onefile exe")
     ap.add_argument("--gui", action="store_true",
-                    help="build the windowed GUI exe (gui.py) instead of the CLI")
+                    help="build the windowed Tkinter GUI exe (gui.py) instead of the CLI")
+    ap.add_argument("--web", action="store_true",
+                    help="build the webview dashboard exe (webgui.py + webui/ + pywebview)")
     ap.add_argument("--native", action="store_true",
                     help="L5: compile crypto modules to .pyd before freezing")
     ap.add_argument("--register", action="store_true",
@@ -190,9 +210,9 @@ def main() -> int:
         if args.native:
             build_native_modules()
             with _native_only():
-                exe_path = build_exe(name_mod, args.dist, gui=args.gui, name=name_for_build)
+                exe_path = build_exe(name_mod, args.dist, gui=args.gui, name=name_for_build, web=args.web)
         else:
-            exe_path = build_exe(name_mod, args.dist, gui=args.gui, name=name_for_build)
+            exe_path = build_exe(name_mod, args.dist, gui=args.gui, name=name_for_build, web=args.web)
         m_hex = integrity.measure(exe_path).hex()   # measure the FROZEN exe
     else:
         print("[!] --exe not set: brain.enc written but M not measured "
