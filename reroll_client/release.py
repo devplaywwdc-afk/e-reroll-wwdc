@@ -110,6 +110,14 @@ def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = N
         # PyInstaller can't scan, so collect `cryptography` submodules explicitly.
         "--collect-all", "cryptography",
     ]
+    # app logo: exe icon (--icon) + bundle the png for the Tk window iconphoto
+    _assets = os.path.join(HERE, "assets")
+    _ico = os.path.join(_assets, "logo.ico")
+    _png = os.path.join(_assets, "logo.png")
+    if os.path.exists(_ico):
+        cmd += ["--icon", _ico, "--add-data", f"{_ico}{sep}."]
+    if os.path.exists(_png):
+        cmd += ["--add-data", f"{_png}{sep}."]
     if gui:
         cmd += ["--windowed"]   # no console window for the customer GUI
     cmd.append(entry)

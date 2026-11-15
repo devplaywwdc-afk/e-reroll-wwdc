@@ -23,3 +23,7 @@ loader/*.build/
 # never commit real secrets
 .env
 brain_src.json
+
+# app logo assets ARE tracked (override root *.png ignore)
+!assets/logo.png
+!assets/logo.ico

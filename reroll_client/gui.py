@@ -79,6 +79,8 @@ class App:
         root.geometry("640x520")
         root.minsize(560, 460)
         root.option_add("*Font", FONT)
+        self._iconimg = None
+        self._set_icon(root)
 
         style = ttk.Style()
         try:
@@ -94,6 +96,28 @@ class App:
         self._build_ui()
         self.root.after(80, self._drain_log)
         self.root.after(400, lambda: self._check_update(manual=False))  # notice on start
+
+    def _set_icon(self, root):
+        """Window / taskbar icon from the bundled logo (png via iconphoto; ico
+        fallback on Windows). Silent no-op if the asset isn't present."""
+        base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        png = next((p for p in (os.path.join(base, "logo.png"),
+                                os.path.join(base, "assets", "logo.png"))
+                    if os.path.exists(p)), None)
+        if png:
+            try:
+                self._iconimg = tk.PhotoImage(file=png)
+                root.iconphoto(True, self._iconimg)
+            except Exception:
+                pass
+        ico = next((p for p in (os.path.join(base, "logo.ico"),
+                                os.path.join(base, "assets", "logo.ico"))
+                    if os.path.exists(p)), None)
+        if ico:
+            try:
+                root.iconbitmap(ico)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------ UI
     def _build_ui(self):
