@@ -22,6 +22,50 @@ FONT = ("Tahoma", 10)
 FONT_B = ("Tahoma", 10, "bold")
 FONT_MONO = ("Tahoma", 9)   # Tahoma (not Consolas) so Thai in logs renders
 
+# ---------------------------------------------------------------- Windows XP "Luna" skin
+XP_FACE = "#ECE9D8"       # silver-beige window face
+XP_TITLE_HI = "#3E92F0"   # title-bar gradient (top)
+XP_TITLE_LO = "#0A57CE"   # title-bar gradient (bottom)
+XP_GROUP = "#0A3D91"      # blue group-box captions
+XP_ACCENT = "#2f8f2f"     # XP green "go"
+XP_FIELD = "#FFFFFF"
+
+
+def _blend(a, b, t):
+    ca = tuple(int(a[i:i + 2], 16) for i in (1, 3, 5))
+    cb = tuple(int(b[i:i + 2], 16) for i in (1, 3, 5))
+    return "#%02x%02x%02x" % tuple(int(ca[i] + (cb[i] - ca[i]) * t) for i in range(3))
+
+
+def _apply_xp_style(style):
+    """Approximate the XP Luna (blue) theme with ttk 'clam' + color overrides."""
+    try:
+        style.theme_use("clam")
+    except tk.TclError:
+        pass
+    style.configure(".", font=FONT, background=XP_FACE, foreground="#1a1a1a")
+    style.configure("TFrame", background=XP_FACE)
+    style.configure("TLabel", background=XP_FACE, font=FONT)
+    style.configure("Status.TLabel", background=XP_FACE, font=FONT_B)
+    style.configure("TCheckbutton", background=XP_FACE, font=FONT)
+    style.map("TCheckbutton", background=[("active", XP_FACE)])
+    style.configure("TLabelframe", background=XP_FACE, bordercolor="#8aa4d0",
+                    relief="groove")
+    style.configure("TLabelframe.Label", background=XP_FACE, foreground=XP_GROUP,
+                    font=FONT_B)
+    style.configure("TButton", font=FONT, padding=5, relief="raised",
+                    background=XP_FACE, bordercolor="#7f9db9", focuscolor=XP_FACE)
+    style.map("TButton", background=[("active", "#dfe8f7"), ("pressed", "#c9d8ef")])
+    style.configure("Accent.TButton", font=FONT_B, padding=6, foreground="#ffffff",
+                    background=XP_ACCENT, bordercolor="#1f6b1f")
+    style.map("Accent.TButton", background=[("active", "#37a337"), ("pressed", "#277227")])
+    style.configure("Stop.TButton", font=FONT_B, padding=6, foreground="#ffffff",
+                    background="#c0392b", bordercolor="#8c2820")
+    style.map("Stop.TButton", background=[("active", "#d14233"), ("pressed", "#9c2b20")])
+    for w in ("TCombobox", "TSpinbox", "TEntry"):
+        style.configure(w, fieldbackground=XP_FIELD, background=XP_FIELD,
+                        bordercolor="#7f9db9", arrowcolor="#0a3d91", relief="sunken")
+
 
 def _bundled_build_id() -> str:
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -72,27 +116,28 @@ class App:
         self.daily_show_var = tk.BooleanVar(value=False)  # daily: show player in name
         self._imgrefs: list = []   # keep PhotoImage refs alive
 
+        # run controls
+        self.workers_var = tk.IntVar(value=5)             # parallel workers (reroll)
+        self.verbose_var = tk.BooleanVar(value=False)     # raw per-request log
+        self.stop_event = None                            # set while a run is live
+        self._auth_gen = 0                                # supersede stale Discord logins
+        self._iconimg = None
+        self._barlogo = None
+
         _title = "eFootball Reroll"
         if self.locked_module:
             _title += f" — {_MODULE_TH.get(self.locked_module, self.locked_module)}"
         root.title(_title)
-        root.geometry("640x520")
-        root.minsize(560, 460)
+        w, h = 648, 610
+        sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+        root.geometry(f"{w}x{h}+{(sw - w) // 2}+{max(0, (sh - h) // 4)}")
+        root.minsize(560, 480)
+        root.configure(bg=XP_FACE)
         root.option_add("*Font", FONT)
-        self._iconimg = None
         self._set_icon(root)
 
-        style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
-        style.configure(".", font=FONT)
-        style.configure("TButton", font=FONT, padding=6)
-        style.configure("Accent.TButton", font=FONT_B, padding=7)
-        style.configure("TLabel", font=FONT)
-        style.configure("Status.TLabel", font=FONT_B)
-
+        _apply_xp_style(ttk.Style())
+        self._init_chrome()      # XP title bar (borderless) — falls back to native
         self._build_ui()
         self.root.after(80, self._drain_log)
         self.root.after(400, lambda: self._check_update(manual=False))  # notice on start
@@ -108,6 +153,10 @@ class App:
             try:
                 self._iconimg = tk.PhotoImage(file=png)
                 root.iconphoto(True, self._iconimg)
+                try:
+                    self._barlogo = self._iconimg.subsample(13, 13)  # ~20px for the title bar
+                except Exception:
+                    self._barlogo = None
             except Exception:
                 pass
         ico = next((p for p in (os.path.join(base, "logo.ico"),
@@ -118,6 +167,169 @@ class App:
                 root.iconbitmap(ico)
             except Exception:
                 pass
+
+    # ------------------------------------------------------------------ XP window chrome
+    def _init_chrome(self):
+        """Borderless window + a drawn XP Luna title bar. Any failure falls back
+        to the native window frame (content stays XP-themed either way)."""
+        self.xp_chrome = False
+        self._chrome_hwnd = None
+        self._maxed = None
+        try:
+            self.root.overrideredirect(True)
+            self.root.update_idletasks()
+            self._build_titlebar()
+            self._add_resize_grips()
+            self.root.after(14, self._enable_taskbar)
+            self.root.bind("<Map>", lambda e: self.root.after(10, self._enable_taskbar))
+            self.xp_chrome = True
+        except Exception:
+            try:
+                self.root.overrideredirect(False)
+                self.root.resizable(True, True)
+            except Exception:
+                pass
+
+    def _add_resize_grips(self):
+        """Drag-to-resize handles on a borderless window (right/left/bottom +
+        the two bottom corners), drawn as a thin themed frame so the window edge
+        matches the title bar. Double-click the title bar to maximize/restore."""
+        root = self.root
+        BORD = "#1f66c8"
+        MINW, MINH = 560, 480
+        rs = {}
+
+        def mk(cursor):
+            try:
+                return tk.Frame(root, bg=BORD, cursor=cursor)
+            except tk.TclError:
+                return tk.Frame(root, bg=BORD)
+
+        def start(e, mode):
+            rs.update(x=e.x_root, y=e.y_root, w=root.winfo_width(),
+                      h=root.winfo_height(), ox=root.winfo_x(), oy=root.winfo_y(),
+                      mode=mode)
+
+        def do(e):
+            dx, dy, m = e.x_root - rs["x"], e.y_root - rs["y"], rs["mode"]
+            w, h, ox, oy = rs["w"], rs["h"], rs["ox"], rs["oy"]
+            if "r" in m:
+                w = max(MINW, rs["w"] + dx)
+            if "b" in m:
+                h = max(MINH, rs["h"] + dy)
+            if "l" in m:
+                w = max(MINW, rs["w"] - dx); ox = rs["ox"] + (rs["w"] - w)
+            root.geometry(f"{int(w)}x{int(h)}+{int(ox)}+{int(oy)}")
+
+        def grip(cursor, mode, **place):
+            g = mk(cursor)
+            g.place(**place)
+            g.bind("<Button-1>", lambda e: start(e, mode))
+            g.bind("<B1-Motion>", do)
+
+        grip("size_we", "r", relx=1, x=-3, y=30, width=3, relheight=1.0, height=-33, anchor="ne")
+        grip("size_we", "l", relx=0, x=0, y=30, width=3, relheight=1.0, height=-33, anchor="nw")
+        grip("size_ns", "b", relx=0, rely=1, x=3, y=-3, relwidth=1.0, width=-6, height=3, anchor="sw")
+        grip("size_nw_se", "rb", relx=1, rely=1, x=-3, y=-3, width=3, height=3, anchor="se")
+        grip("size_ne_sw", "lb", relx=0, rely=1, x=0, y=-3, width=3, height=3, anchor="sw")
+
+    def _toggle_max(self, e=None):
+        if self._maxed:
+            self.root.geometry(self._maxed)
+            self._maxed = None
+        else:
+            self._maxed = self.root.geometry()
+            sw = self.root.winfo_screenwidth()
+            sh = self.root.winfo_screenheight()
+            self.root.geometry(f"{sw}x{sh - 48}+0+0")
+
+    def _enable_taskbar(self):
+        """Make a borderless window behave like a normal app: taskbar button +
+        Alt-Tab + minimize/restore (Windows only; no-op elsewhere)."""
+        if self._chrome_hwnd:
+            return
+        try:
+            from ctypes import windll
+            GWL_EXSTYLE, WS_APPWINDOW, WS_TOOLWINDOW = -20, 0x00040000, 0x00000080
+            hwnd = windll.user32.GetParent(self.root.winfo_id())
+            st = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            windll.user32.SetWindowLongW(
+                hwnd, GWL_EXSTYLE, (st & ~WS_TOOLWINDOW) | WS_APPWINDOW)
+            self._chrome_hwnd = hwnd
+            self.root.withdraw()
+            self.root.after(10, self.root.deiconify)
+        except Exception:
+            self._chrome_hwnd = None
+
+    def _minimize(self):
+        try:
+            from ctypes import windll
+            hwnd = self._chrome_hwnd or windll.user32.GetParent(self.root.winfo_id())
+            windll.user32.ShowWindow(hwnd, 6)   # SW_MINIMIZE
+        except Exception:
+            try:
+                self.root.iconify()
+            except Exception:
+                pass
+
+    def _build_titlebar(self):
+        W = 648
+        bar = tk.Canvas(self.root, height=30, highlightthickness=0, bd=0)
+        bar.pack(fill="x", side="top")
+        self._titlebar = bar
+        cur = {"w": W}
+
+        def paint(w):
+            w = max(200, int(w))
+            bar.delete("all")
+            bar.configure(width=w)
+            for y in range(30):
+                bar.create_line(0, y, w, y, fill=_blend(XP_TITLE_HI, XP_TITLE_LO, y / 29.0))
+            bar.create_line(0, 29, w, 29, fill="#06409a")
+            x0 = 9
+            if self._barlogo is not None:
+                bar.create_image(x0, 15, image=self._barlogo, anchor="w"); x0 += 24
+            bar.create_text(x0 + 2, 15, text="eFootball Reroll", anchor="w",
+                            fill="#ffffff", font=("Tahoma", 10, "bold"))
+            bar.create_rectangle(w - 27, 5, w - 7, 25, fill="#d14d3a", outline="#7a2418")
+            bar.create_text(w - 17, 14, text="x", fill="#ffffff", font=("Tahoma", 11, "bold"))
+            bar.create_rectangle(w - 52, 5, w - 32, 25, fill="#3f82e6", outline="#1a4f94")
+            bar.create_text(w - 42, 12, text="_", fill="#ffffff", font=("Tahoma", 11, "bold"))
+            cur["w"] = w
+
+        paint(W)
+        self.root.update_idletasks()
+        paint(self.root.winfo_width() or W)
+        self._drag = {"btn": None, "dx": 0, "dy": 0}
+
+        def press(e):
+            w = cur["w"]
+            if 5 <= e.y <= 25 and w - 27 <= e.x <= w - 7:
+                self._drag["btn"] = "close"; return
+            if 5 <= e.y <= 25 and w - 52 <= e.x <= w - 32:
+                self._drag["btn"] = "min"; return
+            self._drag = {"btn": None,
+                          "dx": e.x_root - self.root.winfo_x(),
+                          "dy": e.y_root - self.root.winfo_y()}
+
+        def drag(e):
+            if self._drag.get("btn"):
+                return
+            self.root.geometry(f"+{e.x_root - self._drag['dx']}+{e.y_root - self._drag['dy']}")
+
+        def release(e):
+            if self._drag.get("btn") == "close":
+                self.root.destroy()
+            elif self._drag.get("btn") == "min":
+                self._minimize()
+            self._drag["btn"] = None
+
+        bar.bind("<Button-1>", press)
+        bar.bind("<B1-Motion>", drag)
+        bar.bind("<ButtonRelease-1>", release)
+        bar.bind("<Double-Button-1>", self._toggle_max)
+        self.root.bind("<Configure>",
+                       lambda e: paint(self.root.winfo_width()) if self.xp_chrome else None)
 
     # ------------------------------------------------------------------ UI
     def _build_ui(self):
@@ -180,6 +392,15 @@ class App:
         self.daily_chk = ttk.Checkbutton(
             cfr, text="เช็คอิน: ใส่ชื่อนักเตะในชื่อไฟล์", variable=self.daily_show_var)
         self.daily_chk.grid(row=3, column=2, columnspan=2, sticky="w", padx=6, pady=6)
+
+        # workers (parallel) + raw-log switch
+        ttk.Label(cfr, text="ตัวรันพร้อมกัน").grid(row=4, column=0, sticky="w", padx=10, pady=6)
+        self.workers_sb = ttk.Spinbox(cfr, from_=1, to=64, textvariable=self.workers_var,
+                                      width=6, font=FONT)
+        self.workers_sb.grid(row=4, column=1, sticky="w", padx=6, pady=6)
+        ttk.Checkbutton(cfr, text="Log ดิบ (แสดงรัว ๆ ทุก request)",
+                        variable=self.verbose_var).grid(
+                            row=4, column=2, columnspan=2, sticky="w", padx=6, pady=6)
         cfr.columnconfigure(1, weight=1)
 
         # Buttons
@@ -188,6 +409,9 @@ class App:
         self.btn_start = ttk.Button(bfr, text="เริ่ม", command=self._on_start,
                                     style="Accent.TButton")
         self.btn_start.pack(side="left")
+        self.btn_stop = ttk.Button(bfr, text="หยุด", command=self._on_stop,
+                                   style="Stop.TButton", state="disabled")
+        self.btn_stop.pack(side="left", padx=6)
         # pack picker (gacha): scan free packs -> tick wanted players.
         # Created always; shown/hidden by _on_module_change (combined exe picks mode).
         self.btn_scan = ttk.Button(bfr, text="สแกนแพ็ค / เลือกนักเตะ",
@@ -198,27 +422,34 @@ class App:
             side="right", padx=6)
         self._on_module_change()
 
-        # Log
+        # live result summary (updated during a run by the engine progress hook)
+        self.summary_var = tk.StringVar(value="สรุปผล: สำเร็จ 0 · ล้มเหลว 0")
+        self.summary_lbl = ttk.Label(self.root, textvariable=self.summary_var,
+                                     style="Status.TLabel", foreground=XP_GROUP)
+        self.summary_lbl.pack(fill="x", padx=14, pady=(0, 2))
+
+        # credit / contact (clickable) — packed BOTTOM first so the log never
+        # covers it (otherwise it needs the window stretched to show).
+        cred = ttk.Frame(self.root)
+        cred.pack(side="bottom", fill="x", padx=12, pady=(0, 8))
+        tg = ttk.Label(cred, text="ติดต่อ / อัปเดต: t.me/j3xdr", foreground="#1f66c8",
+                       cursor="hand2")
+        tg.pack(side="left")
+        tg.bind("<Button-1>", lambda e: webbrowser.open("https://t.me/j3xdr"))
+        shop = ttk.Label(cred, text="สั่งซื้อ: crgwwdc.shop", foreground="#1f66c8",
+                         cursor="hand2")
+        shop.pack(side="right")
+        shop.bind("<Button-1>", lambda e: webbrowser.open("https://crgwwdc.shop"))
+
+        # Log (fills the space between the buttons and the footer)
         lfr = ttk.LabelFrame(self.root, text="บันทึก")
         lfr.pack(fill="both", expand=True, **pad)
-        self.log = tk.Text(lfr, height=12, font=FONT_MONO, wrap="word",
+        self.log = tk.Text(lfr, height=10, font=FONT_MONO, wrap="word",
                            bg="#1e1e1e", fg="#e0e0e0", insertbackground="#e0e0e0")
         self.log.pack(side="left", fill="both", expand=True, padx=(8, 0), pady=8)
         sb = ttk.Scrollbar(lfr, command=self.log.yview)
         sb.pack(side="right", fill="y", pady=8)
         self.log.configure(yscrollcommand=sb.set, state="disabled")
-
-        # credit / contact (clickable)
-        cred = ttk.Frame(self.root)
-        cred.pack(fill="x", padx=12, pady=(0, 8))
-        tg = ttk.Label(cred, text="ติดต่อ / อัปเดต: t.me/j3xdr", foreground="#4a90d9",
-                       cursor="hand2")
-        tg.pack(side="left")
-        tg.bind("<Button-1>", lambda e: webbrowser.open("https://t.me/j3xdr"))
-        shop = ttk.Label(cred, text="สั่งซื้อ: crgwwdc.shop", foreground="#4a90d9",
-                         cursor="hand2")
-        shop.pack(side="right")
-        shop.bind("<Button-1>", lambda e: webbrowser.open("https://crgwwdc.shop"))
 
     # ------------------------------------------------------------------ log
     def _append(self, text: str):
@@ -334,7 +565,8 @@ class App:
         canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-e.delta / 120), "units"))
 
         for pack in packs:
-            tag = "  [ฟรี]" if pack.get("free") else ""
+            tag = ("  [ฟรี]" if pack.get("free")
+                   else "  [" + (pack.get("reason") or "ซื้อไม่ได้") + "]")
             ttk.Label(inner, text=f"— {pack.get('title') or pack['agent_id']} —{tag}",
                       font=FONT_B,
                       foreground=("#1e7e34" if pack.get("free") else "#4a90d9")).pack(
@@ -463,17 +695,27 @@ class App:
 
     # ------------------------------------------------------------------ Discord
     def _on_login(self):
-        self.btn_login.configure(state="disabled", text="กำลังเปิดเบราว์เซอร์...")
+        # button stays clickable: clicking again cancels the stuck attempt and
+        # retries (covers "opened the wrong browser / hung on กำลังเปิด...").
+        self._auth_gen += 1
+        gen = self._auth_gen
+        self.btn_login.configure(text="กำลังรอ... (กดซ้ำเพื่อลองใหม่)")
         self._log("กำลังเข้าสู่ระบบ Discord — อนุญาต (Authorize) ในเบราว์เซอร์ที่เปิดขึ้น")
+        self._log("ถ้าเปิดผิดเบราว์เซอร์หรือค้าง กดปุ่มนี้ซ้ำได้เลย (หรือก๊อปลิงก์ด้านล่างไปเปิดเอง)")
 
         def work():
             try:
                 from loader import discord_auth
-                info = discord_auth.login()
+                info = discord_auth.login(
+                    on_url=lambda u: self.logq.put("ลิงก์ login: " + u + "\n"))
+                if gen != self._auth_gen:
+                    return   # a newer click superseded this attempt
                 self.discord_token = info.get("prod_access_token")
                 self.discord_name = info.get("username")
                 self.root.after(0, self._login_ok)
             except Exception as e:  # noqa: BLE001
+                if gen != self._auth_gen:
+                    return
                 self.root.after(0, lambda: self._login_fail(str(e)))
 
         threading.Thread(target=work, daemon=True).start()
@@ -540,7 +782,13 @@ class App:
 
         module = self.locked_module or self.module_var.get()
         count = max(1, int(self.count_var.get() or 1))
-        params = {"count": count, "module": module, "fmt": self.fmt_var.get()}
+        self.stop_event = threading.Event()
+        self.summary_var.set("สรุปผล: สำเร็จ 0 · ล้มเหลว 0  (กำลังเริ่ม...)")
+        params = {"count": count, "module": module, "fmt": self.fmt_var.get(),
+                  "workers": max(1, int(self.workers_var.get() or 1)),
+                  "verbose": bool(self.verbose_var.get()),
+                  "stop": self.stop_event,
+                  "progress": self._progress_cb}
         if self.out_dir:
             params["out_dir"] = self.out_dir   # reroll output
             params["src_dir"] = self.out_dir   # gacha/daily source
@@ -549,7 +797,8 @@ class App:
         if module == "gacha" and self.wanted_ids:
             params["wanted_ids"] = self.wanted_ids
         self.btn_start.configure(state="disabled", text="กำลังทำงาน...")
-        self._log(f"เริ่ม {module} จำนวน {count} — build {self.build_id}")
+        self.btn_stop.configure(state="normal", text="หยุด")
+        self._log(f"เริ่ม {module} จำนวน {count} · {params['workers']} workers — build {self.build_id}")
 
         def work():
             old = sys.stdout
@@ -577,11 +826,26 @@ class App:
                     self.logq.put(f"\n[ผิดพลาด] {e}\n")
             finally:
                 sys.stdout = old
-                self.root.after(0, lambda: self.btn_start.configure(
-                    state="normal", text="เริ่ม"))
+                self.root.after(0, self._run_done)
 
         self.worker = threading.Thread(target=work, daemon=True)
         self.worker.start()
+
+    def _on_stop(self):
+        if self.stop_event:
+            self.stop_event.set()
+            self._log("กำลังหยุด... (รอรอบที่ค้างอยู่ให้จบก่อน)")
+        self.btn_stop.configure(state="disabled", text="กำลังหยุด...")
+
+    def _run_done(self):
+        self.btn_start.configure(state="normal", text="เริ่ม")
+        self.btn_stop.configure(state="disabled", text="หยุด")
+        self.stop_event = None
+
+    def _progress_cb(self, ok, fail, total):
+        # called from engine worker threads → marshal to the Tk thread
+        self.root.after(0, lambda: self.summary_var.set(
+            f"สรุปผล: สำเร็จ {ok} · ล้มเหลว {fail}   (จากทั้งหมด {total})"))
 
 
 def main():

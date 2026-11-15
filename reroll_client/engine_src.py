@@ -28,6 +28,29 @@ from Crypto.Cipher import AES
 
 # ---------------------------------------------------------------- brain-backed crypto
 _B: dict = {}
+_LOG = None          # run()'s logger (print → GUI queue)
+_VERBOSE = False     # raw per-request logging (GUI "Log ดิบ" switch)
+_STOP = None         # threading.Event set by the GUI "หยุด" button
+_PROGRESS = None     # GUI live-summary callback: progress(ok, fail, total)
+
+
+def _emit(msg):
+    if _LOG:
+        _LOG(msg)
+    else:
+        print(msg, flush=True)
+
+
+def _report(ok, fail, total):
+    if _PROGRESS:
+        try:
+            _PROGRESS(ok, fail, total)
+        except Exception:
+            pass
+
+
+def _stopped() -> bool:
+    return bool(_STOP is not None and _STOP.is_set())
 
 
 def _aes_key() -> bytes:
@@ -131,8 +154,13 @@ class GateClient:
             try:
                 r = self.http.post(url, data=body, headers=headers, timeout=self.timeout)
                 last = self._parse(cmd, r)
+                if _VERBOSE:
+                    rc = last.get("result") if isinstance(last, dict) else "?"
+                    _emit(f"[{r.status_code}] {cmd} -> {rc}")
             except requests.RequestException as e:
                 last = {"result": "ERR_NETWORK", "_exc": type(e).__name__}
+                if _VERBOSE:
+                    _emit(f"[net] {cmd} -> ERR_NETWORK ({type(e).__name__})")
             res = last.get("result") if isinstance(last, dict) else None
             if res in RETRYABLE or res == "ERR_NETWORK":
                 if on_throttle:
@@ -646,19 +674,35 @@ def _summary(log, title, lines):
 
 # ---------------------------------------------------------------- module entrypoints
 def _reroll(params, log):
+    """Create `count` accounts across `workers` parallel threads (speed scales with
+    the user's machine + network). Cooperative stop via the _STOP event; a result
+    summary reports ok/fail counts and a sample of the errors."""
+    import concurrent.futures as cf
+    import threading
     count = int((params or {}).get("count", 1))
+    workers = max(1, min(64, int((params or {}).get("workers", 1) or 1)))
     prefix = (params or {}).get("prefix") or _B.get("default_prefix", "j3xdr")
     claim = bool((params or {}).get("claim", True))
-    delay = float((params or {}).get("delay", 1.0))
     out = _out_dir(params)
-    made, fail = [], 0
-    c = GateClient()
-    for i in range(count):
+    made, errors = [], []
+    lock = threading.Lock()
+    counter = {"n": 0}
+
+    def one(_slot):
+        if _stopped():
+            return
+        with lock:
+            counter["n"] += 1
+            i = counter["n"]
         try:
+            c = GateClient()   # own session per worker (thread-safe)
             resp = create_user(c, prefix=prefix)
-            if "auth_code" not in resp:
-                log(f"[{i+1}/{count}] FAIL: {resp.get('result')}"); fail += 1
-                time.sleep(delay); continue
+            if not isinstance(resp, dict) or "auth_code" not in resp:
+                msg = (resp or {}).get("result", "?") if isinstance(resp, dict) else "?"
+                with lock:
+                    errors.append(f"#{i} CREATE_USER {msg}")
+                log(f"[{i}/{count}] FAIL: {msg}")
+                return
             uc, auth = resp["user_code"], resp["auth_code"]
             uid = resp["pes_user_info"]["user_id"]
             devid = resp.get("_device_identifier")
@@ -669,7 +713,7 @@ def _reroll(params, log):
                 sid = lr.get("session_id")
                 if sid:
                     setup = finish_setup(c, uid, sid).get("result", "?")
-                    if claim:
+                    if claim and not _stopped():
                         cs = claim_starter(uid, auth, devid, uc)
                         coins, gp = cs.get("coins", 0), cs.get("gp", 0)
             except Exception as e:
@@ -677,16 +721,34 @@ def _reroll(params, log):
             rec = {"user_code": uc, "user_id": uid, "auth_code": auth,
                    "device_identifier": devid, "coins": coins, "gp": gp,
                    "players": [], "module": "reroll"}
-            write_record(out, rec, "reroll", params)
-            made.append(uc)
-            log(f"[{i+1}/{count}] OK {uc} uid={uid} coins={coins} myclub={setup}")
+            with lock:
+                write_record(out, rec, "reroll", params)
+                made.append(uc)
+            log(f"[{i}/{count}] OK {uc} uid={uid} coins={coins} myclub={setup}")
         except Exception as e:
-            log(f"[{i+1}/{count}] ERROR: {e}"); fail += 1
-        time.sleep(delay + random.random())
-    _summary(log, "REROLL", [f"สร้างสำเร็จ {len(made)}/{count}  ล้มเหลว {fail}",
-                             f"โฟลเดอร์: {out}"])
-    return {"module": "reroll", "created": made, "failed": fail, "out_dir": out,
-            "summary": {"ok": len(made), "fail": fail, "total": count}}
+            with lock:
+                errors.append(f"#{i} {type(e).__name__}: {e}")
+            log(f"[{i}/{count}] ERROR: {e}")
+        finally:
+            _report(len(made), len(errors), count)
+
+    _report(0, 0, count)
+    log(f"เริ่ม reroll {count} บัญชี · {workers} worker พร้อมกัน")
+    with cf.ThreadPoolExecutor(max_workers=workers) as ex:
+        for _ in ex.map(one, range(count)):
+            pass
+    stopped = _stopped()
+    lines = [f"สร้างสำเร็จ {len(made)}/{count}  ล้มเหลว {len(errors)}"]
+    if stopped:
+        lines.append("** หยุดโดยผู้ใช้ **")
+    lines.append(f"โฟลเดอร์: {out}")
+    if errors:
+        lines.append(f"error ({min(len(errors), 10)} ตัวอย่างล่าสุด):")
+        lines += ["- " + e for e in errors[-10:]]
+    _summary(log, "REROLL", lines)
+    return {"module": "reroll", "created": made, "failed": len(errors), "out_dir": out,
+            "stopped": stopped, "errors": errors,
+            "summary": {"ok": len(made), "fail": len(errors), "total": count}}
 
 
 def _gacha_scan(params, log):
@@ -697,21 +759,39 @@ def _gacha_scan(params, log):
         log("ไม่พบไฟล์บัญชีในโฟลเดอร์ (เลือกโฟลเดอร์ที่มีไฟล์บัญชีก่อน)")
         return {"module": "gacha", "action": "scan", "packs": []}
     a = next(iter(recs.values()))
+    log(f"สแกนจากบัญชี {a['user_code']} (1 ไอดีพอ — แพ็คทั้งเซิร์ฟเหมือนกัน)")
     c = GateClient(user_code=a["user_code"])
     lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
     sid = lr.get("session_id")
     if not sid:
-        log("login บัญชีแรกไม่สำเร็จ")
+        log("login บัญชีที่ใช้สแกนไม่สำเร็จ")
         return {"module": "gacha", "action": "scan", "packs": []}
     scan = scan_agents(c, int(a["user_id"]), sid)
+    meta = {x["agent_id"]: x for x in scan["all"]}
     all_ids = [x["agent_id"] for x in scan["all"]]
     free_ids = {x["agent_id"] for x in scan["free"]}
     log(f"เจอ {len(all_ids)} แพ็ค (ฟรีกดได้ {len(free_ids)}) — กำลังดึงรายชื่อนักเตะ")
     packs = pack_players(c, int(a["user_id"]), sid, all_ids) if all_ids else []
+
+    def _why(s):
+        if not s.get("free"):
+            return "ซื้อไม่ได้ (ไม่มีออปชันฟรี)"
+        if s.get("needs_ad"):
+            return "ต้องดูโฆษณาก่อน (กดอัตโนมัติไม่ได้)"
+        if (s.get("remaining") or 0) <= 0:
+            return "ครบโควตาแล้ว"
+        return "ซื้อไม่ได้"
+
     for p in packs:
-        p["free"] = p["agent_id"] in free_ids
-    packs.sort(key=lambda p: (not p["free"], -(p["players"][0]["overall"] or 0) if p["players"] else 0))
-    log(f"ได้ {sum(len(p['players']) for p in packs)} นักเตะจาก {len(packs)} แพ็ค")
+        s = meta.get(p["agent_id"], {})
+        p["buyable"] = p["agent_id"] in free_ids
+        p["free"] = p["buyable"]
+        p["reason"] = "" if p["buyable"] else _why(s)
+        if not p["buyable"]:
+            log(f"  ข้ามแพ็ค {p.get('title') or p['agent_id']}: {p['reason']}")
+    packs.sort(key=lambda p: (not p["buyable"], -(p["players"][0]["overall"] or 0) if p["players"] else 0))
+    buy_n = sum(1 for p in packs if p["buyable"])
+    log(f"ได้ {sum(len(p['players']) for p in packs)} นักเตะจาก {len(packs)} แพ็ค (กดฟรีได้ {buy_n})")
     return {"module": "gacha", "action": "scan", "packs": packs}
 
 
@@ -725,15 +805,19 @@ def _gacha(params, log):
     wanted_order = [int(x) for x in (params or {}).get("wanted_ids", [])]
     wanted_set = set(wanted_order)
     recs = _acc_records(src)
-    results, hit_accounts = [], 0
+    results, hit_accounts, fails = [], 0, 0
     log(f"gacha pass: {len(recs)} accounts @ {src}")
+    _report(0, 0, len(recs))
     for uc, a in recs.items():
+        if _stopped():
+            log("** หยุดโดยผู้ใช้ **"); break
         try:
             c = GateClient(user_code=uc)
             lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
             sid = lr.get("session_id")
             if not sid:
-                log(f"{uc}: login failed"); continue
+                log(f"{uc}: login failed"); fails += 1
+                _report(hit_accounts, fails, len(recs)); continue
             drawn = draw_all_free(c, int(a["user_id"]), sid, only_agent=only)
             info = efb_many([p["id"] for p in drawn if p.get("id")])
             by_id = {}
@@ -757,10 +841,11 @@ def _gacha(params, log):
             results.append({"user_code": uc, "drawn": len(drawn),
                             "hits": [p["id"] for p in ordered]})
         except Exception as e:
-            log(f"{uc}: ERROR {e}")
+            log(f"{uc}: ERROR {e}"); fails += 1
+        _report(hit_accounts, fails, len(recs))
         time.sleep(1.0)
-    _summary(log, "GACHA", [f"บัญชีที่ได้นักเตะเป้าหมาย {hit_accounts}/{len(recs)}",
-                            f"โฟลเดอร์: {src}"])
+    _summary(log, "GACHA", [f"บัญชีที่ได้นักเตะเป้าหมาย {hit_accounts}/{len(recs)}  "
+                            f"(พลาด {fails})", f"โฟลเดอร์: {src}"])
     return {"module": "gacha", "results": results,
             "summary": {"hit_accounts": hit_accounts, "total": len(recs)}}
 
@@ -770,14 +855,18 @@ def _daily(params, log):
     recs = _acc_records(src)
     show_players = bool((params or {}).get("daily_show_players"))
     log(f"daily pass: {len(recs)} accounts @ {src}")
-    ok = claimed_total = 0
+    ok = claimed_total = fails = 0
+    _report(0, 0, len(recs))
     for uc, a in recs.items():
+        if _stopped():
+            log("** หยุดโดยผู้ใช้ **"); break
         uid, auth = a["user_id"], a["auth_code"]
         c = GateClient(user_code=uc)
         try:
             lr = login(c, uid, auth, a.get("device_identifier"))
             if "session_id" not in lr:
-                log(f"  {uc}: LOGIN fail {lr.get('result')}"); continue
+                log(f"  {uc}: LOGIN fail {lr.get('result')}"); fails += 1
+                _report(ok, fails, len(recs)); continue
             sid = lr["session_id"]
             mb = get_mailbox(c, uid, sid)
             ids = [p["present_id"] for p in mb.get("present_list", [])] if isinstance(mb, dict) else []
@@ -796,10 +885,11 @@ def _daily(params, log):
             log(f"  {uc}: OK coins={st['coins']} claimed={claimed}{pl}")
             ok += 1; claimed_total += claimed
         except Exception as e:
-            log(f"  {uc}: ERROR {e}")
+            log(f"  {uc}: ERROR {e}"); fails += 1
+        _report(ok, fails, len(recs))
         time.sleep(1.0)
-    _summary(log, "DAILY", [f"ล็อกอินสำเร็จ {ok}/{len(recs)}  รับของรวม {claimed_total} ชิ้น",
-                            f"โฟลเดอร์: {src}"])
+    _summary(log, "DAILY", [f"ล็อกอินสำเร็จ {ok}/{len(recs)}  พลาด {fails}  "
+                            f"รับของรวม {claimed_total} ชิ้น", f"โฟลเดอร์: {src}"])
     return {"module": "daily", "ok": ok, "total": len(recs), "claimed": claimed_total,
             "summary": {"ok": ok, "total": len(recs), "claimed": claimed_total}}
 
@@ -843,12 +933,17 @@ _DISPATCH = {"reroll": _reroll, "gacha": _gacha, "daily": _daily}
 
 def run(brain: dict, session=None, params: dict | None = None):
     """Loader entrypoint. `session` is the live SessionCtx (heartbeat/lease)."""
-    global _B
+    global _B, _LOG, _VERBOSE, _STOP, _PROGRESS
     _B = brain
     module_id = (params or {}).get("module") or os.environ.get("REROLL_MODULE", "reroll")
 
     def log(msg):
         print(msg, flush=True)
+
+    _LOG = log
+    _VERBOSE = bool((params or {}).get("verbose"))
+    _STOP = (params or {}).get("stop")
+    _PROGRESS = (params or {}).get("progress")
 
     action = (params or {}).get("action")
     if action == "merge":
