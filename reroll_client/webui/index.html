@@ -60,8 +60,10 @@
   .chead{padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--txt2);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
   .chead .l{display:flex;align-items:center;gap:8px}.chead .d{width:6px;height:6px;border-radius:50%;background:var(--p);box-shadow:0 0 6px var(--p)}
   .cbody{padding:14px;overflow:auto;display:flex;flex-direction:column;gap:12px}
-  .field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;color:var(--txt2)}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}.field label{font-size:11px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  input,select,textarea{width:100%;box-sizing:border-box;max-width:100%}
   input,select{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;transition:var(--trans)}
+  .grid2{min-width:0}.grid2>*{min-width:0}
   input:focus,select:focus{border-color:rgba(168,85,247,.6);box-shadow:0 0 0 2px rgba(168,85,247,.15)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .chk{font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:7px;cursor:pointer}
@@ -173,7 +175,7 @@
               </div>
               <div class="grid2">
                 <div class="field"><label>Prefix ชื่อในเกม</label><input id="r_prefix" value="j3xdr" maxlength="10"></div>
-                <div class="field"><label title="หน่วงเวลาแต่ละไอดีต่อ worker (วินาที) — 0 = เร็วสุด · เพิ่มเลขถ้าโดน throttle (ERR_SERVERNOTREADY) จะยิงนุ่มขึ้น" style="cursor:help">ความไว · หน่วง วิ/ไอดี &#9432;</label><input id="r_delay" type="number" value="0" min="0" step="0.5"></div>
+                <div class="field"><label title="หน่วงเวลาขั้นต่ำต่อไอดี/worker (วินาที). 0 = ให้ระบบ (governor) หาเร็วสุดที่ปลอดภัยเอง — แนะนำ 0. ยิ่งเลขมาก = ยิ่งช้าลง (ใส่เผื่ออยากบังคับให้ช้า)" style="cursor:help">หน่วงขั้นต่ำ วิ/ไอดี (0=อัตโนมัติ) &#9432;</label><input id="r_delay" type="number" value="0" min="0" step="0.5"></div>
               </div>
               <div class="field"><label>โฟลเดอร์เก็บผล</label>
                 <div class="row"><input id="r_out" placeholder="(ค่าเริ่มต้น ข้างโปรแกรม)" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('r_out')">เลือก…</button></div></div>
