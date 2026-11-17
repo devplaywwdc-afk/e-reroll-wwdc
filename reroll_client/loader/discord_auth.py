@@ -75,7 +75,10 @@ def _capture_code(state: str, timeout: float, on_url=None) -> str:
         def do_GET(self):  # noqa: N802
             p = urllib.parse.urlparse(self.path)
             q = urllib.parse.parse_qs(p.query)
-            if p.path == "/cb" and q.get("state", [""])[0] == state and "code" in q:
+            # accept the code even if state differs: re-clicking / switching
+            # browsers issues a new state, so the earlier tab's redirect carries a
+            # stale state (-> was HTTP 400). state on loopback is only soft CSRF.
+            if p.path == "/cb" and "code" in q:
                 holder["code"] = q["code"][0]
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
