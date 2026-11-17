@@ -461,10 +461,19 @@ def scan_agents(client, uid, sid):
         bt = "BUY_BY_COIN"
         if pr.get("can_use_gp") == "YES":
             bt = "BUY_BY_GP"
+        coin_p = gp_p = None   # cheapest non-zero coin / gp price across options
+        for opt in prices.get(aid, {}).get("price_list", []):
+            pr2 = opt.get("price", {})
+            cp, gpp = pr2.get("coin_price") or 0, pr2.get("gp_price") or 0
+            if cp > 0:
+                coin_p = cp if coin_p is None else min(coin_p, cp)
+            if gpp > 0:
+                gp_p = gpp if gp_p is None else min(gp_p, gpp)
         out.append({"agent_id": aid, "title": ag.get("title"),
                     "free": bool(free_opt), "needs_ad": needs_ad,
                     "count": free_opt.get("multiple_count") if free_opt else None,
                     "buy_type": bt if free_opt else None,
+                    "coin": coin_p, "gp": gp_p,
                     "remaining": max(0, limit - used)})
     free = [a for a in out if a["free"] and a["remaining"] > 0 and not a["needs_ad"]]
     return {"all": out, "free": free, "free_count": len(free)}
@@ -590,12 +599,13 @@ def pack_players(client, uid, sid, agent_ids):
         if not a:
             continue
         pickup_ids = [p.get("gameplayer_id", {}).get("id") for p in (a.get("pickup_list") or [])]
-        pickup = [card(i) for i in pickup_ids if i]
+        pickup = [{**card(i), "featured": True} for i in pickup_ids if i]
         seen = set(pickup_ids)
-        more = [card(x["id"]) for x in (a.get("pickup_cardtype_list") or [])
+        more = [{**card(x["id"]), "featured": False} for x in (a.get("pickup_cardtype_list") or [])
                 if x.get("id") and x["id"] not in seen]
-        allp = pickup + more
-        allp.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
+        pickup.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
+        more.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
+        allp = pickup + more   # featured (pickup/Epic headline) first, then the rest
         if allp:
             packs.append({"agent_id": aid, "title": a.get("title"), "players": allp})
     return packs
@@ -841,6 +851,18 @@ def _reroll(params, log):
         lines.append(f"error ({min(len(errors), 10)} ตัวอย่างล่าสุด):")
         lines += ["- " + e for e in errors[-10:]]
     _summary(log, "REROLL", lines)
+    if (params or {}).get("post_gacha") and made and not stopped:
+        log("── สุ่มกาชาฟรีต่อหลัง reroll (เปิดแพ็คฟรีทั้งหมด) ──")
+        gp = dict(params)
+        gp.pop("action", None)
+        gp["module"] = "gacha"
+        gp["src_dir"] = out
+        gp["out_dir"] = out
+        gp["wanted_ids"] = []   # keep every drawn player (no filter)
+        try:
+            _gacha(gp, log)
+        except Exception as e:  # noqa: BLE001
+            log(f"กาชาต่อผิดพลาด: {e}")
     _stats()
     _event({"type": "stopped"})
     _event({"type": "done", "module": "reroll",
@@ -885,6 +907,8 @@ def _gacha_scan(params, log):
         s = meta.get(p["agent_id"], {})
         p["buyable"] = p["agent_id"] in free_ids
         p["free"] = p["buyable"]
+        p["coin"] = s.get("coin")
+        p["gp"] = s.get("gp")
         p["reason"] = "" if p["buyable"] else _why(s)
         if not p["buyable"]:
             log(f"  ข้ามแพ็ค {p.get('title') or p['agent_id']}: {p['reason']}")

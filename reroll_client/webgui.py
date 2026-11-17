@@ -146,7 +146,7 @@ class Api:
         try:
             from loader import discord_auth
             info = discord_auth.login(
-                on_url=lambda u: self._push({"type": "applog", "lvl": "info", "t": "ลิงก์ login: " + u}))
+                on_url=lambda u: self._push({"type": "authurl", "t": u}))
             self.token = info.get("prod_access_token")
             self.name = info.get("username")
             return {"ok": True, "username": self.name}
@@ -166,12 +166,16 @@ class Api:
     def scan_packs(self, out_dir=None):
         if not self.token:
             return {"error": "เข้าสู่ระบบก่อน"}
-        try:
+        old = sys.stdout
+        sys.stdout = _StdoutPush(self)   # engine print() must NOT hit the frozen
+        try:                             # exe's cp874 stdout (crashes on names like Brasileirão)
             res = run_module("gacha", self.build_id, discord_token=self.token,
                              params={"action": "scan", "out_dir": out_dir, "src_dir": out_dir})
             return {"packs": (res or {}).get("packs", [])}
         except Exception as e:  # noqa: BLE001
             return {"error": str(e)}
+        finally:
+            sys.stdout = old
 
     # ---- run control ----
     def stop(self):
@@ -226,6 +230,11 @@ class Api:
 
 
 def main():
+    for s in (sys.stdout, sys.stderr):   # never crash on non-cp874 chars (ã, Thai, ∞)
+        try:
+            s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     api = Api()
     idx = os.path.join(_asset_dir(), "index.html")
     win = webview.create_window(
