@@ -510,7 +510,19 @@ def draw_all_free(client, uid, sid, scan=None, only_agent=0):
 
 
 # --- efootbase enrichment (public player data: name / overall / art image) ---
+import threading as _thr
 _EFB_CACHE: dict = {}
+_PESDB_LOCK = _thr.Lock()        # pesdb rate-limits hard (429 "Please wait"):
+_PESDB_NEXT = [0.0]              # global min-interval gate (~1 req / 0.7s) + retry
+_PESDB_GAP = 0.7
+
+
+def _pesdb_gate():
+    with _PESDB_LOCK:
+        w = _PESDB_NEXT[0] - time.time()
+        if w > 0:
+            time.sleep(w)
+        _PESDB_NEXT[0] = time.time() + _PESDB_GAP
 
 
 def efb_lookup(pid, timeout=7):
@@ -561,9 +573,14 @@ def efb_lookup(pid, timeout=7):
             s2 = requests.Session()
             s2.headers["User-Agent"] = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                         "AppleWebKit/537.36 Chrome/120 Safari/537.36")
-            r2 = s2.get(f"https://www.pesdb.net/efootball/?id={key}",
-                        timeout=timeout, allow_redirects=True)
-            if r2.status_code == 200:
+            r2 = None
+            for _att in range(5):   # global-paced; retry on 429 "Please wait"
+                _pesdb_gate()
+                r2 = s2.get(f"https://www.pesdb.net/efootball/?id={key}",
+                            timeout=timeout, allow_redirects=True)
+                if r2.status_code != 429:
+                    break
+            if r2 is not None and r2.status_code == 200:
                 m = re.search(r"<title>([^<]+)</title>", r2.text)
                 if m:
                     t = _html.unescape(m.group(1)).split("| pesdb")[0].strip()

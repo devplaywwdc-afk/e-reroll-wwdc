@@ -116,12 +116,11 @@
   .pkbox{width:min(1080px,96vw);height:min(90vh,920px);background:var(--bg2);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   .pkhead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);font-weight:800}
   .pkhead button{background:none;border:none;color:var(--txt2);font-size:19px;cursor:pointer}
-  .pkbody{flex:1;overflow:auto;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;align-content:start}
-  @media(max-width:820px){.pkbody{grid-template-columns:1fr}}
+  .pkbody{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
   .pkfoot{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border)}
   .pkpk{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:11px;min-width:0}
   .pkpk-h{font-size:13.5px;font-weight:800;color:var(--g);line-height:1.35}.pkpk-h.nf{color:var(--txt2)}
-  .pkcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+  .pkcards{display:grid;grid-template-columns:var(--pcc,repeat(auto-fill,minmax(150px,1fr)));gap:10px}
   .pkcard{position:relative;border:1px solid var(--border);border-radius:11px;overflow:hidden;cursor:pointer;background:rgba(0,0,0,.35);transition:var(--trans)}
   .pkcard:hover{border-color:rgba(0,255,136,.45)}
   .pkcard.sel{border-color:var(--g);box-shadow:0 0 0 2px rgba(0,255,136,.35) inset}
@@ -166,7 +165,13 @@
 <!-- gacha pack picker -->
 <div id="pkmodal" class="pkmodal" style="display:none">
   <div class="pkbox">
-    <div class="pkhead"><span>เลือกนักเตะที่ต้องการ (กดการ์ด = เลือก)</span><button onclick="closePk()">✕</button></div>
+    <div class="pkhead"><span>เลือกนักเตะที่ต้องการ (กดการ์ด = เลือก)</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <label style="font-size:12px;color:var(--txt2);font-weight:400">คอลัมน์
+          <select id="pkcols" onchange="setPkCols()" style="width:auto;display:inline-block;padding:4px 8px">
+            <option value="auto">อัตโนมัติ</option><option value="3">3</option><option value="4">4</option>
+            <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+        <button onclick="closePk()">✕</button></div></div>
     <div class="pkbody" id="pkbody"></div>
     <div class="pkfoot"><span id="pkcount" class="hint">เลือก 0 คน</span><button class="btn btn-primary" onclick="donePk()">เลือกเสร็จ</button></div>
   </div>
@@ -436,7 +441,12 @@ function lb(id){event&&event.stopPropagation();const pl=findPl(id);if(!pl)return
   $('lbcap').textContent=(pl.name||('#'+pl.id))+'  ·  '+(pl.overall||'?')+'  '+(pl.position||'');
   $('lb').style.display='flex';}
 function lbClose(){$('lb').style.display='none';}
-function openPk(){const body=$('pkbody');body.innerHTML='';
+function setPkCols(){const v=($('pkcols')||{value:'auto'}).value;
+  document.documentElement.style.setProperty('--pcc',
+    v==='auto'?'repeat(auto-fill,minmax(150px,1fr))':('repeat('+v+',1fr)'));
+  try{localStorage.setItem('pkcols',v);}catch(e){}}
+function openPk(){try{const sv=localStorage.getItem('pkcols');if(sv&&$('pkcols'))$('pkcols').value=sv;}catch(e){}setPkCols();
+  const body=$('pkbody');body.innerHTML='';
   PACKS.forEach(pk=>{const players=pk.players||[];let feat=players.filter(p=>p.featured);let more=players.filter(p=>!p.featured);
     if(!feat.length){feat=players;more=[];}   // nothing flagged -> show all, no toggle
     const d=document.createElement('div');d.className='pkpk';
@@ -480,6 +490,10 @@ window._ev=function(m){try{
     $('rate').textContent=`${m.rate}/วิ · ${(m.perday||0).toLocaleString()}/วัน`;}
   else if(m.type==='started'){$('s_w').textContent=m.workers;setLive(true);}
   else if(m.type==='stopped'){setLive(false);}
+  else if(m.type==='runerr'){setLive(false);
+    const map={'p-daily':'d_log','p-gacha':'g_log','p-merge':'m_log'};const b=map[document.querySelector('.panel.on').id];
+    if(b)logln($(b),'err',m.t);if(m.raw)try{console.log(m.raw);}catch(e){}
+    alert('รันไม่ได้: '+m.t+(m.raw?('\n\n['+m.raw+']'):''));}
   else if(m.type==='progress'){/* summary bar handled by stats */}
   else if(m.type==='done'){setLive(false);const s=m.summary||{};
     const map={reroll:null,daily:'d_bar',gacha:'g_bar'};const bar=map[m.module];if(bar)$(bar).style.width='100%';}

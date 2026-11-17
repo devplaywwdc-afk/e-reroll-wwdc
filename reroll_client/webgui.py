@@ -218,7 +218,24 @@ class Api:
             try:
                 run_module(gate, self.build_id, discord_token=self.token, params=p)
             except Exception as e:  # noqa: BLE001
-                self._push({"type": "applog", "lvl": "err", "t": "[ผิดพลาด] " + str(e)})
+                et, msg = type(e).__name__, str(e)
+                low = (et + " " + msg).lower()
+                if et == "NoRental" or "no active rental" in low:
+                    hint = "ยังไม่มีสิทธิ์เช่า — ไปเช่าที่เว็บก่อน"
+                elif et == "AccessDenied" or "seat" in low or "403" in low or "denied" in low:
+                    hint = ("สิทธิ์/seat ไม่ผ่าน — คีย์อาจผูกกับเครื่องอื่นอยู่ (ใช้ได้ทีละเครื่อง) "
+                            "หรือ seat เต็ม · ติดต่อแอดมินเพิ่ม seat")
+                elif et == "UpdateRequired" or "426" in low or "stale" in low:
+                    hint = "เวอร์ชันเก่า — อัปเดตโปรแกรมเป็นตัวล่าสุด"
+                elif any(k in low for k in ("tls", "pin", "ssl", "timed out",
+                                            "connection", "unreachable", "network", "getaddr")):
+                    hint = ("เชื่อมเซิร์ฟเวอร์ไม่ได้ — เน็ต/ไฟร์วอลล์/ISP อาจบล็อก "
+                            "(ต้องต่อ 140.99.254.10:8787 ออกได้)")
+                elif "debug" in low or "inject" in low:
+                    hint = "ตรวจพบ debugger/injector — ปิดโปรแกรมพวกนั้น/ยกเว้นใน AV แล้วลองใหม่"
+                else:
+                    hint = msg
+                self._push({"type": "runerr", "t": hint, "raw": et + ": " + msg})
             finally:
                 sys.stdout = old
                 self._push({"type": "done", "module": module})
