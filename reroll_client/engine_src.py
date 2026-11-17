@@ -554,6 +554,27 @@ def efb_lookup(pid, timeout=7):
                 info["art"] = "https://" + arts[0]
     except Exception:
         pass
+    # fallback: pesdb.net covers NEW cards efootbase hasn't indexed yet.
+    # title = "<name> - <rarity> (<card>) | pesdb.net"
+    if not info["name"]:
+        try:
+            s2 = requests.Session()
+            s2.headers["User-Agent"] = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                        "AppleWebKit/537.36 Chrome/120 Safari/537.36")
+            r2 = s2.get(f"https://www.pesdb.net/efootball/?id={key}",
+                        timeout=timeout, allow_redirects=True)
+            if r2.status_code == 200:
+                m = re.search(r"<title>([^<]+)</title>", r2.text)
+                if m:
+                    t = _html.unescape(m.group(1)).split("| pesdb")[0].strip()
+                    nm = t.split(" - ")[0].strip()
+                    if nm and nm.lower() != "efootball":
+                        info["name"] = nm
+                    mr = re.search(r" - ([A-Za-z][A-Za-z ]*?)\s*\(", t)
+                    if mr:
+                        info["rarity"] = mr.group(1).strip()
+        except Exception:
+            pass
     _EFB_CACHE[key] = info
     return info
 
