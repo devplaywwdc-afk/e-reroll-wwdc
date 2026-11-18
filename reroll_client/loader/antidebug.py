@@ -165,7 +165,10 @@ def detect_threats() -> list[str]:
     """Return a list of threat flags (empty = clean). Never raises."""
     if not _is_windows():
         return []
-    if os.environ.get("REROLL_ALLOW_DEBUG") == "1":
+    # REROLL_ALLOW_DEBUG is a DEV convenience only — it must NOT work in a shipped
+    # (frozen) build, or an attacker just sets it to strip anti-debug before a RAM
+    # dump. In a PyInstaller onefile exe sys.frozen is set -> the bypass is ignored.
+    if os.environ.get("REROLL_ALLOW_DEBUG") == "1" and not getattr(sys, "frozen", False):
         return []
     out: list[str] = []
     out += _basic_debugger_flags()
@@ -184,9 +187,13 @@ def enforce() -> None:
         os._exit(3)
 
 
-def watch(stop_event, interval: float = 7.0) -> None:
+def watch(stop_event, interval: float = 25.0) -> None:
     """Background re-check: catches a debugger/injector ATTACHED mid-run (after the
-    one-shot enforce() at start). Exits the process on detection. Daemon-safe."""
+    one-shot enforce() at start). Exits the process on detection. Daemon-safe.
+
+    25s interval: the per-cycle EnumProcessModules scan is the heaviest check, so a
+    tighter loop put a small hitch into the UI every few seconds. An attach is still
+    caught within one cycle; the dump/patch surface it guards is not time-critical."""
     import threading
 
     def _loop():

@@ -1,0 +1,51 @@
+    uid: Optional[str] = None,
+) -> dict[str, Any]:
+    """Verify a bank slip via Slip2Go against the shop PromptPay E-Wallet."""
+    acc = await _promptpay_account()
+    if not bool(acc.get("enabled", True)):
+        raise HTTPException(status_code=503, detail="slip_topup_disabled")
+    if not slip2go.configured():
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "slip2go_not_configured", "message": "ช่องทางพร้อมเพย์ยังไม่พร้อม"},
+        )
+    expected_baht = int(expected_satang) / 100.0
+    code = str(acc.get("account_no") or slip2go.PROMPTPAY_CODE_DEFAULT)
+
+    async def _call(check_duplicate: bool) -> dict[str, Any]:
+        if qr_payload:
+            return await slip2go.verify_qr_code(
+                qr_payload,
+                amount_baht=expected_baht,
+                promptpay_code=code,
+                check_duplicate=check_duplicate,
+            )
+        return await slip2go.verify_image_base64(
+            image_b64 or "",
+            amount_baht=expected_baht,
+            promptpay_code=code,
+            check_duplicate=check_duplicate,
+        )
+
+    try:
+        result = await _call(True)
+        first_code = str(result.get("code") or "")
+        if not result.get("ok") and first_code in {"200404", "200501"}:
+            retry = await _call(False)
+            print(
+                f"[topup] slip2go retry-no-dup first={first_code} "
+                f"retry={retry.get('code')} ok={retry.get('ok')} "
+                f"ref={(retry.get('trans_ref') or '')[:32]}"
+            )
+            if retry.get("ok") or (
+                slip2go.looks_like_bank_trans_ref(retry.get("trans_ref"))
+                and retry.get("amount_ok")
+            ):
+                retry["ok"] = True
+                result = retry
+    except slip2go.Slip2GoError as exc:
+        raise HTTPException(
+            status_code=exc.http_status,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+    if _slip_service_down(result):

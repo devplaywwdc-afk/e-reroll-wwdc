@@ -1,0 +1,107 @@
+<?xml version='1.0' encoding='utf8'?>
+<nuitka-compilation-report nuitka_version="4.3.4" nuitka_commercial_version="not installed" mode="module" completion="exception">
+  <exception exception_type="PermissionError" exception_value="[Errno 13] Permission denied: 'C:\\Users\\jaras\\OneDrive\\Desktop\\Efootball\\reroll_client\\loader\\brain.cp313-win_amd64.pyd'">
+Traceback (most recent call last):
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\utils\FileOperations.py", line 1400, in renameFile
+    os.rename(source_filename, dest_filename)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileExistsError: [WinError 183] Cannot create a file when that file already exists: 'C:\\Users\\jaras\\OneDrive\\Desktop\\EFOOTB~2\\REROLL~2\\loader\\BRAIN~1.BUI\\_nuitka_temp.pyd' -&gt; 'C:\\Users\\jaras\\OneDrive\\Desktop\\Efootball\\reroll_client\\loader\\brain.cp313-win_amd64.pyd'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\MainControl.py", line 1454, in main
+    _main()
+    ~~~~~^^
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\MainControl.py", line 1288, in _main
+    result, scons_options = compileTree()
+                            ~~~~~~~~~~~^^
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\MainControl.py", line 1139, in compileTree
+    result, scons_options = runSconsBackend()
+                            ~~~~~~~~~~~~~~~^^
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\MainControl.py", line 954, in runSconsBackend
+    runScons(
+    ~~~~~~~~^
+        scons_options=scons_options,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...&lt;3 lines&gt;...
+        source_dir_external=source_dir_external,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\build\SconsInterface.py", line 658, in runScons
+    renameFile(scons_created_exe, orig_result_exe)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\utils\FileOperations.py", line 1402, in renameFile
+    copyFile(source_filename, dest_filename)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\site-packages\nuitka\utils\FileOperations.py", line 1504, in copyFile
+    shutil.copyfile(source_path, dest_path)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jaras\AppData\Local\Programs\Python\Python313\Lib\shutil.py", line 262, in copyfile
+    with open(dst, 'wb') as fdst:
+         ~~~~^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: 'C:\\Users\\jaras\\OneDrive\\Desktop\\Efootball\\reroll_client\\loader\\brain.cp313-win_amd64.pyd'
+</exception>
+  <scons_environment c_compiler="zig" the_cc_name="zig.exe" the_compiler="~\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\Nuitka\Nuitka\Cache\downloads\pip\private-dc688c34\Lib\site-packages\ziglang\zig.exe" />
+  <module name="brain" kind="CompiledPythonModule" usage="root_module" reason="Root module" source_path="${cwd}\brain.py">
+    <plugin-influence name="implicit-imports" influence="condition-used" condition="module_mode and plugin(&quot;pyside6&quot;)" tags_used="module_mode,plugin" result="false" />
+    <optimization-time pass="1" time="0.0312" micro_passes="4" max_branch_merge="5" merged_total="71" />
+    <optimization-time pass="2" time="0.0000" micro_passes="1" max_branch_merge="5" merged_total="15" />
+    <code-generation-time time="0.0312" />
+    <module_usages>
+      <module_usage name="__future__" finding="excluded" line="11" reason="import" exclusion_reason="Not following into stdlib unless standalone or requested to follow into stdlib." />
+      <module_usage name="json" finding="excluded" line="13" reason="import" exclusion_reason="Not following into stdlib unless standalone or requested to follow into stdlib." />
+      <module_usage name="os" finding="excluded" line="14" reason="import" exclusion_reason="Not following into stdlib unless standalone or requested to follow into stdlib." />
+      <module_usage name="cryptography.hazmat.primitives.ciphers.aead" finding="absolute" line="16" reason="import" />
+    </module_usages>
+  </module>
+  <performance>
+    <memory_usage name="after_launch" value="45633536" />
+    <memory_usage name="before_c_code_generation" value="55615488" />
+    <memory_usage name="before_running_scons" value="56463360" />
+  </performance>
+  <data_composer blob_size="2152" total="152">
+    <module_data filename="__bytecode.const" blob_name=".bytecode" blob_size="3" input_size="0" />
+    <module_data filename="__constants.const" blob_name="" blob_size="1013" input_size="2497" />
+    <module_data filename="module.brain.const" blob_name="brain" blob_size="1107" input_size="2330" />
+  </data_composer>
+  <performance-totals>
+    <optimization-time pass="1" time="0.0312" module_count="1" />
+    <optimization-time pass="2" time="0.0000" module_count="1" />
+    <optimization-time pass="all" time="0.0312" module_count="1" />
+    <code-generation-time time="0.0312" module_count="1" />
+  </performance-totals>
+  <python_binary filename="${cwd}\brain.cp313-win_amd64.pyd" backend_resource_mode="c23_embed" reproducible="no" size="735744" />
+  <command_line>
+    <option value="--module" />
+    <option value="C:\Users\jaras\OneDrive\Desktop\Efootball\reroll_client\loader\brain.py" />
+    <option value="--output-dir=C:\Users\jaras\OneDrive\Desktop\Efootball\reroll_client\loader" />
+    <option value="--no-pyi-file" />
+    <option value="--remove-output" />
+    <option value="--assume-yes-for-downloads" />
+  </command_line>
+  <plugins>
+    <plugin name="anti-bloat" user_enabled="no" />
+    <plugin name="gi" user_enabled="no" />
+    <plugin name="implicit-imports" user_enabled="no" />
+    <plugin name="options-nanny" user_enabled="no" />
+    <plugin name="pkg-resources" user_enabled="no" />
+    <plugin name="transformers" user_enabled="no" />
+  </plugins>
+  <distributions />
+  <python python_exe="${sys.prefix}\python.exe" python_flavor="CPython Official" python_version="3.13.5" os_name="Windows" os_release="11" arch_name="x86_64" filesystem_encoding="utf-8" gil="yes">
+    <search_path>
+      <path value="${cwd}" />
+      <path value="${sys.prefix}\DLLs" />
+      <path value="${sys.prefix}\Lib" />
+      <path value="${sys.prefix}" />
+      <path value="${sys.prefix}\Lib\site-packages" />
+      <path value="${sys.prefix}\Lib\site-packages\win32" />
+      <path value="${sys.prefix}\Lib\site-packages\win32\lib" />
+      <path value="${sys.prefix}\Lib\site-packages\pythonwin" />
+      <path value="${sys.prefix}\Lib\site-packages\setuptools\_vendor" />
+    </search_path>
+  </python>
+  <output run_filename="${cwd}\brain.cp313-win_amd64.pyd" />
+</nuitka-compilation-report>

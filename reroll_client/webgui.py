@@ -10,10 +10,12 @@ in RAM — this file is only the shell.
 from __future__ import annotations
 
 import base64
+import collections
 import json
 import os
 import sys
 import threading
+import time
 import webbrowser
 
 import webview
@@ -74,21 +76,91 @@ class Api:
         self._window = None   # underscore: pywebview must NOT expose/serialize it
                               # (it wraps the native WebView2 control -> infinite
                               # property recursion -> the window freezes)
+        self._maxd = False
         self.token = None
         self.name = None
         self.build_id = _bundled_build_id()
         self.stop_event = None
         self.worker = None
+        # event bus: workers enqueue (non-blocking); one flusher coalesces into a
+        # single evaluate_js per tick (see _push/_flusher).
+        self._evq = collections.deque()
+        self._evstop = False
+        threading.Thread(target=self._flusher, daemon=True).start()
+
+    # ---- frameless window controls (custom themed title bar) ----
+    def win_min(self):
+        try:
+            self._window.minimize()
+        except Exception:  # noqa: BLE001
+            pass
+        return {"ok": True}
+
+    def win_max(self):
+        try:
+            if self._maxd:
+                self._window.restore()
+            else:
+                self._window.maximize()
+            self._maxd = not self._maxd
+        except Exception:  # noqa: BLE001
+            pass
+        return {"maxd": self._maxd}
+
+    def win_close(self):
+        try:
+            self._window.destroy()
+        except Exception:  # noqa: BLE001
+            pass
+        return {"ok": True}
+
+    def win_resize(self, w, h):
+        # frameless windows have no native resize border on WebView2 -> the page
+        # drives resizing via edge/corner grips that call this.
+        try:
+            self._window.resize(int(w), int(h))
+            self._maxd = False
+        except Exception:  # noqa: BLE001
+            pass
+        return {"ok": True}
+
+    def win_move(self, x, y):
+        try:
+            self._window.move(int(x), int(y))
+        except Exception:  # noqa: BLE001
+            pass
+        return {"ok": True}
 
     # ---- push an event to the page (any thread) ----
     def _push(self, ev):
-        w = self._window
-        if not w:
-            return
-        try:
-            w.evaluate_js("window._ev(" + json.dumps(ev, ensure_ascii=False) + ")")
-        except Exception:
-            pass
+        # enqueue only. pywebview's evaluate_js is synchronous — calling it per event
+        # made every engine worker BLOCK on the WebView bridge (UI jank + throughput
+        # cap). The flusher drains the queue and sends ONE batched call per tick.
+        self._evq.append(ev)
+
+    def _flusher(self):
+        while not self._evstop:
+            time.sleep(0.08)   # ~12 flushes/sec: imperceptible latency, no flood
+            w = self._window
+            if not w:
+                continue
+            batch = []
+            for _ in range(120):   # cap per tick; leftover rides the next tick
+                try:
+                    batch.append(self._evq.popleft())
+                except IndexError:
+                    break
+            if not batch:
+                continue
+            try:
+                payload = json.dumps(batch, ensure_ascii=False)
+                w.evaluate_js("window._evb(" + payload + ")")
+            except Exception as e:
+                try:
+                    with open(os.path.join(os.environ.get("TEMP", "."), "ewwdc_err.log"), "a", encoding="utf-8") as f:
+                        f.write(f"[flush] n={len(batch)} bytes={len(payload) if 'payload' in dir() else '?'} err={e!r}\n")
+                except Exception:
+                    pass
 
     # ---- small helpers the page calls ----
     def logo_data(self):
@@ -255,8 +327,9 @@ def main():
     api = Api()
     idx = os.path.join(_asset_dir(), "index.html")
     win = webview.create_window(
-        "eFootball Reroll", url=idx, js_api=api,
-        width=1180, height=772, min_size=(980, 648), background_color="#050508")
+        "E-WWDC", url=idx, js_api=api,
+        width=1220, height=948, min_size=(940, 660),
+        frameless=True, easy_drag=False, background_color="#0d0d0d")
     api._window = win
     webview.start()
 

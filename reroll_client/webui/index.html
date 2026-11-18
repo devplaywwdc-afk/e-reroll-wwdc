@@ -1,150 +1,252 @@
 <!doctype html>
-<html lang="th">
+<html lang="th" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>E-FOOTBALL REROLL</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* ===== Ollama-style tokens. Terminal trio (g/r/y) + neutral grays. ===== */
   :root{
-    --g:#00ff88; --p:#a855f7; --b:#3b82f6; --r:#ef4444; --y:#fbbf24;
-    --bg:#050508; --bg2:#0c0c14; --bg3:#141420;
-    --glass:rgba(255,255,255,.04); --glass2:rgba(255,255,255,.08);
-    --border:rgba(255,255,255,.08); --txt:#e2e8f0; --txt2:#94a3b8; --txt3:#475569;
-    --radius:14px; --radius-sm:8px; --trans:all .18s ease;
+    --g:#27c93f; --r:#ff5f56; --y:#ffbd2e; --b:#9aa0a6; --p:#9aa0a6;
+    --radius:12px; --radius-sm:10px; --trans:all .16s ease;
+    --disp:'Nunito','SF Pro Rounded',system-ui,-apple-system,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    /* terminal (worker) surface — dark in BOTH themes, the one "look here" surface */
+    --term:#1b1b1b; --term2:#1f1f1f; --term-bd:#2a2a2a; --term-tx:#d8d8d8; --term-mut:rgba(255,255,255,.5);
+  }
+  /* DARK = default */
+  :root,:root[data-theme="dark"]{
+    --bg:#0d0d0d; --bg2:#141414; --bg3:#1b1b1b;
+    --glass:#141414; --glass2:#1a1a1a;
+    --border:#262626; --txt:#ffffff; --txt2:#a3a3a3; --txt3:#6b6b6b;
+    --fieldbg:#0d0d0d;
+    --pill-bg:#ffffff; --pill-fg:#000000; --pill-press:#dcdcdc;
+  }
+  :root[data-theme="light"]{
+    --bg:#ffffff; --bg2:#ffffff; --bg3:#fafafa;
+    --glass:#ffffff; --glass2:#fafafa;
+    --border:#e5e5e5; --txt:#000000; --txt2:#737373; --txt3:#a3a3a3;
+    --fieldbg:#ffffff;
+    --pill-bg:#000000; --pill-fg:#ffffff; --pill-press:#090909;
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;background:var(--bg);color:var(--txt);
-    font-family:'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif;font-size:13.5px;overflow:hidden}
-  body{display:flex;flex-direction:column}
-  body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-    background-image:linear-gradient(rgba(168,85,247,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.05) 1px,transparent 1px);background-size:40px 40px}
-  body::after{content:'';position:fixed;width:600px;height:600px;top:-200px;left:200px;z-index:0;pointer-events:none;
-    background:radial-gradient(circle,rgba(168,85,247,.1) 0%,transparent 65%)}
-  .orb2{position:fixed;width:500px;height:500px;bottom:-180px;right:-100px;z-index:0;pointer-events:none;
-    background:radial-gradient(circle,rgba(0,255,136,.07) 0%,transparent 65%)}
-  a{color:var(--g);text-decoration:none}
-  ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:4px}
+    font-family:var(--disp);font-size:13.5px;overflow:hidden}
+  body{display:flex;flex-direction:column;transition:background .2s,color .2s}
+  .orb2{display:none}
+  a{color:var(--txt);text-decoration:underline;text-underline-offset:2px}
+  ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:9999px}
 
   .app{position:relative;z-index:1;flex:1;min-height:0;display:grid;grid-template-columns:234px 1fr}
 
-  .side{display:flex;flex-direction:column;background:rgba(8,8,14,.92);border-right:1px solid var(--border);overflow:hidden}
-  .side-brand{display:flex;align-items:center;gap:11px;padding:16px 16px 14px;border-bottom:1px solid var(--border)}
-  .logo{width:38px;height:38px;border-radius:11px;overflow:hidden;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--p),var(--g));box-shadow:0 0 16px rgba(168,85,247,.5);flex-shrink:0}
-  .logo img{width:38px;height:38px;object-fit:cover}
-  .side-brand h1{font-size:15px;font-weight:800;letter-spacing:.3px;
-    background:linear-gradient(90deg,var(--g),var(--p));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .side{display:flex;flex-direction:column;background:var(--bg);border-right:1px solid var(--border);overflow:hidden}
+  .side-brand{display:flex;align-items:center;gap:11px;padding:16px 16px 14px}
+  .logo{width:34px;height:34px;border-radius:9999px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+    background:var(--pill-bg);color:var(--pill-fg);flex-shrink:0;font-family:var(--disp);font-weight:800}
+  .logo img{width:34px;height:34px;object-fit:cover}
+  .side-brand h1{font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--txt)}
   .side-brand small{color:var(--txt2);font-size:10.5px}
   .nav{flex:1;overflow-y:auto;padding:10px}
-  .navitem{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border-radius:9px;border:1px solid transparent;
-    background:transparent;color:var(--txt2);cursor:pointer;font-size:13px;font-weight:600;text-align:left;transition:var(--trans);margin-bottom:2px;font-family:inherit}
-  .navitem:hover{background:var(--glass);color:var(--txt)}
-  .navitem.on{background:linear-gradient(90deg,rgba(0,255,136,.12),rgba(168,85,247,.08));border-color:rgba(0,255,136,.3);color:#fff}
+  .navitem{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:9999px;border:1px solid transparent;
+    background:transparent;color:var(--txt2);cursor:pointer;font-size:13px;font-weight:600;text-align:left;transition:var(--trans);margin-bottom:2px;font-family:var(--disp)}
+  .navitem:hover{background:var(--glass2);color:var(--txt)}
+  .navitem.on{background:var(--pill-bg);border-color:transparent;color:var(--pill-fg)}
   .navitem .em{font-size:15px;width:18px;text-align:center}
   .side-foot{padding:12px 16px;border-top:1px solid var(--border);color:var(--txt3);font-size:11px}
 
   .main{display:flex;flex-direction:column;overflow:hidden}
-  .topbar{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);background:rgba(5,5,8,.6)}
-  .pg-ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--glass);border:1px solid var(--border)}
-  .pg-h{font-size:16px;font-weight:700}.pg-sub{color:var(--txt2);font-size:11.5px}
-  .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:20px;background:var(--glass);border:1px solid var(--border);font-size:12px;color:var(--txt2);cursor:default}
-  .pill.click{cursor:pointer}.pill.click:hover{border-color:rgba(0,255,136,.4)}
-  .pill.ok{color:var(--g);border-color:rgba(0,255,136,.35)}.pill.bad{color:var(--r);border-color:rgba(239,68,68,.35)}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--txt3)}
-  .dot.live{background:var(--g);box-shadow:0 0 8px var(--g);animation:pulse 1.4s infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .topbar{display:flex;align-items:center;gap:8px;row-gap:8px;flex-wrap:wrap;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--bg)}
+  .pg-ic{width:34px;height:34px;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--glass2);border:1px solid var(--border)}
+  .pg-h{font-size:18px;font-weight:700;letter-spacing:-.01em;font-family:var(--disp)}.pg-sub{color:var(--txt2);font-size:11.5px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:9999px;background:var(--glass2);border:1px solid var(--border);font-size:12px;font-weight:500;color:var(--txt2);cursor:default;white-space:nowrap}
+  .pill.click{cursor:pointer}.pill.click:hover{border-color:var(--txt3);color:var(--txt)}
+  .pill.ok{color:var(--txt);border-color:var(--border)}.pill.ok .dot{background:var(--g)}
+  .pill.bad{color:var(--r);border-color:rgba(255,95,86,.4)}
+  .dot{width:7px;height:7px;border-radius:9999px;background:var(--txt3)}
+  .dot.live{background:var(--g);box-shadow:0 0 0 3px rgba(39,201,63,.18);animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 
   .panels{flex:1;overflow:hidden}
   .panel{display:none;height:100%}.panel.on{display:flex;flex-direction:column;overflow:hidden}
   .card{background:var(--glass);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;overflow:hidden;min-height:0}
-  .chead{padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--txt2);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
-  .chead .l{display:flex;align-items:center;gap:8px}.chead .d{width:6px;height:6px;border-radius:50%;background:var(--p);box-shadow:0 0 6px var(--p)}
-  .cbody{padding:14px;overflow:auto;display:flex;flex-direction:column;gap:12px}
-  .field{display:flex;flex-direction:column;gap:5px;min-width:0}.field label{font-size:11px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chead{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--txt);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;font-family:var(--disp)}
+  .chead .l{display:flex;align-items:center;gap:8px}.chead .d{display:none}
+  .cbody{padding:14px;overflow:auto;display:flex;flex-direction:column;gap:10px}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}.field label{font-size:11.5px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   input,select,textarea{width:100%;box-sizing:border-box;max-width:100%}
-  input,select{background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;color:var(--txt);font-size:13px;outline:none;font-family:inherit;transition:var(--trans)}
+  input,select{background:var(--fieldbg);border:1px solid var(--border);border-radius:9999px;padding:9px 14px;color:var(--txt);font-size:13px;outline:none;font-family:var(--disp);transition:var(--trans)}
+  select{cursor:pointer}
   .grid2{min-width:0}.grid2>*{min-width:0}
-  input:focus,select:focus{border-color:rgba(168,85,247,.6);box-shadow:0 0 0 2px rgba(168,85,247,.15)}
+  input:focus,select:focus,textarea:focus{border-color:var(--txt3);box-shadow:0 0 0 2px rgba(59,130,246,.28)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .chk{font-size:12px;color:var(--txt2);display:flex;align-items:center;gap:7px;cursor:pointer}
-  .chk input{width:auto}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);border:1px solid transparent;font-size:13px;font-weight:700;cursor:pointer;transition:var(--trans);font-family:inherit}
-  .btn:active{transform:scale(.98)}.btn:disabled{opacity:.4;cursor:not-allowed}
-  .btn-primary{background:linear-gradient(135deg,var(--g),#00cc6a);border-color:rgba(0,255,136,.5);color:#021;box-shadow:0 0 16px rgba(0,255,136,.25)}
-  .btn-danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.4);color:var(--r)}
-  .btn-outline{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.4);color:var(--g)}
-  .btn-ghost{background:var(--glass2);border-color:var(--border);color:var(--txt2)}
-  .btn-sm{padding:6px 12px;font-size:12px}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .chk{font-size:12.5px;color:var(--txt2);display:flex;align-items:center;gap:8px;cursor:pointer}
+  .chk input{width:auto;accent-color:var(--pill-bg)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:9999px;border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;transition:var(--trans);font-family:var(--disp)}
+  .btn:active{background:var(--pill-press)}.btn:disabled{opacity:.38;cursor:not-allowed}
+  .btn-primary{background:var(--pill-bg);border-color:var(--pill-bg);color:var(--pill-fg)}
+  .btn-primary:active{background:var(--pill-press);border-color:var(--pill-press)}
+  .btn-danger{background:transparent;border-color:rgba(255,95,86,.5);color:var(--r)}
+  .btn-danger:active{background:rgba(255,95,86,.12)}
+  .btn-outline{background:transparent;border-color:var(--txt3);color:var(--txt)}
+  .btn-outline:active{background:var(--glass2)}
+  .btn-ghost{background:transparent;border-color:var(--border);color:var(--txt2)}
+  .btn-ghost:active{background:var(--glass2)}
+  .btn-sm{padding:6px 13px;font-size:12px}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
   .hint{color:var(--txt3);font-size:11px;line-height:1.5}
 
-  .two{flex:1;display:grid;grid-template-columns:316px 1fr;gap:14px;padding:14px;overflow:hidden}
+  .two{flex:1;display:grid;grid-template-columns:336px 1fr;gap:14px;padding:14px;overflow:hidden}
   .two>.card{min-height:0}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
-  .stat{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
-  .stat b{font-size:22px;font-weight:800;display:block;line-height:1.1}.stat small{color:var(--txt3);font-size:10.5px}
-  .stat.ok b{color:var(--g)}.stat.err b{color:var(--r)}.stat.p b{color:var(--p)}.stat.b b{color:var(--b)}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .stat{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .stat b{font-size:26px;font-weight:800;display:block;line-height:1.05;letter-spacing:-.02em;color:var(--txt);font-family:var(--disp)}.stat small{color:var(--txt2);font-size:11px}
+  .stat.ok b{color:var(--g)}.stat.err b{color:var(--r)}.stat.p b{color:var(--txt)}.stat.b b{color:var(--txt)}
   #gridwrap{flex:1;overflow:auto;min-height:0}
-  #grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
-  .pane{background:var(--glass);border:1px solid var(--border);border-radius:11px;display:flex;flex-direction:column;height:168px;overflow:hidden}
-  .pane .ph{padding:6px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:var(--txt2)}
+  #grid{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  /* worker panes: the single dark terminal surface, both themes */
+  .pane{background:var(--term);border:1px solid var(--term-bd);border-radius:11px;display:flex;flex-direction:column;height:168px;overflow:hidden}
+  .pane .ph{padding:7px 11px;border-bottom:1px solid var(--term-bd);display:flex;justify-content:space-between;font-size:11px;font-weight:600;color:var(--term-mut);font-family:var(--mono)}
   .pane .ph b{color:var(--g)}
-  .logarea{flex:1;overflow-y:auto;background:rgba(0,0,0,.4);padding:5px 8px;font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.35}
-  .ll{display:block}.ll.ok{color:var(--g)}.ll.err{color:var(--r)}.ll.info{color:var(--txt2)}
+  .logarea{flex:1;overflow-y:auto;background:#111;padding:6px 9px;font-family:var(--mono);font-size:10.5px;line-height:1.4;color:var(--term-tx)}
+  .ll{display:block}.ll.ok{color:var(--g)}.ll.err{color:var(--r)}.ll.info{color:var(--term-mut)}
 
-  .wrap{padding:14px;flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px}
-  .biglog{flex:1;min-height:160px;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:11px;padding:9px 11px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.45}
+  .wrap{padding:16px;flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px}
+  .biglog{flex:1;min-height:160px;background:var(--term);border:1px solid var(--term-bd);border-radius:11px;padding:10px 12px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--term-tx)}
+  .biglog .ll.info{color:var(--term-mut)}
   table{width:100%;border-collapse:collapse;font-size:12px}
-  th{color:var(--txt2);text-align:left;padding:7px 8px;font-size:11px;font-weight:700;border-bottom:1px solid var(--border)}
-  td{padding:7px 8px;border-bottom:1px solid var(--border);color:var(--txt2)}
-  .pbar{height:7px;background:var(--glass);border:1px solid var(--border);border-radius:6px;overflow:hidden}
-  .pbar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--g),var(--p));transition:width .25s}
+  th{color:var(--txt2);text-align:left;padding:8px;font-size:11px;font-weight:700;border-bottom:1px solid var(--border)}
+  td{padding:8px;border-bottom:1px solid var(--border);color:var(--txt2)}
+  .pbar{height:6px;background:var(--glass2);border:1px solid var(--border);border-radius:9999px;overflow:hidden}
+  .pbar > i{display:block;height:100%;width:0;background:var(--txt);transition:width .25s}
 
   /* login gate */
-  .gate{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(5,5,8,.86);backdrop-filter:blur(6px)}
-  .gate .box{width:380px;max-width:92vw;background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:26px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-  .gate .logo{width:56px;height:56px;border-radius:16px;margin:0 auto 14px}
-  .gate .logo img{width:56px;height:56px}
-  .gate h2{font-size:19px;font-weight:800;margin-bottom:4px;background:linear-gradient(90deg,var(--g),var(--p));-webkit-background-clip:text;background-clip:text;color:transparent}
-  .gate p{color:var(--txt2);font-size:12.5px;margin-bottom:18px;line-height:1.6}
-  .gate .st{font-size:12px;margin-top:14px;min-height:18px;color:var(--txt2)}
-  .pickwrap{display:flex;flex-direction:column;gap:6px;background:rgba(0,255,136,.04);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:4px}
-  .pkpack{font-size:11px;font-weight:700;color:var(--b);margin:6px 0 2px}
+  .gate{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+  .gate .box{width:400px;max-width:92vw;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:34px 30px;text-align:center}
+  .gate .logo{width:52px;height:52px;border-radius:9999px;margin:0 auto 16px}
+  .gate .logo img{width:52px;height:52px}
+  .gate h2{font-size:24px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px;color:var(--txt);font-family:var(--disp)}
+  .gate p{color:var(--txt2);font-size:13px;margin-bottom:20px;line-height:1.6}
+  .gate .st{font-size:12px;margin-top:16px;min-height:18px;color:var(--txt2)}
+  .pickwrap{display:flex;flex-direction:column;gap:6px;background:var(--glass2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:4px}
+  .pkpack{font-size:11px;font-weight:700;color:var(--txt);margin:6px 0 2px}
   .pkrow{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--txt);padding:2px 0}
   /* gacha pack picker modal */
-  .pkmodal{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;background:rgba(5,5,8,.82);backdrop-filter:blur(5px)}
-  .pkbox{width:min(1080px,96vw);height:min(90vh,920px);background:var(--bg2);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-  .pkhead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);font-weight:800}
+  .pkmodal{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
+  .pkbox{width:min(1860px,96vw);height:min(94vh,1040px);background:var(--bg2);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .pkhead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);font-weight:700;font-family:var(--disp)}
   .pkhead button{background:none;border:none;color:var(--txt2);font-size:19px;cursor:pointer}
-  .pkbody{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
-  .pkfoot{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border)}
-  .pkpk{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:11px;min-width:0}
-  .pkpk-h{font-size:13.5px;font-weight:800;color:var(--g);line-height:1.35}.pkpk-h.nf{color:var(--txt2)}
-  .pkcards{display:grid;grid-template-columns:var(--pcc,repeat(auto-fill,minmax(150px,1fr)));gap:10px}
-  .pkcard{position:relative;border:1px solid var(--border);border-radius:11px;overflow:hidden;cursor:pointer;background:rgba(0,0,0,.35);transition:var(--trans)}
-  .pkcard:hover{border-color:rgba(0,255,136,.45)}
-  .pkcard.sel{border-color:var(--g);box-shadow:0 0 0 2px rgba(0,255,136,.35) inset}
-  .pkcard input{position:absolute;top:7px;left:7px;width:19px;height:19px;z-index:2;pointer-events:none;accent-color:var(--g)}
-  .pkeye{position:absolute;top:6px;right:6px;z-index:3;width:26px;height:26px;border:none;border-radius:7px;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
-  .pkeye:hover{background:rgba(0,255,136,.3)}.pkeye svg{width:16px;height:16px}
-  .pkcard .pimg{height:148px;background:#0a0d14 center/contain no-repeat;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:34px}
-  .pkcard .ov{position:absolute;top:34px;right:8px;font-weight:800;font-size:19px;color:#ffd84d;text-shadow:0 1px 4px #000}
-  .pkcard .pn{padding:7px 9px 1px;font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pkbody{flex:1;overflow:auto;padding:16px;display:grid;grid-template-columns:var(--ppr,repeat(auto-fill,minmax(380px,1fr)));gap:14px;align-content:start}
+  .pkfoot{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-top:1px solid var(--border)}
+  .pkpk{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:11px;min-width:0}
+  .pkpk-h{font-size:13.5px;font-weight:700;color:var(--txt);line-height:1.35;font-family:var(--disp)}.pkpk-h.nf{color:var(--txt2)}
+  .pkcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px}
+  .pkcard{position:relative;border:1px solid var(--border);border-radius:11px;overflow:hidden;cursor:pointer;background:var(--bg3);transition:var(--trans)}
+  .pkcard:hover{border-color:var(--txt3)}
+  .pkcard.sel{border-color:var(--txt);box-shadow:0 0 0 2px var(--txt) inset}
+  .pkcard input{position:absolute;top:7px;left:7px;width:19px;height:19px;z-index:2;pointer-events:none;accent-color:var(--pill-bg)}
+  .pkeye{position:absolute;top:6px;right:6px;z-index:3;width:26px;height:26px;border:none;border-radius:9999px;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .pkeye:hover{background:rgba(0,0,0,.8)}.pkeye svg{width:16px;height:16px}
+  .pkcard .pimg{height:148px;background:#0a0a0a center/contain no-repeat;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:34px}
+  .pkcard .pimg .ic{width:38px;height:38px}
+  .lb .lbimg .ic{width:74px;height:74px}
+  .pkcard .ov{position:absolute;top:34px;right:8px;font-weight:800;font-size:19px;color:var(--y);text-shadow:0 1px 4px #000}
+  .pkcard .pn{padding:7px 9px 1px;font-size:12.5px;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pkcard .pp{padding:0 9px 8px;font-size:11px;color:var(--txt3)}
-  .pktoggle{align-self:flex-start;font-size:12px;color:var(--b);background:none;border:1px dashed var(--border);border-radius:8px;padding:6px 12px;cursor:pointer}
+  .pktoggle{align-self:flex-start;font-size:12px;color:var(--txt2);background:none;border:1px dashed var(--border);border-radius:9999px;padding:6px 14px;cursor:pointer}
   /* lightbox: single card */
-  .lb{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.88);backdrop-filter:blur(4px)}
+  .lb{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.88)}
   .lb .lbin{text-align:center}
-  .lb .lbimg{width:min(420px,88vw);height:min(560px,70vh);background:#0a0d14 center/contain no-repeat;border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:80px}
+  .lb .lbimg{width:min(420px,88vw);height:min(560px,70vh);background:#0a0a0a center/contain no-repeat;border:1px solid var(--term-bd);border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:80px}
   .lb .lbcap{margin-top:14px;font-size:17px;font-weight:700;color:#fff}
   .lb .lbx{margin-top:12px}
+  /* scan loading overlay */
+  .scanov{position:fixed;inset:0;z-index:85;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(0,0,0,.55)}
+  .spin{width:46px;height:46px;border:3px solid var(--border);border-top-color:var(--txt);border-radius:9999px;animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ===== custom themed title bar (frameless window) ===== */
+  .titlebar{height:36px;flex-shrink:0;display:flex;align-items:stretch;background:var(--bg);border-bottom:1px solid var(--border);user-select:none;-webkit-user-select:none;z-index:1000}
+  .tb-drag{flex:1;display:flex;align-items:center;gap:9px;padding:0 14px;min-width:0}
+  .tb-mk{width:20px;height:20px;border-radius:9999px;background:var(--pill-bg);color:var(--pill-fg);display:grid;place-items:center;font-size:10px;font-weight:800;font-family:var(--disp);flex-shrink:0}
+  .tb-title{font-weight:700;font-size:12.5px;color:var(--txt);font-family:var(--disp);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wbtn{width:44px;border:0;background:transparent;color:var(--txt2);font-size:13px;cursor:pointer;display:grid;place-items:center;font-family:var(--disp)}
+  .wbtn:hover{background:var(--glass2);color:var(--txt)}
+  .wbtn.cls:hover{background:#e81123;color:#fff}
+  .tb-mk img{width:20px;height:20px;border-radius:9999px;object-fit:cover}
+  /* vector icons (no emoji) */
+  .ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .ic.sol{fill:currentColor;stroke:none}
+  .navitem .ic{width:17px;height:17px;vertical-align:-4px}
+  .pg-ic .ic{width:19px;height:19px;vertical-align:-4px}
+  .btn .ic{width:15px;height:15px;vertical-align:-2px;margin-right:1px}
+  .pill .ic{width:14px;height:14px;vertical-align:-2px}
+  /* frameless resize grips (WebView2 has no native resize border) */
+  .rsz{position:fixed;z-index:1002;background:transparent}
+  .rsz.n{top:0;left:8px;right:8px;height:4px;cursor:ns-resize}
+  .rsz.s{bottom:0;left:8px;right:8px;height:5px;cursor:ns-resize}
+  .rsz.e{top:8px;bottom:8px;right:0;width:5px;cursor:ew-resize}
+  .rsz.w{top:8px;bottom:8px;left:0;width:5px;cursor:ew-resize}
+  .rsz.ne{top:0;right:0;width:11px;height:11px;cursor:nesw-resize}
+  .rsz.nw{top:0;left:0;width:11px;height:11px;cursor:nwse-resize}
+  .rsz.se{bottom:0;right:0;width:13px;height:13px;cursor:nwse-resize}
+  .rsz.sw{bottom:0;left:0;width:11px;height:11px;cursor:nesw-resize}
+  /* overlays sit below the title bar so it stays usable */
+  .gate,.pkmodal,.lb,.scanov,.forcebox{top:36px}
+  /* forced-update block screen */
+  .forcebox{position:fixed;left:0;right:0;bottom:0;z-index:900;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:var(--bg);padding:30px}
+  .forcebox .fb-ic{font-size:42px}
+  .forcebox h2{font-size:23px;font-weight:700;color:var(--txt);font-family:var(--disp)}
+  .forcebox p{color:var(--txt2);font-size:13.5px;max-width:440px;line-height:1.65}
+  .forcebox .fb-ver{font-family:var(--mono);font-size:12px;color:var(--txt3)}
 </style>
 </head>
 <body>
 <div class="orb2"></div>
 
+<!-- icon sprite (replaces all emoji — stroke=currentColor) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="ic-reroll" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.2"/><circle cx="15.5" cy="15.5" r="1.2"/><circle cx="15.5" cy="8.5" r="1.2"/><circle cx="8.5" cy="15.5" r="1.2"/></symbol>
+<symbol id="ic-daily" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></symbol>
+<symbol id="ic-gacha" viewBox="0 0 24 24"><rect x="3.5" y="9" width="17" height="11.5" rx="1.5"/><path d="M3.5 13h17M12 9v11.5M12 9c-1.6 0-3.3-.8-3.3-2.4C8.7 5 11 5.3 12 9c1-3.7 3.3-4 3.3-2.4C15.3 8.2 13.6 9 12 9z"/></symbol>
+<symbol id="ic-merge" viewBox="0 0 24 24"><path d="M3 7.5a2 2 0 0 1 2-2h3.2l1.8 2H15a2 2 0 0 1 2 2"/><rect x="3" y="8.5" width="14" height="11" rx="2"/></symbol>
+<symbol id="ic-check" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="7"/><path d="M20.5 20.5l-5-5"/></symbol>
+<symbol id="ic-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"/></symbol>
+<symbol id="ic-server" viewBox="0 0 24 24"><path d="M4.5 11.5a10 10 0 0 1 15 0M7.5 14.5a6 6 0 0 1 9 0"/><circle cx="12" cy="18" r="1.3"/></symbol>
+<symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+<symbol id="ic-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+<symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></symbol>
+<symbol id="ic-update" viewBox="0 0 24 24"><path d="M12 20.5V6M6 11l6-6 6 6"/></symbol>
+<symbol id="ic-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.6 9.3h3.2a1.9 1.9 0 0 1 0 3.8h-2.9"/></symbol>
+<symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="ic-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/></symbol>
+</defs></svg>
+
+<!-- custom themed title bar (frameless window) -->
+<div class="titlebar">
+  <div class="tb-drag pywebview-drag-region"><span class="tb-mk"><img src="logo.png" alt="" onerror="this.parentNode.textContent='W'"></span><span class="tb-title">E-WWDC · Reroll</span></div>
+  <button class="wbtn" title="ย่อ" onclick="api('win_min')">&#8211;</button>
+  <button class="wbtn" title="ขยาย/คืนขนาด" onclick="api('win_max')">&#9633;</button>
+  <button class="wbtn cls" title="ปิด" onclick="api('win_close')">&#10005;</button>
+</div>
+<div class="rsz n" data-dir="n"></div><div class="rsz s" data-dir="s"></div>
+<div class="rsz e" data-dir="e"></div><div class="rsz w" data-dir="w"></div>
+<div class="rsz ne" data-dir="ne"></div><div class="rsz nw" data-dir="nw"></div>
+<div class="rsz se" data-dir="se"></div><div class="rsz sw" data-dir="sw"></div>
+
+<!-- forced update block screen -->
+<div class="forcebox" id="forcebox">
+  <div class="fb-ic"><svg class="ic" style="width:40px;height:40px;vertical-align:middle"><use href="#ic-update"/></svg></div>
+  <h2>ต้องอัปเดตก่อนใช้งาน</h2>
+  <p id="fbmsg">มีเวอร์ชันใหม่ออกแล้ว — เวอร์ชันนี้ถูกปิดใช้งาน ต้องอัปเดตเป็นตัวล่าสุดก่อนถึงจะใช้ได้</p>
+  <div class="fb-ver" id="fbver"></div>
+  <div class="row" style="justify-content:center">
+    <button class="btn btn-primary" onclick="api('open_url',window._updurl)">โหลดเวอร์ชันใหม่</button>
+    <button class="btn btn-ghost" onclick="api('win_close')">ปิดโปรแกรม</button>
+  </div>
+</div>
+
 <!-- update notice banner -->
-<div id="updbar" style="display:none;flex-shrink:0;z-index:60;align-items:center;gap:12px;justify-content:center;font-size:13px;padding:9px 16px;background:linear-gradient(90deg,rgba(0,255,136,.16),rgba(168,85,247,.12));border-bottom:1px solid rgba(0,255,136,.4)">
+<div id="updbar" style="display:none;flex-shrink:0;z-index:60;align-items:center;gap:12px;justify-content:center;font-size:13px;padding:10px 16px;background:var(--glass2);border-bottom:1px solid var(--border)">
   <span id="updtxt" style="color:var(--txt)"></span>
   <button class="btn btn-primary btn-sm" onclick="api('open_url',window._updurl)">โหลดเวอร์ชันใหม่</button>
   <button class="btn btn-ghost btn-sm" onclick="document.getElementById('updbar').style.display='none'">ภายหลัง</button>
@@ -162,15 +264,17 @@
   </div>
 </div>
 
+<div id="scanov" class="scanov"><div class="spin"></div><div id="scantxt" style="color:var(--txt);font-size:14px">กำลังสแกนแพ็ค…</div></div>
+
 <!-- gacha pack picker -->
 <div id="pkmodal" class="pkmodal" style="display:none">
   <div class="pkbox">
     <div class="pkhead"><span>เลือกนักเตะที่ต้องการ (กดการ์ด = เลือก)</span>
       <div style="display:flex;align-items:center;gap:12px">
-        <label style="font-size:12px;color:var(--txt2);font-weight:400">คอลัมน์
+        <label style="font-size:12px;color:var(--txt2);font-weight:400">Pack/แถว
           <select id="pkcols" onchange="setPkCols()" style="width:auto;display:inline-block;padding:4px 8px">
-            <option value="auto">อัตโนมัติ</option><option value="3">3</option><option value="4">4</option>
-            <option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option></select></label>
+            <option value="auto">อัตโนมัติ</option><option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="4">4</option></select></label>
         <button onclick="closePk()">✕</button></div></div>
     <div class="pkbody" id="pkbody"></div>
     <div class="pkfoot"><span id="pkcount" class="hint">เลือก 0 คน</span><button class="btn btn-primary" onclick="donePk()">เลือกเสร็จ</button></div>
@@ -191,24 +295,26 @@
       <div><h1>E-FOOTBALL</h1><small>REROLL · ระบบอัตโนมัติ</small></div>
     </div>
     <nav class="nav" id="nav">
-      <button class="navitem on" data-tab="reroll" onclick="tab('reroll',this)"><span class="em">🎲</span>Reroll</button>
-      <button class="navitem" data-tab="daily" onclick="tab('daily',this)"><span class="em">📅</span>Daily Login</button>
-      <button class="navitem" data-tab="gacha" onclick="tab('gacha',this)"><span class="em">🎰</span>กาชา</button>
-      <button class="navitem" data-tab="merge" onclick="tab('merge',this)"><span class="em">🗂</span>รวมไฟล์</button>
-      <button class="navitem" data-tab="check" onclick="tab('check',this)"><span class="em">🔎</span>เช็คไอดี</button>
+      <button class="navitem on" data-tab="reroll" onclick="tab('reroll',this)"><svg class="ic"><use href="#ic-reroll"/></svg>Reroll</button>
+      <button class="navitem" data-tab="daily" onclick="tab('daily',this)"><svg class="ic"><use href="#ic-daily"/></svg>Daily Login</button>
+      <button class="navitem" data-tab="gacha" onclick="tab('gacha',this)"><svg class="ic"><use href="#ic-gacha"/></svg>กาชา</button>
+      <button class="navitem" data-tab="merge" onclick="tab('merge',this)"><svg class="ic"><use href="#ic-merge"/></svg>รวมไฟล์</button>
+      <button class="navitem" data-tab="check" onclick="tab('check',this)"><svg class="ic"><use href="#ic-check"/></svg>เช็คไอดี</button>
+      <button class="navitem" onclick="api('open_url','https://www.crgwwdc.shop/efootball/genlink');return false"><svg class="ic"><use href="#ic-link"/></svg>Gen Link Konami (ซื้อเพิ่ม)</button>
     </nav>
     <div class="side-foot">ติดต่อ: <a href="#" onclick="api('open_tg');return false">t.me/j3xdr</a></div>
   </aside>
 
   <div class="main">
     <div class="topbar">
-      <div class="pg-ic" id="pgic">🎲</div>
+      <div class="pg-ic" id="pgic"><svg class="ic"><use href="#ic-reroll"/></svg></div>
       <div><div class="pg-h" id="pgh">Reroll</div><div class="pg-sub" id="pgsub">spray สร้างไอดี + เข้า MyClub</div></div>
       <div style="flex:1"></div>
       <span class="pill" id="entpill">สิทธิ์: —</span>
-      <span class="pill click" id="srvpill" onclick="srv()">🛰 เช็คสถานะเกม</span>
+      <span class="pill click" id="srvpill" onclick="srv()"><svg class="ic"><use href="#ic-server"/></svg> เช็คสถานะเกม</span>
       <span class="pill"><span class="dot" id="livedot"></span><span id="livetxt">idle</span></span>
       <span class="pill" id="userpill">—</span>
+      <span class="pill click" id="themebtn" onclick="toggleTheme()" title="สลับธีม สว่าง/มืด"><svg class="ic"><use href="#ic-moon"/></svg> ธีม</span>
       <span class="pill click" id="verpill" onclick="checkUpd(true)" title="ตรวจเวอร์ชันใหม่">v… · ตรวจอัปเดต</span>
     </div>
 
@@ -220,8 +326,8 @@
             <div class="chead"><div class="l"><span class="d"></span>Reroll &amp; Setup</div></div>
             <div class="cbody">
               <div class="grid2">
-                <div class="field"><label>จำนวนไอดี (0=ไม่จำกัด)</label><input id="r_count" type="number" value="20" min="0"></div>
-                <div class="field"><label title="จำนวนไอดีที่สร้างพร้อมกัน — มากขึ้น = เร็วขึ้น แต่เสี่ยงโดน Konami throttle (ERR_SERVERNOTREADY) มากขึ้น · แนะนำ 5–15 ต่อ 1 IP · ขึ้นกับสเปกเครื่อง + เน็ตด้วย" style="cursor:help">Workers (พร้อมกัน) &#9432;</label><input id="r_workers" type="number" value="8" min="1" max="500" title="มากขึ้น = เร็วขึ้น แต่โดน throttle ง่ายขึ้น · สูงสุด 500 · จาก IP เดียวเกิน ~15–30 จะตันที่ IP (ต้องใช้ proxy ถึงดันทะลุ)"></div>
+                <div class="field"><label>จำนวนไอดี (0=ไม่จำกัด)</label><input id="r_count" type="number" value="0" min="0"></div>
+                <div class="field"><label title="จำนวนไอดีที่สร้างพร้อมกัน — มากขึ้น = เร็วขึ้น แต่เสี่ยงโดน Konami throttle (ERR_SERVERNOTREADY) มากขึ้น · แนะนำ 5–15 ต่อ 1 IP · ขึ้นกับสเปกเครื่อง + เน็ตด้วย" style="cursor:help">Workers (พร้อมกัน) &#9432;</label><input id="r_workers" type="number" value="64" min="1" max="500" title="มากขึ้น = เร็วขึ้น แต่โดน throttle ง่ายขึ้น · สูงสุด 500 · จาก IP เดียวเกิน ~15–30 จะตันที่ IP (ต้องใช้ proxy ถึงดันทะลุ)"></div>
               </div>
               <div class="grid2">
                 <div class="field"><label>Prefix ชื่อในเกม</label><input id="r_prefix" value="j3xdr" maxlength="10"></div>
@@ -230,19 +336,22 @@
               <div class="field"><label>โฟลเดอร์เก็บผล</label>
                 <div class="row"><input id="r_out" placeholder="(ค่าเริ่มต้น ข้างโปรแกรม)" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('r_out')">เลือก…</button></div></div>
               <div class="field"><label>รูปแบบไฟล์</label><select id="r_fmt"><option value="txt">.txt</option><option value="dat">.dat</option></select></div>
-              <label class="chk"><input id="r_claim" type="checkbox" checked> รับของเริ่มต้น + Daily (ช้าลง)</label>
+              <label class="chk" title="ปิดไว้ = เร็วสุด (สร้าง+เซฟอย่างเดียว ~2 วิ/ตัว) แล้วค่อยกด Daily เก็บของทีหลัง · เปิด = รับของตอนสร้างเลย แต่ของเริ่มต้นมักยังไม่มา ช้าลง ~35 วิ/ตัว"><input id="r_claim" type="checkbox"> รับของเริ่มต้นตอนสร้าง (ช้ากว่ามาก — แนะนำปิด แล้วใช้ Daily)</label>
               <label class="chk"><input id="r_verbose" type="checkbox"> Log ดิบ (แสดงรัว ๆ ทุก request)</label>
               <label class="chk"><input id="r_showerr" type="checkbox" checked> แสดง log error ด้วย (ปิด = โชว์เฉพาะสำเร็จ · ลื่นกว่าตอน worker เยอะ)</label>
-              <label class="chk"><input id="r_postgacha" type="checkbox"> สุ่มกาชาฟรีต่อ หลัง reroll (เปิดแพ็คฟรีทั้งหมดในไอดีที่เพิ่งสร้าง)</label>
+              <label class="chk"><input id="r_postgacha" type="checkbox" onchange="updateRerollGate()"> สุ่มกาชาฟรีต่อ หลัง reroll (ต้องสแกน + เลือกนักเตะก่อน)</label>
+              <div id="rr_pick" style="display:none;gap:9px;align-items:center" class="row">
+                <button class="btn btn-outline btn-sm" onclick="scanReroll()">สแกน + เลือกนักเตะ</button>
+                <span class="hint" id="rr_sel">ยังไม่เลือก</span></div>
               <div class="grid2">
                 <div class="field"><label>Log สูงสุด (บรรทัด/worker)</label><input id="r_logmax" type="number" value="100" min="20" max="1000"></div>
                 <div class="field"><label>&nbsp;</label><span class="hint" style="padding-top:8px">กันโปรแกรมค้างตอน log เยอะ</span></div>
               </div>
               <div class="field"><label title="ใส่ 1 proxy ต่อบรรทัด (http://user:pass@host:port หรือ socks5://host:port) — ว่าง = ใช้ IP เครื่อง · หลาย IP = กระจาย worker ข้าม IP ดันทะลุเพดาน throttle ต่อ IP" style="cursor:help">Proxy — ว่าง = IP เครื่อง &#9432;</label>
-                <textarea id="r_proxies" rows="2" placeholder="(ว่างไว้ = ใช้ IP เครื่องนี้)&#10;http://user:pass@host:port" style="resize:vertical;width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none"></textarea></div>
+                <textarea id="r_proxies" rows="2" placeholder="(ว่างไว้ = ใช้ IP เครื่องนี้)&#10;http://user:pass@host:port" style="resize:vertical;width:100%;background:var(--fieldbg);border:1px solid var(--border);border-radius:12px;padding:9px 12px;color:var(--txt);font-family:var(--mono);font-size:11px;outline:none"></textarea></div>
               <div style="flex:1"></div>
-              <button class="btn btn-primary" id="r_start" style="width:100%" onclick="startReroll()">▶ เริ่ม Reroll</button>
-              <button class="btn btn-danger" id="r_stop" style="width:100%" disabled onclick="api('stop')">■ หยุด</button>
+              <button class="btn btn-primary" id="r_start" style="width:100%" onclick="startReroll()"><svg class="ic sol"><use href="#ic-play"/></svg>เริ่ม Reroll</button>
+              <button class="btn btn-danger" id="r_stop" style="width:100%" disabled onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button>
             </div>
           </div>
           <div class="card">
@@ -251,7 +360,7 @@
               <div class="stats">
                 <div class="stat ok"><b id="s_ok">0</b><small>สำเร็จ</small></div>
                 <div class="stat err"><b id="s_fail">0</b><small>ล้มเหลว</small></div>
-                <div class="stat p"><b id="s_time">0s</b><small>เวลา</small></div>
+                <div class="stat p"><b id="s_time">0:00</b><small>เวลา</small></div>
                 <div class="stat b"><b id="s_w">0</b><small>workers</small></div>
               </div>
               <div id="gridwrap"><div id="grid"><div class="hint">กด “เริ่ม Reroll” — worker จะขึ้นที่นี่</div></div></div>
@@ -266,12 +375,13 @@
           <div class="row">
             <div class="field" style="flex:1"><label>โฟลเดอร์บัญชีต้นทาง</label>
               <div class="row"><input id="d_out" placeholder="เลือกโฟลเดอร์บัญชี" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('d_out')">เลือก…</button></div></div>
-            <div class="field"><label>Workers</label><input id="d_workers" type="number" value="6" min="1" max="32" style="width:90px"></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="d_start" onclick="startMod('daily')">▶ เริ่ม Daily</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="d_stop" onclick="api('stop')">■ หยุด</button></div>
+            <div class="field"><label title="เพดาน thread พร้อมกัน — governor ปรับความเร็วจริงให้เองในกรอบนี้ (เจอ throttle ลดเอง) · สูงเกินจุดพอดีจาก IP เดียวจะกลับช้าลง เพราะ retry · ต้อง proxy ถึงดันทะลุ" style="cursor:help">Workers (เพดาน) &#9432;</label><input id="d_workers" type="number" value="64" min="1" max="500" style="width:90px"></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="d_start" onclick="startMod('daily')"><svg class="ic sol"><use href="#ic-play"/></svg>เริ่ม Daily</button></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="d_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('d_log',this)">คัดลอก log</button></div>
           </div>
           <label class="chk"><input id="d_show" type="checkbox"> ใส่ชื่อนักเตะในชื่อไฟล์ (ถ้ามี)</label>
+          <div class="row" style="justify-content:space-between;align-items:baseline"><span class="hint">Daily Login สำเร็จ</span><b id="d_prog" style="font-family:var(--disp);font-size:17px;color:var(--g)">0 / 0</b></div>
           <div class="pbar"><i id="d_bar"></i></div>
           <div class="biglog" id="d_log"></div>
         </div>
@@ -283,9 +393,10 @@
           <div class="row">
             <div class="field" style="flex:1"><label>โฟลเดอร์บัญชีต้นทาง</label>
               <div class="row"><input id="g_out" placeholder="เลือกโฟลเดอร์บัญชี" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('g_out')">เลือก…</button></div></div>
+            <div class="field"><label title="เพดาน thread พร้อมกัน — governor ปรับความเร็วจริงให้เองในกรอบนี้ (เจอ throttle ลดเอง) · สูงเกินจุดพอดีจาก IP เดียวจะกลับช้าลง เพราะ retry · ต้อง proxy ถึงดันทะลุ" style="cursor:help">Workers (เพดาน) &#9432;</label><input id="g_workers" type="number" value="32" min="1" max="500" style="width:90px"></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-outline btn-sm" id="g_scan" onclick="scanPacks()">สแกนแพ็ค / เลือกนักเตะ</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="g_start" disabled title="สแกนแพ็คก่อน" onclick="startMod('gacha')">▶ เปิดกาชา + กรอง</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="g_stop" onclick="api('stop')">■ หยุด</button></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="g_start" disabled title="สแกนแพ็คก่อน" onclick="startMod('gacha')"><svg class="ic sol"><use href="#ic-play"/></svg>เปิดกาชา + กรอง</button></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="g_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('g_log',this)">คัดลอก log</button></div>
           </div>
           <div id="g_pick"></div>
@@ -304,7 +415,7 @@
           <div id="m_list" class="biglog" style="flex:none;min-height:70px;max-height:120px"></div>
           <input id="m_out" type="hidden">
           <div class="row"><select id="m_fmt" style="width:90px"><option value="txt">.txt</option><option value="dat">.dat</option></select>
-            <button class="btn btn-primary" id="m_start" onclick="startMerge()">▶ เริ่มรวมไฟล์</button>
+            <button class="btn btn-primary" id="m_start" onclick="startMerge()"><svg class="ic sol"><use href="#ic-play"/></svg>เริ่มรวมไฟล์</button>
             <button class="btn btn-ghost btn-sm" onclick="cp('m_log',this)">คัดลอก log</button></div>
           <div class="biglog" id="m_log"></div>
         </div>
@@ -317,8 +428,8 @@
             <div class="field" style="flex:1"><label>โฟลเดอร์บัญชี</label>
               <div class="row"><input id="c_out" placeholder="เลือกโฟลเดอร์บัญชี" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('c_out')">เลือก…</button></div></div>
             <div class="field"><label>Workers</label><input id="c_workers" type="number" value="5" min="1" max="32" style="width:90px"></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="c_start" onclick="startCheck()">▶ เช็คทั้งหมด</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="c_stop" onclick="api('stop')">■ หยุด</button></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="c_start" onclick="startCheck()"><svg class="ic sol"><use href="#ic-play"/></svg>เช็คทั้งหมด</button></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="c_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('c_body',this)">คัดลอก</button></div>
           </div>
           <div class="pbar"><i id="c_bar"></i></div>
@@ -332,20 +443,60 @@
 <script>
 const $=id=>document.getElementById(id);
 let READY=false, RUNNING=false, PACKS=[], MERGE=[], LOGMAX=100, gScanned=false;
-const PG={reroll:['🎲','Reroll','spray สร้างไอดี + เข้า MyClub'],
-  daily:['📅','Daily Login','login + รับ daily ทุกบัญชี'],
-  gacha:['🎰','กาชา','สแกน pack ฟรี + เปิด + กรองนักเตะ'],
-  merge:['🗂','รวมไฟล์','รวมไฟล์ user_code เดียวกันข้ามโฟลเดอร์'],
-  check:['🔎','เช็คไอดี','รายงาน currency ของแต่ละไอดี']};
+
+// ---- theme (dark default, persisted) ----
+function applyTheme(t){document.documentElement.dataset.theme=t;
+  const b=$('themebtn');if(b)b.innerHTML=svgIc(t==='dark'?'ic-moon':'ic-sun')+' ธีม';
+  try{localStorage.setItem('theme',t);}catch(e){}}
+function toggleTheme(){applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');}
+(function(){let t='dark';try{t=localStorage.getItem('theme')||'dark';}catch(e){}applyTheme(t);})();
+
+// ---- frameless window resize via edge/corner grips ----
+(function(){
+  const MINW=940,MINH=660;let drag=null,pending=null,raf=0;
+  function flush(){raf=0;if(!pending||!drag)return;const{x,y,w,h,move}=pending;
+    if(move)api('win_move',x,y);api('win_resize',w,h);}
+  function onMove(e){if(!drag)return;
+    const dx=e.screenX-drag.mx,dy=e.screenY-drag.my,d=drag.dir;
+    let x=drag.x,y=drag.y,w=drag.w,h=drag.h,move=false;
+    if(d.indexOf('e')>=0)w=drag.w+dx;
+    if(d.indexOf('s')>=0)h=drag.h+dy;
+    if(d.indexOf('w')>=0){w=drag.w-dx;x=drag.x+dx;move=true;}
+    if(d.indexOf('n')>=0){h=drag.h-dy;y=drag.y+dy;move=true;}
+    if(w<MINW){if(d.indexOf('w')>=0)x=drag.x+(drag.w-MINW);w=MINW;}
+    if(h<MINH){if(d.indexOf('n')>=0)y=drag.y+(drag.h-MINH);h=MINH;}
+    pending={x:Math.round(x),y:Math.round(y),w:Math.round(w),h:Math.round(h),move};
+    if(!raf)raf=requestAnimationFrame(flush);}
+  function onUp(){drag=null;}
+  function start(e,dir){drag={dir,mx:e.screenX,my:e.screenY,
+    x:window.screenX,y:window.screenY,w:window.outerWidth,h:window.outerHeight};
+    e.preventDefault();}
+  document.querySelectorAll('.rsz').forEach(g=>g.addEventListener('mousedown',e=>start(e,g.dataset.dir)));
+  window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
+})();
+const PG={reroll:['ic-reroll','Reroll','spray สร้างไอดี + เข้า MyClub'],
+  daily:['ic-daily','Daily Login','login + รับ daily ทุกบัญชี'],
+  gacha:['ic-gacha','กาชา','สแกน pack ฟรี + เปิด + กรองนักเตะ'],
+  merge:['ic-merge','รวมไฟล์','รวมไฟล์ user_code เดียวกันข้ามโฟลเดอร์'],
+  check:['ic-check','เช็คไอดี','รายงาน currency ของแต่ละไอดี']};
+function svgIc(id,extra){return '<svg class="ic'+(extra||'')+'"><use href="#'+id+'"/></svg>';}
+function fmtDur(sec){sec=Math.max(0,Math.floor(+sec||0));
+  const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60;
+  const z=n=>String(n).padStart(2,'0');
+  if(d)return d+'วัน '+z(h)+':'+z(m)+':'+z(s);
+  if(h)return h+':'+z(m)+':'+z(s);
+  return m+':'+z(s);}
 
 function tab(name,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
   $('p-'+name).classList.add('on');
   document.querySelectorAll('.navitem').forEach(b=>b.classList.remove('on'));
   (btn||document.querySelector(`.navitem[data-tab="${name}"]`)).classList.add('on');
-  const [ic,h,s]=PG[name];$('pgic').textContent=ic;$('pgh').textContent=h;$('pgsub').textContent=s;}
+  const [ic,h,s]=PG[name];$('pgic').innerHTML=svgIc(ic);$('pgh').textContent=h;$('pgsub').textContent=s;}
 
 function logln(box,lvl,t){const d=document.createElement('span');d.className='ll '+(lvl||'info');d.textContent=t;
-  box.appendChild(d);while(box.childNodes.length>LOGMAX)box.removeChild(box.firstChild);box.scrollTop=box.scrollHeight;}
+  box.appendChild(d);while(box.childNodes.length>LOGMAX)box.removeChild(box.firstChild);
+  // during a batch, defer the scroll (one reflow per batch, not per line)
+  if(window._BATCHING){window._scrollBoxes.add(box);}else{box.scrollTop=box.scrollHeight;}}
 
 // copy log text to clipboard (file:// safe — textarea + execCommand, no clipboard API)
 function cpText(t,btn){t=t||'';const ta=document.createElement('textarea');ta.value=t;
@@ -357,17 +508,24 @@ function cpGrid(btn){cpText([...document.querySelectorAll('#grid .logarea')].map
 
 // ---- pywebview bridge ----
 function api(fn,...args){return (window.pywebview&&window.pywebview.api[fn])?window.pywebview.api[fn](...args):Promise.resolve({error:'no bridge'});}
-window.addEventListener('pywebviewready',()=>{READY=true;refreshEnt();setVer();checkUpd(false);});
+// FORCED update: on launch, block the whole app if a newer release exists.
+window.addEventListener('pywebviewready',()=>{READY=true;setVer();
+  api('check_update').then(r=>{window._updurl=(r&&r.url)||window._updurl;
+    if(r&&r.newer){forceUpdate(r.url,r.latest);return;}   // stale build -> hard block
+    refreshEnt();});});
 
 let APPVER='';
 function setVer(){api('app_version').then(r=>{if(r&&r.version){APPVER=r.version;$('verpill').textContent='v'+r.version+' · ตรวจอัปเดต';}});}
+function forceUpdate(url,latest){window._updurl=url||window._updurl;
+  $('fbver').textContent=(latest?('ล่าสุด: '+latest+'  ·  '):'')+'คุณใช้ v'+APPVER;
+  $('gate').style.display='none';$('app').style.visibility='hidden';
+  if($('updbar'))$('updbar').style.display='none';
+  $('pkmodal').style.display='none';$('lb').style.display='none';$('scanov').style.display='none';
+  $('forcebox').style.display='flex';}
 function checkUpd(manual){if(manual)$('verpill').textContent='กำลังตรวจ…';
-  api('check_update').then(r=>{setVer();
-    if(r&&r.newer){window._updurl=r.url;$('updtxt').textContent='มีเวอร์ชันใหม่ '+r.latest+' — คุณใช้ v'+(r.current||APPVER);
-      $('updbar').style.display='flex';}
-    else if(manual){$('updtxt').textContent='ใช้เวอร์ชันล่าสุดแล้ว (v'+APPVER+')';
-      const b=$('updbar').querySelector('.btn-primary');b.style.display='none';$('updbar').style.display='flex';
-      setTimeout(()=>{$('updbar').style.display='none';b.style.display='';},2500);}
+  api('check_update').then(r=>{setVer();window._updurl=(r&&r.url)||window._updurl;
+    if(r&&r.newer){forceUpdate(r.url,r.latest);return;}   // forced even on manual check
+    if(manual){$('verpill').textContent='v'+APPVER+' · ล่าสุดแล้ว';setTimeout(setVer,2500);}
   });}
 
 let authGen=0;
@@ -377,7 +535,7 @@ function doLogin(){authGen++;const g=authGen;    // button stays clickable: re-c
   api('login').then(r=>{if(g!==authGen)return;   // ignore stale attempt
     if(r.ok){$('gbtn').textContent='เข้าสู่ระบบด้วย Discord';
       $('gst').innerHTML='<span style="color:var(--g)">เข้าสู่ระบบ: '+r.username+'</span>';
-      $('userpill').textContent='👤 '+r.username;refreshEnt();}
+      $('userpill').innerHTML=svgIc('ic-user')+' '+r.username;refreshEnt();}
     else{$('gbtn').textContent='เข้าสู่ระบบด้วย Discord';
       $('gst').innerHTML='<span style="color:var(--r)">'+(r.error||'ไม่สำเร็จ')+' — กดลองใหม่ได้</span>';}
   });}
@@ -386,7 +544,9 @@ function refreshEnt(){api('entitlement').then(r=>{
   if(r&&r.has_access){const mods=(r.modules||[]).join(',')||'ครบ';const exp=r.expires_at?('หมดอายุ '+String(r.expires_at).slice(0,10)):'ถาวร';
     $('entpill').textContent='✓ สิทธิ์ ('+mods+') · '+exp;$('entpill').className='pill ok';
     $('gate').style.display='none';$('app').style.visibility='visible';}
-  else{const why=r&&r.reason?r.reason:'ยังไม่มีสิทธิ์';$('entpill').textContent='✗ '+why;$('entpill').className='pill bad';
+  else{const why=r&&r.reason?r.reason:'ยังไม่มีสิทธิ์';
+    if(/426|stale|update ?required/i.test(why)){api('check_update').then(u=>forceUpdate(u&&u.url,u&&u.latest));return;}
+    $('entpill').textContent='✗ '+why;$('entpill').className='pill bad';
     if($('userpill').textContent!=='—'){$('gst').innerHTML='<span style="color:var(--r)">'+why+' — ไปเช่าที่เว็บก่อน</span>';}}
 });}
 
@@ -396,22 +556,27 @@ function addMergeDir(){api('pick_folder').then(r=>{if(r&&r.path&&!MERGE.includes
   logln($('m_list'),'info',r.path);}});}
 
 function setLive(on){RUNNING=on;$('livedot').classList.toggle('live',on);$('livetxt').textContent=on?'RUNNING':'idle';
-  ['r_start','d_start','c_start','m_start','g_scan'].forEach(i=>{if($(i))$(i).disabled=on;});
+  ['d_start','c_start','m_start','g_scan'].forEach(i=>{if($(i))$(i).disabled=on;});
+  if($('r_start'))$('r_start').disabled=on||($('r_postgacha').checked&&!(window._wanted&&window._wanted.length));
   if($('g_start'))$('g_start').disabled=on||!gScanned;   // gacha start locked until a scan
   ['r_stop','d_stop','g_stop','c_stop'].forEach(i=>{if($(i))$(i).disabled=!on;});}
 
 // ---- start actions ----
-function startReroll(){LOGMAX=Math.max(20,+$('r_logmax').value||100);
+function startReroll(){
+  if($('r_postgacha').checked && !(window._wanted&&window._wanted.length)){
+    alert('เปิด "สุ่มกาชาต่อ" ไว้ — ต้องสแกน + เลือกนักเตะก่อน (หรือเอาเช็คออก)');return;}
+  LOGMAX=Math.max(20,+$('r_logmax').value||100);
   const p={module:'reroll',count:+$('r_count').value,workers:+$('r_workers').value,
   prefix:$('r_prefix').value.trim()||'j3xdr',claim:$('r_claim').checked,verbose:$('r_verbose').checked,
   delay:+$('r_delay').value||0,show_errors:$('r_showerr').checked,proxies:$('r_proxies').value,
   post_gacha:$('r_postgacha').checked,fmt:$('r_fmt').value,out_dir:$('r_out').value||null};
+  if(p.post_gacha)p.wanted_ids=window._wanted||[];
   buildGrid(p.workers);go(p);}
 function startMod(mod){
   const dir=$(mod[0]+'_out').value||null;
   const p={module:mod,workers:5,verbose:false,fmt:'txt',delay:0.5,out_dir:dir,src_dir:dir};
-  if(mod==='daily'){p.workers=+$('d_workers').value;p.daily_show_players=$('d_show').checked;$('d_log').innerHTML='';}
-  if(mod==='gacha'){p.wanted_ids=window._wanted||[];$('g_log').innerHTML='';}
+  if(mod==='daily'){p.workers=+$('d_workers').value;p.daily_show_players=$('d_show').checked;$('d_log').innerHTML='';$('d_prog').textContent='0 / 0';$('d_bar').style.width='0';}
+  if(mod==='gacha'){p.workers=+$('g_workers').value;p.wanted_ids=window._wanted||[];$('g_log').innerHTML='';}
   go(p);}
 function startCheck(){$('c_body').innerHTML='';$('c_bar').style.width='0';
   go({action:'check',module:'reroll',workers:+$('c_workers').value,delay:0.5,src_dir:$('c_out').value||null,out_dir:$('c_out').value||null});}
@@ -419,15 +584,24 @@ function startMerge(){if(!MERGE.length){logln($('m_log'),'err','เลือก�
   $('m_log').innerHTML='';go({action:'merge',module:'reroll',merge_dirs:MERGE,out_dir:$('m_out').value||MERGE[0],fmt:$('m_fmt').value});}
 function go(p){setLive(true);api('start',JSON.stringify(p)).then(r=>{if(r&&r.error){setLive(false);alert(r.error);}});}
 
-function scanPacks(){$('g_scan').disabled=true;$('g_scan').textContent='กำลังสแกน…';
-  api('scan_packs',$('g_out').value||null).then(r=>{$('g_scan').disabled=false;$('g_scan').textContent='สแกนแพ็ค / เลือกนักเตะ';
-    if(r.error){logln($('g_log'),'err',r.error);return;}renderPacks(r.packs||[]);});}
+function scanPacks(){$('scanov').style.display='flex';$('g_scan').disabled=true;$('g_scan').textContent='กำลังสแกน…';
+  api('scan_packs',$('g_out').value||null).then(r=>{$('scanov').style.display='none';$('g_scan').disabled=false;$('g_scan').textContent='สแกนแพ็ค / เลือกนักเตะ';
+    if(r.error){logln($('g_log'),'err',r.error);alert('สแกนล้มเหลว: '+r.error);return;}renderPacks(r.packs||[]);});}
+function scanReroll(){const src=$('r_out').value;
+  if(!src){alert('เลือก "โฟลเดอร์เก็บผล" ที่มีไอดีอย่างน้อย 1 ตัวก่อน (แพ็คทั้งเซิร์ฟเหมือนกัน ใช้ไอดีไหนสแกนก็ได้)');return;}
+  $('scanov').style.display='flex';
+  api('scan_packs',src).then(r=>{$('scanov').style.display='none';
+    if(r.error){alert('สแกนล้มเหลว: '+r.error);return;}renderPacks(r.packs||[]);});}
+function updateRerollGate(){const need=$('r_postgacha').checked,have=(window._wanted&&window._wanted.length);
+  $('rr_pick').style.display=need?'flex':'none';
+  if($('rr_sel'))$('rr_sel').textContent=have?('เลือก '+window._wanted.length+' คน'):'ยังไม่เลือก';
+  if(!RUNNING)$('r_start').disabled=need&&!have;}
 function renderPacks(packs){PACKS=packs;gScanned=true;if(!RUNNING)$('g_start').disabled=false;
   if(!packs.length){logln($('g_log'),'err','ไม่พบแพ็ค');return;}
   openPk();}
 const EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function pcard(pl){const sel=(window._wanted||[]).includes(pl.id);
-  const img=pl.art?`<div class="pimg" style="background-image:url('${pl.art}')"></div>`:'<div class="pimg">👤</div>';
+  const img=pl.art?`<div class="pimg" style="background-image:url('${pl.art}')"></div>`:('<div class="pimg">'+svgIc('ic-user')+'</div>');
   return `<div class="pkcard${sel?' sel':''}" data-id="${pl.id}" onclick="cardTog(this,event)">`
     +`<input type="checkbox" value="${pl.id}"${sel?' checked':''}>`
     +`<button class="pkeye" title="ดูการ์ด" onclick="lb(${pl.id})">${EYE}</button>`
@@ -437,13 +611,13 @@ function cardTog(card,e){if(e&&e.target&&e.target.closest('.pkeye'))return;
   const cb=card.querySelector('input');cb.checked=!cb.checked;card.classList.toggle('sel',cb.checked);syncPkCount();}
 function findPl(id){for(const pk of PACKS){for(const p of (pk.players||[]))if(p.id===id)return p;}return null;}
 function lb(id){event&&event.stopPropagation();const pl=findPl(id);if(!pl)return;
-  $('lbimg').style.backgroundImage=pl.art?`url('${pl.art}')`:'';$('lbimg').textContent=pl.art?'':'👤';
+  $('lbimg').style.backgroundImage=pl.art?`url('${pl.art}')`:'';$('lbimg').innerHTML=pl.art?'':svgIc('ic-user',' ');
   $('lbcap').textContent=(pl.name||('#'+pl.id))+'  ·  '+(pl.overall||'?')+'  '+(pl.position||'');
   $('lb').style.display='flex';}
 function lbClose(){$('lb').style.display='none';}
-function setPkCols(){const v=($('pkcols')||{value:'auto'}).value;
-  document.documentElement.style.setProperty('--pcc',
-    v==='auto'?'repeat(auto-fill,minmax(150px,1fr))':('repeat('+v+',1fr)'));
+function setPkCols(){const v=($('pkcols')||{value:'auto'}).value;   // packs per row
+  document.documentElement.style.setProperty('--ppr',
+    v==='auto'?'repeat(auto-fill,minmax(380px,1fr))':('repeat('+v+',1fr)'));
   try{localStorage.setItem('pkcols',v);}catch(e){}}
 function openPk(){try{const sv=localStorage.getItem('pkcols');if(sv&&$('pkcols'))$('pkcols').value=sv;}catch(e){}setPkCols();
   const body=$('pkbody');body.innerHTML='';
@@ -451,7 +625,7 @@ function openPk(){try{const sv=localStorage.getItem('pkcols');if(sv&&$('pkcols')
     if(!feat.length){feat=players;more=[];}   // nothing flagged -> show all, no toggle
     const d=document.createElement('div');d.className='pkpk';
     let badge=pk.free?'  [ฟรี]':('  ['+(pk.reason||'ซื้อไม่ได้')+']');
-    if(!pk.free){if(pk.coin)badge+='  🪙 '+pk.coin.toLocaleString()+' coin';else if(pk.gp)badge+='  GP '+pk.gp.toLocaleString();}
+    if(!pk.free){if(pk.coin)badge+='  '+svgIc('ic-coin',' ')+' '+pk.coin.toLocaleString()+' coin';else if(pk.gp)badge+='  GP '+pk.gp.toLocaleString();}
     let h=`<div class="pkpk-h${pk.free?'':' nf'}">${pk.title||pk.agent_id}${badge} — แนะนำ ${feat.length} คน</div>`;
     h+=`<div class="pkcards">${feat.map(pcard).join('')}</div>`;
     if(more.length)h+=`<button class="pktoggle" onclick="tgMore(this,${more.length})">แสดงทั้งหมด (+${more.length})</button>`
@@ -462,12 +636,12 @@ function tgMore(btn,n){const g=btn.nextElementSibling;const show=g.style.display
   g.style.display=show?'grid':'none';btn.textContent=show?'ซ่อน':('แสดงทั้งหมด (+'+n+')');}
 function syncPkCount(){$('pkcount').textContent='เลือก '+document.querySelectorAll('#pkbody input:checked').length+' คน';}
 function closePk(){window._wanted=[...document.querySelectorAll('#pkbody input:checked')].map(c=>+c.value);
-  $('pkmodal').style.display='none';logln($('g_log'),'info','เลือกนักเตะ '+window._wanted.length+' คน');}
+  $('pkmodal').style.display='none';logln($('g_log'),'info','เลือกนักเตะ '+window._wanted.length+' คน');updateRerollGate();}
 function donePk(){closePk();}
 
-function srv(){$('srvpill').textContent='🛰 กำลังเช็ค…';api('server_status').then(r=>{
+function srv(){$('srvpill').innerHTML=svgIc('ic-server')+' กำลังเช็ค…';api('server_status').then(r=>{
   const m={ok:['var(--g)','ปกติ'],issue:['var(--y)','บาง cmd error'],down:['var(--r)','ติดต่อไม่ได้'],unknown:['var(--txt2)','ไม่ทราบ']};
-  const [c,t]=m[(r&&r.status)||'unknown']||m.unknown;$('srvpill').innerHTML=`🛰 <span style="color:${c}">${t}</span>`;});}
+  const [c,t]=m[(r&&r.status)||'unknown']||m.unknown;$('srvpill').innerHTML=svgIc('ic-server')+` <span style="color:${c}">${t}</span>`;});}
 
 // ---- worker grid ----
 function buildGrid(n){const g=$('grid');g.innerHTML='';for(let i=0;i<n;i++){const p=document.createElement('div');p.className='pane';
@@ -486,7 +660,7 @@ window._ev=function(m){try{
       +'<a href="#" onclick="cpText(window._authurl,this);return false">คัดลอกลิงก์</a> (วางในเบราว์เซอร์ที่ต้องการ)';}
   else if(m.type==='applog'){const map={'p-daily':'d_log','p-gacha':'g_log','p-merge':'m_log'};
     const b=map[document.querySelector('.panel.on').id];if(b)logln($(b),m.lvl||'info',m.t);}
-  else if(m.type==='stats'){$('s_ok').textContent=m.ok;$('s_fail').textContent=m.fail;$('s_time').textContent=m.elapsed+'s';
+  else if(m.type==='stats'){$('s_ok').textContent=m.ok;$('s_fail').textContent=m.fail;$('s_time').textContent=fmtDur(m.elapsed);
     $('rate').textContent=`${m.rate}/วิ · ${(m.perday||0).toLocaleString()}/วัน`;}
   else if(m.type==='started'){$('s_w').textContent=m.workers;setLive(true);}
   else if(m.type==='stopped'){setLive(false);}
@@ -496,17 +670,25 @@ window._ev=function(m){try{
     alert('รันไม่ได้: '+m.t+(m.raw?('\n\n['+m.raw+']'):''));}
   else if(m.type==='progress'){/* summary bar handled by stats */}
   else if(m.type==='done'){setLive(false);const s=m.summary||{};
-    const map={reroll:null,daily:'d_bar',gacha:'g_bar'};const bar=map[m.module];if(bar)$(bar).style.width='100%';}
+    const map={reroll:null,daily:'d_bar',gacha:'g_bar'};const bar=map[m.module];if(bar)$(bar).style.width='100%';
+    if(m.module==='daily'&&s.total!=null)$('d_prog').textContent=(s.ok||0)+' / '+s.total;}
   else if(m.type==='cstart'){$('c_body').innerHTML='';$('c_bar').style.width='0';}
   else if(m.type==='crow'){const r=m.rep;const tr=document.createElement('tr');
-    if(r.error)tr.innerHTML=`<td style="color:#fff">${r.user_code}</td><td colspan="5" style="color:var(--r)">${r.error}</td>`;
-    else tr.innerHTML=`<td style="color:#fff">${r.user_code}</td><td style="color:var(--b)">${(r.gp||0).toLocaleString()}</td><td style="color:var(--y)">${r.coins}</td><td style="color:var(--p)">${r.efp}</td><td>${r.mailbox}</td><td>${r.players}</td>`;
+    if(r.error)tr.innerHTML=`<td style="color:var(--txt)">${r.user_code}</td><td colspan="5" style="color:var(--r)">${r.error}</td>`;
+    else tr.innerHTML=`<td style="color:var(--txt)">${r.user_code}</td><td style="color:var(--txt)">${(r.gp||0).toLocaleString()}</td><td style="color:var(--txt)">${r.coins}</td><td style="color:var(--txt)">${r.efp}</td><td>${r.mailbox}</td><td>${r.players}</td>`;
     $('c_body').appendChild(tr);$('c_bar').style.width=Math.round(m.done/m.total*100)+'%';}
   else if(m.type==='cdone'){$('c_bar').style.width='100%';setLive(false);}
   // generic progress bars for daily/gacha from progress events
   if(m.type==='progress'){const tot=m.total||1,pct=Math.round((m.ok+m.fail)/tot*100);
-    const act=document.querySelector('.panel.on').id;const b={'p-daily':'d_bar','p-gacha':'g_bar'}[act];if(b)$(b).style.width=pct+'%';}
+    const act=document.querySelector('.panel.on').id;const b={'p-daily':'d_bar','p-gacha':'g_bar'}[act];if(b)$(b).style.width=pct+'%';
+    if($('d_prog')&&m.total!=null)$('d_prog').textContent=(m.ok||0)+' / '+m.total;}
 }catch(e){console.error(e);}};
+
+// batched sink: Python sends an array of events per tick → apply all, scroll once.
+window._BATCHING=false;window._scrollBoxes=new Set();
+window._evb=function(arr){window._BATCHING=true;
+  try{for(let i=0;i<arr.length;i++){try{window._ev(arr[i]);}catch(e){console.error(e);}}}
+  finally{window._BATCHING=false;window._scrollBoxes.forEach(function(b){b.scrollTop=b.scrollHeight;});window._scrollBoxes.clear();}};
 
 </script>
 </body>

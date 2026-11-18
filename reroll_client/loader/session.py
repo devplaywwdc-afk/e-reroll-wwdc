@@ -9,6 +9,7 @@ Implements exactly the server contract:
 """
 from __future__ import annotations
 
+import base64
 import threading
 import time
 
@@ -110,6 +111,7 @@ def open_session(build_id: str, module_id: str, brain_enc: bytes,
     body = {
         "hwid": hwid(), "build_id": build_id, "module_id": module_id,
         "client_eph_pub": eph_pub_hex, "m": m.hex(),
+        "proto": 2,   # per-session key: k_brain never reaches this process (gap-1)
     }
     if key:
         body["key"] = key
@@ -136,13 +138,21 @@ def open_session(build_id: str, module_id: str, brain_enc: bytes,
     shared = crypto_core.ecdh_shared(eph, r["server_x25519_pub"])
     k_wrap = crypto_core.derive_kwrap(shared, hwid(), m)
     try:
-        k_brain = crypto_core.unwrap_k_brain(k_wrap, r["wrapped"])
+        # proto 2: this is the per-session sk, not the build k_brain (which the
+        # server keeps). proto 1: the build k_brain (legacy). Same unwrap either way.
+        sess_key = crypto_core.unwrap_k_brain(k_wrap, r["wrapped"])
     except Exception as e:
         # tamper / wrong-M / wrong build: no branch to patch, this is the gate.
         raise SessionError("brain key unwrap failed (tamper or wrong build)") from e
     try:
-        brain = brain_mod.decrypt_brain(k_brain, brain_enc)
+        bs = r.get("brain_sess")
+        if bs:
+            # proto 2: brain delivered re-encrypted under sk; ignore the bundle.
+            brain = brain_mod.decrypt_brain(sess_key, base64.b64decode(bs))
+        else:
+            # proto 1: decrypt the statically-bundled brain.enc with the build k_brain.
+            brain = brain_mod.decrypt_brain(sess_key, brain_enc)
     except Exception as e:
         raise SessionError("brain decrypt failed") from e
 
-    return SessionCtx(cl, r, grant, k_brain, brain, m)
+    return SessionCtx(cl, r, grant, sess_key, brain, m)

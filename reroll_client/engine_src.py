@@ -23,6 +23,7 @@ import sys
 import time
 import zlib
 
+import msgpack
 import requests
 from Crypto.Cipher import AES
 
@@ -99,8 +100,8 @@ def _pkcs7_unpad(data: bytes) -> bytes:
 
 
 def encrypt_body(payload: dict, iv: bytes | None = None) -> bytes:
-    raw = __import__("msgpack").packb(payload, use_bin_type=False)
-    comp = zlib.compress(raw)
+    raw = msgpack.packb(payload, use_bin_type=False)
+    comp = zlib.compress(raw, 1)   # level 1: the gate ignores ratio, speed > size
     iv = iv or os.urandom(16)
     ct = AES.new(_aes_key(), AES.MODE_CBC, iv).encrypt(_pkcs7_pad(comp))
     return iv + ct
@@ -116,7 +117,7 @@ def decrypt_body(body: bytes) -> dict:
     iv, ct = body[:16], body[16:]
     comp = _pkcs7_unpad(AES.new(_aes_key(), AES.MODE_CBC, iv).decrypt(ct))
     raw = _decompress(comp)
-    return __import__("msgpack").unpackb(raw, raw=False, strict_map_key=False)
+    return msgpack.unpackb(raw, raw=False, strict_map_key=False)
 
 
 def make_sign(body: bytes, v5: int | None = None, v10: int | None = None) -> str:
@@ -216,7 +217,7 @@ class Governor:
     """AIMD rate pacing shared by all reroll workers: additive-ish speed-up,
     multiplicative back-off. Keeps ONE source IP at its safe max — the server
     soft-throttles CREATE_USER per IP (ERR_TEMP_UNAVAILABLE)."""
-    def __init__(self, start=0.3, lo=0.0, hi=15.0):
+    def __init__(self, start=0.3, lo=0.0, hi=6.0):
         import threading as _t
         self.delay = max(float(lo), float(start))
         self.lo, self.hi = float(lo), float(hi)
@@ -227,16 +228,22 @@ class Governor:
     def on_success(self):
         with self.lock:
             self.ok += 1
-            self.delay = max(self.lo, self.delay * 0.90)
+            self.delay = max(self.lo, self.delay * 0.85)   # recover a touch faster
 
     def on_throttle(self):
         with self.lock:
             self.throttled += 1
-            self.delay = min(self.hi, self.delay * 2.0 + 0.3)
+            self.delay = min(self.hi, self.delay * 1.7 + 0.2)
 
     def wait(self):
+        if _stopped():
+            return
         with self.lock:
             d = self.delay
+        if d > 0:
+            # ±50% jitter so 64 workers don't all sleep-then-fire in lockstep
+            # (that lockstep is what made the counter freeze then jump in bursts)
+            d *= (0.5 + random.random())
         _isleep(d)
 
 
@@ -272,15 +279,21 @@ def _commons(cmd, user_id, session_id, hash_val):
     }
 
 
-def create_user(client, name=None, device=None, prefix=None):
+def create_user(client, name=None, device=None, prefix=None, check_name=False):
     name = name or rand_name(prefix)
     dev = device or rand_device()
-    chk = _commons("CMD_CHECK_STRING", 0, "", _B["device_hash"])
-    chk["device"] = {"device_identifier": dev["device_identifier"]}
-    chk["str_list"] = [name]
-    r = client.send("CMD_CHECK_STRING", chk)
-    if r.get("result") != "NOERR":
-        raise GateError(f"CHECK_STRING failed: {r}")
+    # CMD_CHECK_STRING (name validation) is NOT required to create a usable account —
+    # verified: accounts created without it still log in and claim daily/mailbox. Off by
+    # default → 1 gate request/account instead of 2 (random names rarely collide; a bad
+    # name just fails CREATE_USER and the worker retries). The per-IP throttle counts
+    # CREATE_USER only, so skipping CHECK_STRING saves bandwidth, not the account ceiling.
+    if check_name:
+        chk = _commons("CMD_CHECK_STRING", 0, "", _B["device_hash"])
+        chk["device"] = {"device_identifier": dev["device_identifier"]}
+        chk["str_list"] = [name]
+        r = client.send("CMD_CHECK_STRING", chk)
+        if r.get("result") != "NOERR":
+            raise GateError(f"CHECK_STRING failed: {r}")
     p = _commons("CMD_CREATE_USER", 0, "", _B["device_hash"])
     p["device"] = {"device_identifier": dev["device_identifier"]}
     p.update({
@@ -736,32 +749,76 @@ def _filename(scheme, rec, params):
     return base + _ext(params)
 
 
-def write_record(folder, rec, scheme, params, replace_old_uc=True):
+def build_uc_index(folder):
+    """One-time {user_code: filepath} scan. Lets per-account dedup be O(1) instead of
+    an os.listdir + json.load of the WHOLE folder on every single write — that scan
+    was O(folder) per account, i.e. quadratic over a run, so the counter visibly
+    stalled longer the more files piled up."""
+    idx = {}
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return idx
+    for fn in names:
+        if not fn.lower().endswith((".txt", ".dat")):
+            continue
+        fp = os.path.join(folder, fn)
+        try:
+            uc = json.load(open(fp, encoding="utf-8")).get("user_code")
+        except Exception:
+            continue
+        if uc:
+            idx[uc] = fp
+    return idx
+
+
+def write_record(folder, rec, scheme, params, replace_old_uc=True,
+                 uc_index=None, idx_lock=None):
     """Write an account record; delete any previous file for the same user_code so
-    one account never leaves stale copies behind when it gets re-named."""
+    one account never leaves stale copies behind when it gets re-named.
+
+    Hot loops pass a prebuilt uc_index (+ its lock): dedup is then a dict lookup and
+    at most one os.remove — no folder scan. The write itself needs no lock (each
+    account owns a unique path), so callers do it OUTSIDE their counter lock."""
     os.makedirs(folder, exist_ok=True)
     rec = {k: v for k, v in rec.items() if k != "_file"}
     rec.setdefault("version", "2.1.0")
     path = os.path.join(folder, _filename(scheme, rec, params))
-    if replace_old_uc:
-        uc = rec.get("user_code")
-        for fn in os.listdir(folder):
-            if not fn.lower().endswith((".txt", ".dat")):
-                continue
-            fp = os.path.join(folder, fn)
-            if os.path.abspath(fp) == os.path.abspath(path):
-                continue
-            try:
-                old = json.load(open(fp, encoding="utf-8"))
-            except Exception:
-                continue
-            if old.get("user_code") == uc:
-                try:
-                    os.remove(fp)
-                except OSError:
-                    pass
+    uc = rec.get("user_code")
     with open(path, "w", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False))
+    if replace_old_uc and uc is not None:
+        if uc_index is not None:
+            if idx_lock is not None:
+                idx_lock.acquire()
+            try:
+                old = uc_index.get(uc)
+                if old and os.path.abspath(old) != os.path.abspath(path):
+                    try:
+                        os.remove(old)
+                    except OSError:
+                        pass
+                uc_index[uc] = path
+            finally:
+                if idx_lock is not None:
+                    idx_lock.release()
+        else:
+            # legacy O(N) scan — kept for any non-hot caller that passes no index
+            for fn in os.listdir(folder):
+                if not fn.lower().endswith((".txt", ".dat")):
+                    continue
+                fp = os.path.join(folder, fn)
+                if os.path.abspath(fp) == os.path.abspath(path):
+                    continue
+                try:
+                    old = json.load(open(fp, encoding="utf-8"))
+                except Exception:
+                    continue
+                if old.get("user_code") == uc:
+                    try:
+                        os.remove(fp)
+                    except OSError:
+                        pass
     return path
 
 
@@ -783,7 +840,16 @@ def _reroll(params, log):
     workers = max(1, min(500, int((params or {}).get("workers", 1) or 1)))
     unlimited = count <= 0
     prefix = (params or {}).get("prefix") or _B.get("default_prefix", "j3xdr")
-    claim = bool((params or {}).get("claim", True))
+    # claim decoupled: a brand-new account's starter mailbox is NOT ready at
+    # creation time, so the old inline claim_starter spun 7x (~35s/acct) and still
+    # got nothing ~90% of the time. Default off → reroll just create+setup+save
+    # (~2s/acct); the daily pass claims later when the mailbox is actually filled.
+    claim = bool((params or {}).get("claim", False))
+    # finish_setup (CMD_GET_USEABLE_TEAM_LIST + CMD_SET_MYCLUB_ENTRY_INFO) = 2 extra
+    # gate requests/account. Default OFF → reroll = CHECK_STRING + CREATE_USER only
+    # (2 req/acct instead of 5 → ~2.5x more accounts/sec on one IP). Turn on only if a
+    # bare account can't later claim daily/gacha without the myClub entry being set.
+    fsetup = bool((params or {}).get("finish_setup", False))
     delay = float((params or {}).get("delay", 0) or 0)      # floor หน่วง (วิ) — governor คุมต่อเอง
     show_errors = bool((params or {}).get("show_errors", True))
     # proxy pool (optional): one IP per worker, round-robin; empty = this machine's IP
@@ -800,6 +866,8 @@ def _reroll(params, log):
     t0 = time.time()
     tgt = "∞" if unlimited else count
     gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: keeps 1 IP at its safe max
+    uc_index = build_uc_index(out)
+    idx_lock = threading.Lock()
 
     def _stats():
         dt = max(0.001, time.time() - t0)
@@ -833,21 +901,25 @@ def _reroll(params, log):
                 devid = resp.get("_device_identifier")
                 coins = gp = 0
                 setup = "skipped"
-                try:
-                    lr = login(c, uid, auth, devid)
-                    sid = lr.get("session_id")
-                    if sid:
-                        setup = finish_setup(c, uid, sid).get("result", "?")
-                        if claim and not _stopped():
-                            cs = claim_starter(uid, auth, devid, uc)
-                            coins, gp = cs.get("coins", 0), cs.get("gp", 0)
-                except Exception as e:
-                    setup = f"err:{e}"
+                # login/finish_setup/claim only when asked — a plain reroll (both off)
+                # stops at create_user, so it's just 2 gate requests per account.
+                if fsetup or claim:
+                    try:
+                        lr = login(c, uid, auth, devid)
+                        sid = lr.get("session_id")
+                        if sid:
+                            if fsetup:
+                                setup = finish_setup(c, uid, sid).get("result", "?")
+                            if claim and not _stopped():
+                                cs = claim_starter(uid, auth, devid, uc)
+                                coins, gp = cs.get("coins", 0), cs.get("gp", 0)
+                    except Exception as e:
+                        setup = f"err:{e}"
                 rec = {"user_code": uc, "user_id": uid, "auth_code": auth,
                        "device_identifier": devid, "coins": coins, "gp": gp,
                        "players": [], "module": "reroll"}
+                write_record(out, rec, "reroll", params, uc_index=uc_index, idx_lock=idx_lock)
                 with lock:
-                    write_record(out, rec, "reroll", params)
                     made.append(uc)
                 gov.on_success()
                 _event({"type": "log", "w": w, "lvl": "ok", "t": f"[{i}] OK {uc} coins={coins}"})
@@ -859,10 +931,21 @@ def _reroll(params, log):
                     _event({"type": "log", "w": w, "lvl": "err", "t": f"[{i}] ERR {e}"})
             gov.wait()
 
+    peak = {"r": 0.0}   # highest windowed accounts/วิ seen = the IP's real ceiling
+
     def monitor():   # one stats/progress pulse ~2x/s (decoupled from per-account → no UI flood)
+        prev_t, prev_ok = time.time(), 0
         while not done["f"]:
             _report(len(made), len(errors), count)
             _stats()
+            now = time.time()
+            ok = len(made)
+            dt = now - prev_t
+            if dt >= 1.0:   # windowed rate over the last ~1s, not the cumulative average
+                wr = (ok - prev_ok) / dt
+                if wr > peak["r"]:
+                    peak["r"] = wr
+                prev_t, prev_ok = now, ok
             time.sleep(0.4)
 
     _report(0, 0, count)
@@ -879,7 +962,13 @@ def _reroll(params, log):
         t.join()
     done["f"] = True
     stopped = _stopped()
+    dt_total = max(0.001, time.time() - t0)
+    n_made = len(made)
+    ip_n = 1 if proxies == [None] else len(proxies)
     log(f"governor: ok={gov.ok} throttled={gov.throttled} final_delay={gov.delay:.2f}s")
+    log(f"ceiling: {n_made} acct / {dt_total:.0f}s = {n_made / dt_total:.2f}/วิ sustained"
+        f" · peak {peak['r']:.2f}/วิ · {ip_n} IP · {workers} worker"
+        f" · {n_made / dt_total / ip_n:.2f}/วิ ต่อ IP")
     lines = [f"สร้างสำเร็จ {len(made)}  ล้มเหลว {len(errors)}"
              + ("" if unlimited else f"  (เป้า {count})")]
     if stopped:
@@ -896,7 +985,7 @@ def _reroll(params, log):
         gp["module"] = "gacha"
         gp["src_dir"] = out
         gp["out_dir"] = out
-        gp["wanted_ids"] = []   # keep every drawn player (no filter)
+        gp["wanted_ids"] = (params or {}).get("wanted_ids") or []  # [] = keep all
         try:
             _gacha(gp, log)
         except Exception as e:  # noqa: BLE001
@@ -961,100 +1050,212 @@ def _gacha(params, log):
     user's filter order + coins + user_code, and store the players in the record."""
     if (params or {}).get("action") == "scan":
         return _gacha_scan(params, log)
+    import threading
     src = _src_dir(params)
     only = int((params or {}).get("agent", 0))
     delay = float((params or {}).get("delay", 0) or 0)
+    workers = max(1, min(500, int((params or {}).get("workers", 32) or 32)))
     wanted_order = [int(x) for x in (params or {}).get("wanted_ids", [])]
     wanted_set = set(wanted_order)
-    recs = _acc_records(src)
-    results, hit_accounts, fails = [], 0, 0
-    log(f"gacha pass: {len(recs)} accounts @ {src}")
-    _report(0, 0, len(recs))
-    for uc, a in recs.items():
-        if _stopped():
-            log("** หยุดโดยผู้ใช้ **"); break
-        try:
-            c = GateClient(user_code=uc)
-            lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
-            sid = lr.get("session_id")
-            if not sid:
-                log(f"{uc}: login failed"); fails += 1
-                _report(hit_accounts, fails, len(recs)); continue
-            drawn = draw_all_free(c, int(a["user_id"]), sid, only_agent=only)
-            info = efb_many([p["id"] for p in drawn if p.get("id")])
-            by_id = {}
-            for p in drawn:
-                e = info.get(str(p.get("id")), {})
-                by_id[p["id"]] = {"id": p["id"], "name": e.get("name") or str(p.get("id")),
-                                  "overall": e.get("overall"), "rarity": p.get("rarity")}
-            if wanted_set:
-                # keep only wanted, in the exact order the user ticked them
-                ordered = [by_id[i] for i in wanted_order if i in by_id]
-            else:
-                ordered = sorted(by_id.values(), key=lambda x: x.get("overall") or 0, reverse=True)
-            st = account_status(c, int(a["user_id"]), sid)
-            rec = dict(a); rec.pop("_file", None)
-            rec.update({"coins": st["coins"], "gp": st["gp"],
-                        "players": ordered, "module": "gacha"})
-            write_record(src, rec, "gacha", params)
-            if ordered:
-                hit_accounts += 1
-            log(f"{uc}: drawn={len(drawn)} hits={len(ordered)} coins={st['coins']}")
-            results.append({"user_code": uc, "drawn": len(drawn),
-                            "hits": [p["id"] for p in ordered]})
-        except Exception as e:
-            log(f"{uc}: ERROR {e}"); fails += 1
-        _report(hit_accounts, fails, len(recs))
-        _isleep(delay)
-    _summary(log, "GACHA", [f"บัญชีที่ได้นักเตะเป้าหมาย {hit_accounts}/{len(recs)}  "
-                            f"(พลาด {fails})", f"โฟลเดอร์: {src}"])
+    recs = list(_acc_records(src).items())
+    total = len(recs)
+    gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: self-tunes to the IP
+    cnt = {"hit": 0, "fail": 0}
+    idx = {"i": 0}
+    results = []
+    lock = threading.Lock()
+    log(f"gacha pass: {total} accounts @ {src} · {workers} worker (adaptive)")
+    _report(0, 0, total)
+
+    def _next():
+        with lock:
+            if idx["i"] >= total:
+                return None
+            it = recs[idx["i"]]
+            idx["i"] += 1
+            return it
+
+    uc_index = build_uc_index(src)
+    idx_lock = threading.Lock()
+
+    def worker():
+        c = GateClient()   # reused across accounts (keep-alive); user_code set per account
+        while not _stopped():
+            item = _next()
+            if item is None:
+                return
+            gov.wait()
+            if _stopped():
+                return
+            uc, a = item
+            c.user_code = uc
+            c.http.cookies.clear()   # reused session: drop any server-set cookie per account
+            try:
+                lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
+                sid = lr.get("session_id")
+                if not sid:
+                    res = lr.get("result") if isinstance(lr, dict) else "?"
+                    if res in RETRYABLE or res == "ERR_NETWORK":
+                        gov.on_throttle()
+                    with lock:
+                        cnt["fail"] += 1
+                        log(f"{uc}: login failed ({res})")
+                        _report(cnt["hit"], cnt["fail"], total)
+                    continue
+                if _stopped():
+                    return
+                drawn = draw_all_free(c, int(a["user_id"]), sid, only_agent=only)
+                info = efb_many([p["id"] for p in drawn if p.get("id")])
+                by_id = {}
+                for p in drawn:
+                    e = info.get(str(p.get("id")), {})
+                    by_id[p["id"]] = {"id": p["id"], "name": e.get("name") or str(p.get("id")),
+                                      "overall": e.get("overall"), "rarity": p.get("rarity")}
+                if wanted_set:
+                    # keep only wanted, in the exact order the user ticked them
+                    ordered = [by_id[i] for i in wanted_order if i in by_id]
+                else:
+                    ordered = sorted(by_id.values(), key=lambda x: x.get("overall") or 0, reverse=True)
+                st = account_status(c, int(a["user_id"]), sid)
+                rec = dict(a); rec.pop("_file", None)
+                rec.update({"coins": st["coins"], "gp": st["gp"],
+                            "players": ordered, "module": "gacha"})
+                gov.on_success()
+                write_record(src, rec, "gacha", params, uc_index=uc_index, idx_lock=idx_lock)
+                with lock:
+                    if ordered:
+                        cnt["hit"] += 1
+                    results.append({"user_code": uc, "drawn": len(drawn),
+                                    "hits": [p["id"] for p in ordered]})
+                    log(f"{uc}: drawn={len(drawn)} hits={len(ordered)} coins={st['coins']}")
+                    _report(cnt["hit"], cnt["fail"], total)
+            except Exception as e:
+                gov.on_throttle()
+                with lock:
+                    cnt["fail"] += 1
+                    log(f"{uc}: ERROR {e}")
+                    _report(cnt["hit"], cnt["fail"], total)
+
+    nthreads = min(workers, max(1, total))
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(nthreads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if _stopped():
+        log("** หยุดโดยผู้ใช้ **")
+    log(f"governor: ok={gov.ok} throttled={gov.throttled} final_delay={gov.delay:.2f}s")
+    _summary(log, "GACHA", [f"บัญชีที่ได้นักเตะเป้าหมาย {cnt['hit']}/{total}  "
+                            f"(พลาด {cnt['fail']})", f"โฟลเดอร์: {src}"])
     return {"module": "gacha", "results": results,
-            "summary": {"hit_accounts": hit_accounts, "total": len(recs)}}
+            "summary": {"hit_accounts": cnt["hit"], "total": total}}
 
 
 def _daily(params, log):
+    """Claim daily/starter presents on every saved account, in parallel.
+
+    Threaded like _check, but paced by a shared AIMD Governor instead of a fixed
+    worker count: all `workers` threads share one source IP, so the governor speeds
+    up while Konami answers cleanly and backs off the moment it throttles — it
+    self-finds the IP's safe rate. `workers` is the ceiling, not the target."""
+    import threading
     src = _src_dir(params)
-    recs = _acc_records(src)
+    recs = list(_acc_records(src).items())
+    total = len(recs)
     show_players = bool((params or {}).get("daily_show_players"))
     delay = float((params or {}).get("delay", 0) or 0)
-    log(f"daily pass: {len(recs)} accounts @ {src}")
-    ok = claimed_total = fails = 0
-    _report(0, 0, len(recs))
-    for uc, a in recs.items():
-        if _stopped():
-            log("** หยุดโดยผู้ใช้ **"); break
-        uid, auth = a["user_id"], a["auth_code"]
-        c = GateClient(user_code=uc)
-        try:
-            lr = login(c, uid, auth, a.get("device_identifier"))
-            if "session_id" not in lr:
-                log(f"  {uc}: LOGIN fail {lr.get('result')}"); fails += 1
-                _report(ok, fails, len(recs)); continue
-            sid = lr["session_id"]
-            mb = get_mailbox(c, uid, sid)
-            ids = [p["present_id"] for p in mb.get("present_list", [])] if isinstance(mb, dict) else []
-            claimed = 0
-            if ids:
-                rr = recv_present(c, uid, sid, ids)
-                claimed = len(rr.get("receive_result_list", [])) if rr.get("result") == "NOERR" else 0
-            st = account_status(c, uid, sid)
-            rec = dict(a); rec.pop("_file", None)
-            rec.update({"coins": st["coins"], "gp": st["gp"], "efp": st["efp"],
-                        "module": "daily"})
-            write_record(src, rec, "daily", params)
-            pl = ""
-            if show_players and rec.get("players"):
-                pl = " | นักเตะ: " + ", ".join(p.get("name", "?") for p in rec["players"][:3])
-            log(f"  {uc}: OK coins={st['coins']} claimed={claimed}{pl}")
-            ok += 1; claimed_total += claimed
-        except Exception as e:
-            log(f"  {uc}: ERROR {e}"); fails += 1
-        _report(ok, fails, len(recs))
-        _isleep(delay)
-    _summary(log, "DAILY", [f"ล็อกอินสำเร็จ {ok}/{len(recs)}  พลาด {fails}  "
-                            f"รับของรวม {claimed_total} ชิ้น", f"โฟลเดอร์: {src}"])
-    return {"module": "daily", "ok": ok, "total": len(recs), "claimed": claimed_total,
-            "summary": {"ok": ok, "total": len(recs), "claimed": claimed_total}}
+    workers = max(1, min(500, int((params or {}).get("workers", 64) or 64)))
+    gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: self-tunes to the IP
+    log(f"daily pass: {total} accounts @ {src} · {workers} worker (adaptive)")
+    cnt = {"ok": 0, "claimed": 0, "fail": 0}
+    idx = {"i": 0}
+    lock = threading.Lock()
+    _report(0, 0, total)
+
+    def _next():
+        with lock:
+            if idx["i"] >= total:
+                return None
+            it = recs[idx["i"]]
+            idx["i"] += 1
+            return it
+
+    uc_index = build_uc_index(src)
+    idx_lock = threading.Lock()
+
+    def worker():
+        # persistent worker: pull the next account until the queue drains or stop.
+        # checking _stopped() each loop makes หยุด single-press (no pre-queued backlog).
+        # ONE GateClient per worker, reused across accounts → TCP/TLS keep-alive to the
+        # gate host instead of a fresh handshake per account (set user_code per account).
+        c = GateClient()
+        while not _stopped():
+            item = _next()
+            if item is None:
+                return
+            gov.wait()
+            if _stopped():
+                return
+            uc, a = item
+            uid, auth = a["user_id"], a["auth_code"]
+            c.user_code = uc
+            c.http.cookies.clear()   # reused session: drop any server-set cookie per account
+            try:
+                lr = login(c, uid, auth, a.get("device_identifier"))
+                if not isinstance(lr, dict) or "session_id" not in lr:
+                    res = lr.get("result") if isinstance(lr, dict) else "?"
+                    if res in RETRYABLE or res == "ERR_NETWORK":
+                        gov.on_throttle()      # IP throttle → slow every worker down
+                    with lock:
+                        cnt["fail"] += 1
+                        log(f"  {uc}: LOGIN fail {res}")
+                        _report(cnt["ok"], cnt["fail"], total)
+                    continue
+                sid = lr["session_id"]
+                if _stopped():
+                    return
+                mb = get_mailbox(c, uid, sid)
+                ids = [p["present_id"] for p in mb.get("present_list", [])] if isinstance(mb, dict) else []
+                claimed = 0
+                if ids:
+                    rr = recv_present(c, uid, sid, ids)
+                    claimed = len(rr.get("receive_result_list", [])) if rr.get("result") == "NOERR" else 0
+                # nothing claimed → mailbox unchanged, reuse it (skip one get_mailbox)
+                st = account_status(c, uid, sid, mailbox=(None if ids else mb))
+                rec = dict(a); rec.pop("_file", None)
+                rec.update({"coins": st["coins"], "gp": st["gp"], "efp": st["efp"],
+                            "module": "daily"})
+                gov.on_success()               # clean answer → let the governor speed up
+                pl = ""
+                if show_players and rec.get("players"):
+                    pl = " | นักเตะ: " + ", ".join(p.get("name", "?") for p in rec["players"][:3])
+                # write off the counter lock (unique path per account; dedup via index)
+                write_record(src, rec, "daily", params, uc_index=uc_index, idx_lock=idx_lock)
+                with lock:
+                    cnt["ok"] += 1
+                    cnt["claimed"] += claimed
+                    log(f"  {uc}: OK coins={st['coins']} claimed={claimed}{pl}")
+                    _report(cnt["ok"], cnt["fail"], total)
+            except Exception as e:
+                gov.on_throttle()
+                with lock:
+                    cnt["fail"] += 1
+                    log(f"  {uc}: ERROR {e}")
+                    _report(cnt["ok"], cnt["fail"], total)
+
+    nthreads = min(workers, max(1, total))
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(nthreads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if _stopped():
+        log("** หยุดโดยผู้ใช้ **")
+    log(f"governor: ok={gov.ok} throttled={gov.throttled} final_delay={gov.delay:.2f}s")
+    _summary(log, "DAILY", [f"ล็อกอินสำเร็จ {cnt['ok']}/{total}  พลาด {cnt['fail']}  "
+                            f"รับของรวม {cnt['claimed']} ชิ้น", f"โฟลเดอร์: {src}"])
+    return {"module": "daily", "ok": cnt["ok"], "total": total, "claimed": cnt["claimed"],
+            "summary": {"ok": cnt["ok"], "total": total, "claimed": cnt["claimed"]}}
 
 
 def _merge(params, log):
