@@ -713,8 +713,7 @@ window.addEventListener('pywebviewready',()=>{READY=true;setVer();loadPatch();
 function loadPatch(){api('changelog').then(r=>{
   const rels=(r&&r.releases)||[];window._patches=rels;
   if(!rels.length){$('patchver').textContent='ดูรายละเอียดบนเว็บ';$('patchnotes').textContent='';return;}
-  const cur='v'+((r&&r.current)||APPVER);
-  const top=rels.find(x=>x.version===cur)||rels[0];
+  const top=rels[0];   // headline = newest version in PATCHNOTE (not tied to exe version)
   $('patchver').textContent=(top.version||'')+(top.date?('  ·  '+top.date):'');
   $('patchnotes').textContent=(top.notes||'').trim()||'(ไม่มีรายละเอียด)';
   if(rels.length>1)$('patchmore').style.display='inline-block';

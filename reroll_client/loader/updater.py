@@ -32,8 +32,13 @@ def fetch_patchnotes(timeout: float = 8.0) -> list:
     Never raises (returns [] on any error)."""
     out = []
     try:
-        url = f"https://raw.githubusercontent.com/{config.GITHUB_REPO}/main/PATCHNOTE.md"
-        req = urllib.request.Request(url, headers={"User-Agent": "efootball-reroll-updater"})
+        # GitHub contents API with the raw media type: returns the live file (NOT the
+        # raw.githubusercontent CDN, which caches ~5 min and showed stale versions).
+        url = f"https://api.github.com/repos/{config.GITHUB_REPO}/contents/PATCHNOTE.md"
+        req = urllib.request.Request(url, headers={
+            "Accept": "application/vnd.github.raw+json",
+            "User-Agent": "efootball-reroll-updater",
+        })
         with urllib.request.urlopen(req, timeout=timeout) as r:
             text = r.read().decode("utf-8", "replace")
     except Exception:  # noqa: BLE001
