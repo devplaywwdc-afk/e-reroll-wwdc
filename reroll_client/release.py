@@ -106,6 +106,7 @@ def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = N
         # be in the exe (PyInstaller can't see imports inside the encrypted blob):
         "--hidden-import", "requests",
         "--hidden-import", "msgpack",
+        "--hidden-import", "injectmod",   # lazily imported by webgui (Inject tab)
         "--collect-all", "Crypto",
         # the loader's crypto (X25519/HKDF/AES-GCM) lives in native .pyd (L5) that
         # PyInstaller can't scan, so collect `cryptography` submodules explicitly.
@@ -137,6 +138,13 @@ def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = N
                 "--hidden-import", "bottle",
                 "--hidden-import", "proxy_tools",
                 "--hidden-import", "socks"]   # PySocks: socks5:// proxy support
+        # bundle adb.exe (+ its DLLs) into bin/ so Inject ADB works even when the
+        # user has no platform-tools installed (injectmod prefers the bundled adb).
+        _bin = os.path.join(HERE, "bin")
+        for _f in ("adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"):
+            _p = os.path.join(_bin, _f)
+            if os.path.exists(_p):
+                cmd += ["--add-binary", f"{_p}{sep}bin"]
     if gui or web:
         cmd += ["--windowed"]   # no console window for the customer GUI
     cmd.append(entry)

@@ -58,7 +58,7 @@ function scanSig(sig){
 
 function ascii(bytes){ var u=new Uint8Array(bytes),s=''; for(var i=0;i<u.length;i++){var c=u[i]; s+=(c>=32&&c<127)?String.fromCharCode(c):'.';} return s; }
 function hex(bytes){ var u=new Uint8Array(bytes),s=''; for(var i=0;i<u.length;i++) s+=('0'+u[i].toString(16)).slice(-2); return s; }
-var INTEREST=/CMD_CREATE_USER|CMD_LOGIN|CMD_GET_EULA_AREA_LIST|CMD_GET_COUNTRY_LIST|CMD_SET_USER_EULA_INFO/;
+var INTEREST=/CMD_/;
 
 function hookW(W){ Interceptor.attach(W,{ onEnter:function(a){ try{
     var n=a[2].toInt32(); if(n<=0||n>1048576) return;

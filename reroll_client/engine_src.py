@@ -134,7 +134,28 @@ def make_sign(body: bytes, v5: int | None = None, v10: int | None = None) -> str
 
 # ---------------------------------------------------------------- gate client
 RETRYABLE = {"ERR_TEMP_UNAVAILABLE", "ERR_BUSY", "ERR_MAINTENANCE"}
+# game-server down / maintenance → not a client bug: stop the whole job, don't retry
+MAINTENANCE = {"ERR_SERVERNOTREADY", "ERR_MAINTENANCE"}
 DEFAULT_UA = "PES/1.0 (ANDROID 14; {user_code}; SM-A526B; {ts}; 6.1.1; ; 11.1.1; )"
+_MAINT_HIT = False
+
+
+def _maint_stop(res):
+    """Konami gate is in maintenance / down. Show a plain message once and stop
+    every worker via the shared stop Event (so the job ends immediately)."""
+    global _MAINT_HIT
+    if _MAINT_HIT:
+        return
+    _MAINT_HIT = True
+    if _LOG:
+        _LOG("")
+        _LOG("เซิฟเกมกำลังปิดปรับปรุง — หยุดงานอัตโนมัติ รอเซิฟเปิดแล้วค่อยลองใหม่ "
+             "(ไม่ใช่ปัญหาโปรแกรม/คีย์ · " + str(res) + ")")
+    if _STOP is not None:
+        try:
+            _STOP.set()
+        except Exception:
+            pass
 
 
 class GateError(Exception):
@@ -188,6 +209,9 @@ class GateClient:
                 if _VERBOSE:
                     _emit(f"[net] {cmd} -> ERR_NETWORK ({type(e).__name__})")
             res = last.get("result") if isinstance(last, dict) else None
+            if res in MAINTENANCE:
+                _maint_stop(res)
+                return last
             if res in RETRYABLE or res == "ERR_NETWORK":
                 if on_throttle:
                     on_throttle(attempt)
@@ -340,6 +364,28 @@ def login(client, user_id, auth_code, device_identifier=None):
     return client.send("CMD_LOGIN", t)
 
 
+def get_konami_link(client, user_id, session_id, device_identifier=None, lang="th"):
+    """Fetch the my.konami.net account-link URL for a logged-in account.
+    Returns {url, expires, link_status, result}. URL lives ~20 min."""
+    b = _commons("CMD_GET_IS_KONAMIID_LINK", user_id, session_id, _B["login_hash"])
+    b.update({
+        "steam_id": "NotImplement", "xuid": "NotImplement", "account_id": "NotImplement",
+        "platform": "ANDROID", "region": "REGION_ASIA",
+        "is_needless_url": "NO", "is_need_info_url": "YES",
+    })
+    if device_identifier:
+        b["device"] = {"device_identifier": device_identifier}
+    r = client.send("CMD_GET_IS_KONAMIID_LINK", b)
+    if not isinstance(r, dict):
+        return {"url": "", "expires": 0, "link_status": None, "result": "?"}
+    url = r.get("mykonami_url", "") or ""
+    # in-game webview uses a locale path (/th/...); insert it to match
+    if url and lang and "/account-link/" in url and f"/{lang}/account-link/" not in url:
+        url = url.replace("my.konami.net/account-link/", f"my.konami.net/{lang}/account-link/")
+    return {"url": url, "expires": r.get("url_expiration_date", 0),
+            "link_status": r.get("link_status"), "result": r.get("result")}
+
+
 def get_mailbox(client, user_id, session_id):
     return client.send("CMD_GET_MAILBOX_INFO",
                        _commons("CMD_GET_MAILBOX_INFO", user_id, session_id, _B["login_hash"]))
@@ -353,6 +399,28 @@ def get_mainmenu(client, user_id, session_id):
 def get_login_bonus(client, user_id, session_id):
     return client.send("CMD_GET_LOGIN_BONUS_INFO",
                        _commons("CMD_GET_LOGIN_BONUS_INFO", user_id, session_id, _B["login_hash"]))
+
+
+def play_sugoroku(client, user_id, session_id):
+    """Play today's Daily Game (sugoroku) once: GET board -> SET one SUCCESS roll.
+    1 play/account/day; the reward lands in the MAILBOX, so call this BEFORE the
+    mailbox claim in the same session (RECV_PRESENT then collects it). Over days the
+    32-node board reaches the Epic go-around reward.
+    Verified live payload: {sugoroku_result:'SUCCESS', fail_reason:3, kind:<GET.kind>, stage_id:300}."""
+    g = client.send("CMD_GET_SUGOROKU",
+                    _commons("CMD_GET_SUGOROKU", user_id, session_id, _B["login_hash"]))
+    if not isinstance(g, dict) or g.get("result") != "NOERR":
+        return {"played": False, "reason": g.get("result") if isinstance(g, dict) else "err"}
+    if g.get("is_sugoroku") != "YES":
+        return {"played": False, "reason": "unavailable"}  # already played today / not active
+    b = _commons("CMD_SET_SUGOROKU", user_id, session_id, _B["login_hash"])
+    b.update({"sugoroku_result": "SUCCESS", "fail_reason": 3,
+              "kind": g.get("kind", 1), "stage_id": 300})
+    r = client.send("CMD_SET_SUGOROKU", b)
+    if not isinstance(r, dict) or r.get("result") != "NOERR":
+        return {"played": False, "reason": r.get("result") if isinstance(r, dict) else "err"}
+    return {"played": True, "before": r.get("before_location"),
+            "after": r.get("after_current_location"), "around": r.get("after_go_around_num")}
 
 
 def recv_present(client, user_id, session_id, present_ids):
@@ -529,6 +597,43 @@ _PESDB_LOCK = _thr.Lock()        # pesdb rate-limits hard (429 "Please wait"):
 _PESDB_NEXT = [0.0]              # global min-interval gate (~1 req / 0.7s) + retry
 _PESDB_GAP = 0.7
 
+# persistent name cache: resolved names survive across runs/launches so a re-scan is
+# instant (the slow part was re-fetching every card's name each scan).
+_CACHE_DIR = os.environ.get("TEMP") or os.environ.get("TMP") or "."
+_EFB_CACHE_FILE = os.path.join(_CACHE_DIR, "ewwdc_name_cache.json")
+_EFB_CACHE_LOADED = [False]
+_EFB_CACHE_LOCK = _thr.Lock()
+
+
+def _efimg_art(pid):
+    return f"https://efimg.com/efootballhub22/images/player_cards/{pid}_l.png"
+
+
+def _load_name_cache():
+    with _EFB_CACHE_LOCK:
+        if _EFB_CACHE_LOADED[0]:
+            return
+        _EFB_CACHE_LOADED[0] = True
+        try:
+            with open(_EFB_CACHE_FILE, encoding="utf-8") as f:
+                d = json.load(f)
+            if isinstance(d, dict):
+                for k, v in d.items():
+                    _EFB_CACHE.setdefault(str(k), v)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _save_name_cache():
+    try:
+        with _EFB_CACHE_LOCK:
+            keep = {k: v for k, v in _EFB_CACHE.items()
+                    if isinstance(v, dict) and v.get("name")}
+        with open(_EFB_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(keep, f, ensure_ascii=False)
+    except Exception:  # noqa: BLE001
+        pass
+
 
 def _pesdb_gate():
     with _PESDB_LOCK:
@@ -544,7 +649,9 @@ def efb_lookup(pid, timeout=7):
     key = str(pid)
     if key in _EFB_CACHE:
         return _EFB_CACHE[key]
-    info = {"id": key, "name": None, "overall": None, "position": None, "art": None}
+    # art: deterministic efhub/efimg card image from the id — no scrape needed
+    info = {"id": key, "name": None, "overall": None, "position": None,
+            "art": f"https://efimg.com/efootballhub22/images/player_cards/{key}_l.png"}
     try:
         s = requests.Session()
         s.headers["User-Agent"] = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -573,53 +680,35 @@ def efb_lookup(pid, timeout=7):
                     if mm:
                         info["overall"] = int(mm.group(1))
                         info["position"] = mm.group(2)
-            arts = re.findall(
-                r"cdn\.assets\.efootbase\.com/eFPlayers/players/\d+/v2/art-[0-9a-f]+\.webp", h)
-            if arts:
-                info["art"] = "https://" + arts[0]
+            # (art comes from the deterministic efimg URL set above — no scrape)
     except Exception:
         pass
-    # fallback: pesdb.net covers NEW cards efootbase hasn't indexed yet.
-    # title = "<name> - <rarity> (<card>) | pesdb.net"
+    # NOTE: the old pesdb.net fallback was removed — it was serialized (0.7s gate) +
+    # retried 5x and is currently flaky, which dragged a 128-card scan to ~2 min for
+    # the ~20% of cards efootbase misses. Those cards now just keep their efimg image
+    # (always present) with no name; speed matters far more than a few missing names.
     if not info["name"]:
-        try:
-            s2 = requests.Session()
-            s2.headers["User-Agent"] = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                        "AppleWebKit/537.36 Chrome/120 Safari/537.36")
-            r2 = None
-            for _att in range(5):   # global-paced; retry on 429 "Please wait"
-                _pesdb_gate()
-                r2 = s2.get(f"https://www.pesdb.net/efootball/?id={key}",
-                            timeout=timeout, allow_redirects=True)
-                if r2.status_code != 429:
-                    break
-            if r2 is not None and r2.status_code == 200:
-                m = re.search(r"<title>([^<]+)</title>", r2.text)
-                if m:
-                    t = _html.unescape(m.group(1)).split("| pesdb")[0].strip()
-                    nm = t.split(" - ")[0].strip()
-                    if nm and nm.lower() != "efootball":
-                        info["name"] = nm
-                    mr = re.search(r" - ([A-Za-z][A-Za-z ]*?)\s*\(", t)
-                    if mr:
-                        info["rarity"] = mr.group(1).strip()
-        except Exception:
-            pass
+        info["name"] = None   # unresolved — UI shows the card by image + id
     _EFB_CACHE[key] = info
     return info
 
 
-def efb_many(ids, workers=12):
+def efb_many(ids, workers=16):
     import concurrent.futures as cf
+    _load_name_cache()
     out = {}
     todo = [str(i) for i in ids if str(i) not in _EFB_CACHE]
     for i in ids:
         if str(i) in _EFB_CACHE:
-            out[str(i)] = _EFB_CACHE[str(i)]
+            e = _EFB_CACHE[str(i)]
+            if isinstance(e, dict) and not e.get("art"):
+                e["art"] = _efimg_art(i)   # fill art for entries cached before efimg
+            out[str(i)] = e
     if todo:
         with cf.ThreadPoolExecutor(max_workers=workers) as ex:
             for info in ex.map(efb_lookup, todo):
                 out[info["id"]] = info
+        _save_name_cache()   # persist newly-resolved names
     return out
 
 
@@ -773,16 +862,26 @@ def build_uc_index(folder):
 
 
 def write_record(folder, rec, scheme, params, replace_old_uc=True,
-                 uc_index=None, idx_lock=None):
+                 uc_index=None, idx_lock=None, keep_name=False):
     """Write an account record; delete any previous file for the same user_code so
     one account never leaves stale copies behind when it gets re-named.
+
+    keep_name=True: overwrite the record's ORIGINAL file in place (rec["_file"]) and
+    keep its filename — never rename or delete the user's existing file. (Used by
+    daily/gacha when the user ticks "ไม่เปลี่ยนชื่อไฟล์เดิม".)
 
     Hot loops pass a prebuilt uc_index (+ its lock): dedup is then a dict lookup and
     at most one os.remove — no folder scan. The write itself needs no lock (each
     account owns a unique path), so callers do it OUTSIDE their counter lock."""
     os.makedirs(folder, exist_ok=True)
+    src_file = rec.get("_file")
     rec = {k: v for k, v in rec.items() if k != "_file"}
     rec.setdefault("version", "2.1.0")
+    if keep_name and src_file and os.path.isfile(src_file):
+        # write back to the exact same file — no new name, no dedup/remove
+        with open(src_file, "w", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False))
+        return src_file
     path = os.path.join(folder, _filename(scheme, rec, params))
     uc = rec.get("user_code")
     with open(path, "w", encoding="utf-8") as f:
@@ -1054,6 +1153,7 @@ def _gacha(params, log):
     src = _src_dir(params)
     only = int((params or {}).get("agent", 0))
     delay = float((params or {}).get("delay", 0) or 0)
+    keep_name = bool((params or {}).get("keep_filename", True))   # default: don't rename user's files
     workers = max(1, min(500, int((params or {}).get("workers", 32) or 32)))
     wanted_order = [int(x) for x in (params or {}).get("wanted_ids", [])]
     wanted_set = set(wanted_order)
@@ -1117,11 +1217,11 @@ def _gacha(params, log):
                 else:
                     ordered = sorted(by_id.values(), key=lambda x: x.get("overall") or 0, reverse=True)
                 st = account_status(c, int(a["user_id"]), sid)
-                rec = dict(a); rec.pop("_file", None)
+                rec = dict(a)   # keep _file so keep_name can overwrite in place
                 rec.update({"coins": st["coins"], "gp": st["gp"],
                             "players": ordered, "module": "gacha"})
                 gov.on_success()
-                write_record(src, rec, "gacha", params, uc_index=uc_index, idx_lock=idx_lock)
+                write_record(src, rec, "gacha", params, uc_index=uc_index, idx_lock=idx_lock, keep_name=keep_name)
                 with lock:
                     if ordered:
                         cnt["hit"] += 1
@@ -1163,11 +1263,13 @@ def _daily(params, log):
     recs = list(_acc_records(src).items())
     total = len(recs)
     show_players = bool((params or {}).get("daily_show_players"))
+    keep_name = bool((params or {}).get("keep_filename", True))   # default: don't rename user's files
+    do_sugoroku = bool((params or {}).get("sugoroku", True))       # เกมประจำวัน (default ON)
     delay = float((params or {}).get("delay", 0) or 0)
     workers = max(1, min(500, int((params or {}).get("workers", 64) or 64)))
     gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: self-tunes to the IP
     log(f"daily pass: {total} accounts @ {src} · {workers} worker (adaptive)")
-    cnt = {"ok": 0, "claimed": 0, "fail": 0}
+    cnt = {"ok": 0, "claimed": 0, "fail": 0, "sugoroku": 0}
     idx = {"i": 0}
     lock = threading.Lock()
     _report(0, 0, total)
@@ -1214,6 +1316,21 @@ def _daily(params, log):
                 sid = lr["session_id"]
                 if _stopped():
                     return
+                # trigger today's login bonus FIRST — the gate delivers the daily
+                # reward into the mailbox, so it must be claimed below (recv_present).
+                try:
+                    get_login_bonus(c, uid, sid)
+                except Exception:  # noqa: BLE001
+                    pass
+                # Daily Game (sugoroku) — reward also lands in the mailbox, so play it
+                # BEFORE the claim. Reuses the open session (no re-login). GET gates on
+                # is_sugoroku=YES → no wasted SET / no error when already played today.
+                sug = None
+                if do_sugoroku:
+                    try:
+                        sug = play_sugoroku(c, uid, sid)
+                    except Exception as e:  # noqa: BLE001
+                        sug = {"played": False, "reason": str(e)}
                 mb = get_mailbox(c, uid, sid)
                 ids = [p["present_id"] for p in mb.get("present_list", [])] if isinstance(mb, dict) else []
                 claimed = 0
@@ -1222,7 +1339,7 @@ def _daily(params, log):
                     claimed = len(rr.get("receive_result_list", [])) if rr.get("result") == "NOERR" else 0
                 # nothing claimed → mailbox unchanged, reuse it (skip one get_mailbox)
                 st = account_status(c, uid, sid, mailbox=(None if ids else mb))
-                rec = dict(a); rec.pop("_file", None)
+                rec = dict(a)   # keep _file so keep_name can overwrite in place
                 rec.update({"coins": st["coins"], "gp": st["gp"], "efp": st["efp"],
                             "module": "daily"})
                 gov.on_success()               # clean answer → let the governor speed up
@@ -1230,11 +1347,17 @@ def _daily(params, log):
                 if show_players and rec.get("players"):
                     pl = " | นักเตะ: " + ", ".join(p.get("name", "?") for p in rec["players"][:3])
                 # write off the counter lock (unique path per account; dedup via index)
-                write_record(src, rec, "daily", params, uc_index=uc_index, idx_lock=idx_lock)
+                write_record(src, rec, "daily", params, uc_index=uc_index, idx_lock=idx_lock, keep_name=keep_name)
+                sg_played = bool(sug and sug.get("played"))
                 with lock:
                     cnt["ok"] += 1
                     cnt["claimed"] += claimed
-                    log(f"  {uc}: OK coins={st['coins']} claimed={claimed}{pl}")
+                    if sg_played:
+                        cnt["sugoroku"] += 1
+                    got = (f"เก็บ Daily Login + กล่องจดหมาย {claimed} ชิ้น" if claimed
+                           else "เก็บครบแล้ว (ไม่มีของใหม่ในกล่อง)")
+                    sgtxt = " · เกมประจำวัน✓" if sg_played else ""
+                    log(f"  {uc}: OK · {got}{sgtxt} · coins={st['coins']}{pl}")
                     _report(cnt["ok"], cnt["fail"], total)
             except Exception as e:
                 gov.on_throttle()
@@ -1252,8 +1375,10 @@ def _daily(params, log):
     if _stopped():
         log("** หยุดโดยผู้ใช้ **")
     log(f"governor: ok={gov.ok} throttled={gov.throttled} final_delay={gov.delay:.2f}s")
-    _summary(log, "DAILY", [f"ล็อกอินสำเร็จ {cnt['ok']}/{total}  พลาด {cnt['fail']}  "
-                            f"รับของรวม {cnt['claimed']} ชิ้น", f"โฟลเดอร์: {src}"])
+    _summary(log, "DAILY", [f"ล็อกอินสำเร็จ {cnt['ok']}/{total}  พลาด {cnt['fail']}",
+                            f"รับ Daily Login + กล่องจดหมาย รวม {cnt['claimed']} ชิ้น",
+                            f"เล่นเกมประจำวัน (sugoroku) สำเร็จ {cnt['sugoroku']} บัญชี",
+                            f"โฟลเดอร์: {src}"])
     return {"module": "daily", "ok": cnt["ok"], "total": total, "claimed": cnt["claimed"],
             "summary": {"ok": cnt["ok"], "total": total, "claimed": cnt["claimed"]}}
 
@@ -1298,7 +1423,20 @@ def _check(params, log):
     import concurrent.futures as cf
     import threading
     src = _src_dir(params)
-    recs = _acc_records(src)
+    files = (params or {}).get("files")
+    if files:   # individual .txt/.dat files picked in the UI
+        recs = {}
+        for fp in files:
+            try:
+                r = json.load(open(fp, encoding="utf-8"))
+            except Exception:
+                continue
+            uc = r.get("user_code")
+            if uc:
+                r["_file"] = fp
+                recs[uc] = r
+    else:
+        recs = _acc_records(src)
     total = len(recs)
     workers = max(1, min(32, int((params or {}).get("workers", 5) or 5)))
     _event({"type": "cstart", "total": total})
@@ -1320,8 +1458,19 @@ def _check(params, log):
                 rep["error"] = "login failed"
             else:
                 st = account_status(c, int(a["user_id"]), sid)
+                # OWNED cards straight from the login response (the account's real roster),
+                # not the saved record — id works with efimg art, carries rarity + sell_gp.
+                roster = (lr.get("entry_info") or {}).get("gameplayer_list") or []
+                players = [{"id": p.get("gameplayer_id", {}).get("id"),
+                            "rarity": p.get("default_rarity"),
+                            "sell_gp": p.get("sell_gp")}
+                           for p in roster if p.get("gameplayer_id", {}).get("id")]
                 rep.update({"gp": st["gp"], "coins": st["coins"], "efp": st["efp"],
-                            "mailbox": st["mailbox"], "players": len(a.get("players") or [])})
+                            "mailbox": st["mailbox"],
+                            "players": players, "n_players": len(players),
+                            # creds for inline Gen Link / Inject (stay local in the app)
+                            "user_id": a.get("user_id"), "auth_code": a.get("auth_code"),
+                            "device_identifier": a.get("device_identifier")})
         except Exception as e:
             rep["error"] = f"{type(e).__name__}: {e}"
         with lock:
@@ -1340,13 +1489,164 @@ def _check(params, log):
     return {"module": "check", "results": out, "summary": {"total": total, "checked": len(out)}}
 
 
-_DISPATCH = {"reroll": _reroll, "gacha": _gacha, "daily": _daily}
+def _parse_records_text(txt):
+    """Parse pasted Code: a JSON dict, a JSON list, or one JSON record per line."""
+    txt = (txt or "").strip()
+    if not txt:
+        return []
+    try:
+        j = json.loads(txt)
+        return [x for x in (j if isinstance(j, list) else [j]) if isinstance(x, dict)]
+    except Exception:
+        pass
+    out = []
+    for line in txt.splitlines():
+        line = line.strip().rstrip(",")
+        if not line:
+            continue
+        try:
+            j = json.loads(line)
+            if isinstance(j, dict):
+                out.append(j)
+        except Exception:
+            pass
+    return out
+
+
+def _genlink_records(params, log):
+    """Collect account records from pasted text, explicit files (.txt/.dat), or a
+    folder. Each needs user_id + auth_code (device_identifier/user_code optional)."""
+    recs, seen = [], set()
+
+    def _add(r):
+        if not isinstance(r, dict):
+            return
+        uid, auth = r.get("user_id"), r.get("auth_code")
+        if uid in (None, "") or not auth:
+            return
+        key = str(uid)
+        if key in seen:
+            return
+        seen.add(key)
+        recs.append(r)
+
+    txt = (params or {}).get("text")
+    if txt:
+        for r in _parse_records_text(txt):
+            _add(r)
+    for fp in ((params or {}).get("files") or []):
+        try:
+            _add(json.load(open(fp, encoding="utf-8")))   # .dat is JSON, same as .txt
+        except Exception as e:  # noqa: BLE001
+            log(f"อ่านไฟล์ไม่ได้ {os.path.basename(str(fp))}: {e}")
+    src = (params or {}).get("src_dir")
+    if src and os.path.isdir(src):
+        for _uc, r in _acc_records(src).items():
+            _add(r)
+    return recs
+
+
+def _genlink(params, log):
+    """KONAMI ID account-link URL generator. Unlimited, no cooldown — rides the
+    user's existing session entitlement. Emits one 'glink' event per account."""
+    import threading
+    recs = _genlink_records(params, log)
+    total = len(recs)
+    if not total:
+        log("ไม่พบบัญชี (วาง Code / เลือกไฟล์ .txt/.dat / โฟลเดอร์)")
+        _event({"type": "gldone", "ok": 0, "total": 0})
+        return {"ok": 0, "total": 0, "links": []}
+    lang = (params or {}).get("lang") or "th"
+    delay = float((params or {}).get("delay", 0) or 0)
+    workers = max(1, min(64, int((params or {}).get("workers", 8) or 8)))
+    gov = Governor(start=max(0.3, delay), lo=delay)
+    log(f"genlink: {total} บัญชี · {workers} worker")
+    cnt = {"ok": 0, "fail": 0}
+    links = []
+    idx = {"i": 0}
+    lock = threading.Lock()
+    _report(0, 0, total)
+
+    def _next():
+        with lock:
+            if idx["i"] >= total:
+                return None
+            r = recs[idx["i"]]
+            idx["i"] += 1
+            return r
+
+    def worker():
+        c = GateClient()
+        while not _stopped():
+            a = _next()
+            if a is None:
+                return
+            gov.wait()
+            if _stopped():
+                return
+            uid, auth = a.get("user_id"), a.get("auth_code")
+            devid = a.get("device_identifier")
+            uc = a.get("user_code") or str(uid)
+            c.user_code = str(uc)
+            c.http.cookies.clear()
+            try:
+                lr = login(c, int(uid), auth, devid)
+                sid = lr.get("session_id") if isinstance(lr, dict) else None
+                if not sid:
+                    res = lr.get("result") if isinstance(lr, dict) else "?"
+                    if res in RETRYABLE or res == "ERR_NETWORK":
+                        gov.on_throttle()
+                    with lock:
+                        cnt["fail"] += 1
+                        log(f"  {uc}: login fail {res}")
+                        _report(cnt["ok"], cnt["fail"], total)
+                    _event({"type": "glink", "uc": uc, "ok": False, "err": f"login {res}"})
+                    continue
+                link = get_konami_link(c, int(uid), sid, devid, lang=lang)
+                gov.on_success()
+                if link.get("result") == "NOERR" and link.get("url"):
+                    exp = int(link.get("expires") or 0)
+                    with lock:
+                        cnt["ok"] += 1
+                        links.append({"user_code": uc, "user_id": uid, "url": link["url"],
+                                      "expires": exp, "link_status": link.get("link_status")})
+                        log(f"  {uc}: OK")
+                        _report(cnt["ok"], cnt["fail"], total)
+                    _event({"type": "glink", "uc": uc, "ok": True, "url": link["url"],
+                            "expires": exp, "user_id": uid})
+                else:
+                    with lock:
+                        cnt["fail"] += 1
+                        log(f"  {uc}: link fail {link.get('result')}")
+                        _report(cnt["ok"], cnt["fail"], total)
+                    _event({"type": "glink", "uc": uc, "ok": False, "err": str(link.get("result"))})
+            except Exception as e:  # noqa: BLE001
+                gov.on_throttle()
+                with lock:
+                    cnt["fail"] += 1
+                    log(f"  {uc}: ERROR {e}")
+                    _report(cnt["ok"], cnt["fail"], total)
+                _event({"type": "glink", "uc": uc, "ok": False, "err": str(e)})
+
+    nthreads = min(workers, max(1, total))
+    threads = [threading.Thread(target=worker, daemon=True) for _ in range(nthreads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    log(f"genlink เสร็จ: ok={cnt['ok']} fail={cnt['fail']}")
+    _event({"type": "gldone", "ok": cnt["ok"], "total": total})
+    return {"ok": cnt["ok"], "total": total, "links": links}
+
+
+_DISPATCH = {"reroll": _reroll, "gacha": _gacha, "daily": _daily, "genlink": _genlink}
 
 
 def run(brain: dict, session=None, params: dict | None = None):
     """Loader entrypoint. `session` is the live SessionCtx (heartbeat/lease)."""
-    global _B, _LOG, _VERBOSE, _STOP, _PROGRESS, _EMIT
+    global _B, _LOG, _VERBOSE, _STOP, _PROGRESS, _EMIT, _MAINT_HIT
     _B = brain
+    _MAINT_HIT = False
     module_id = (params or {}).get("module") or os.environ.get("REROLL_MODULE", "reroll")
 
     def log(msg):

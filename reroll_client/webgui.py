@@ -191,6 +191,82 @@ class Api:
             return {"error": str(e)}
         return {}
 
+    def pick_files(self):
+        """Multi-select .txt/.dat account files (for Gen Link)."""
+        try:
+            res = self._window.create_file_dialog(
+                webview.OPEN_DIALOG, allow_multiple=True,
+                file_types=("บัญชี (*.txt;*.dat)", "ทุกไฟล์ (*.*)"))
+            if res:
+                return {"paths": list(res) if isinstance(res, (list, tuple)) else [res]}
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e)}
+        return {"paths": []}
+
+    # ---- inject (local adb; no gate/license) ----
+    def inject_list(self):
+        try:
+            import injectmod
+            return {"devices": injectmod.list_devices()}
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e)}
+
+    def inject_push(self, device, acct_json, opts_json=None):
+        if not device:
+            return {"error": "เลือกอุปกรณ์ก่อน"}
+        try:
+            acct = json.loads(acct_json) if isinstance(acct_json, str) else dict(acct_json or {})
+        except Exception as e:  # noqa: BLE001
+            return {"error": f"บัญชีไม่ถูกต้อง: {e}"}
+        if not (acct.get("user_code") and acct.get("auth_code") and acct.get("user_id") is not None):
+            return {"error": "บัญชีต้องมี user_code + auth_code + user_id"}
+        opts = {}
+        if opts_json:
+            try:
+                opts = json.loads(opts_json) if isinstance(opts_json, str) else dict(opts_json)
+            except Exception:  # noqa: BLE001
+                opts = {}
+        try:
+            import injectmod
+            return injectmod.inject(device, acct,
+                                    backup=opts.get("backup", True),
+                                    clear_system=opts.get("clear_system", True),
+                                    launch=opts.get("launch", True))
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e)}
+
+    def read_account_file(self, path):
+        """Load one .txt/.dat account record (for the Inject picker)."""
+        try:
+            with open(path, encoding="utf-8") as f:
+                return {"account": json.load(f)}
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e)}
+
+    def save_image(self, url, name=None):
+        """Download a card image (efimg) and save it where the user picks."""
+        if not url:
+            return {"error": "no url"}
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                data = r.read()
+            if not data:
+                return {"error": "empty image"}
+            fn = name or (url.rsplit("/", 1)[-1] or "card.png")
+            if not fn.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                fn += ".png"
+            res = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=fn)
+            if not res:
+                return {"ok": False, "cancelled": True}
+            path = res if isinstance(res, str) else res[0]
+            with open(path, "wb") as f:
+                f.write(data)
+            return {"ok": True, "path": path}
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e)}
+
     def server_status(self):
         return {"status": "unknown"}   # v1: real gate probe is a fast-follow
 
@@ -204,6 +280,16 @@ class Api:
             return updater.check_latest()
         except Exception as e:  # noqa: BLE001
             return {"error": str(e), "newer": False, "current": config.APP_VERSION}
+
+    def changelog(self):
+        """Patch notes (newest-first) for the login-screen panel. Reads PATCHNOTE.md on
+        the repo (survives deleting old releases); falls back to GitHub releases."""
+        try:
+            from loader import updater
+            rels = updater.fetch_patchnotes() or updater.list_releases()
+            return {"current": config.APP_VERSION, "releases": rels}
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e), "current": config.APP_VERSION, "releases": []}
 
     def open_url(self, url):
         try:

@@ -26,6 +26,66 @@ def _ver_tuple(s: str) -> tuple:
     return tuple(out) or (0,)
 
 
+def fetch_patchnotes(timeout: float = 8.0) -> list:
+    """Parse PATCHNOTE.md (on the repo's default branch) into [{version,name,date,notes}],
+    newest-first. Lets patch history survive even when old GitHub releases are deleted.
+    Never raises (returns [] on any error)."""
+    out = []
+    try:
+        url = f"https://raw.githubusercontent.com/{config.GITHUB_REPO}/main/PATCHNOTE.md"
+        req = urllib.request.Request(url, headers={"User-Agent": "efootball-reroll-updater"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            text = r.read().decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001
+        return out
+    cur = None
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if cur:
+                out.append(cur)
+            head = line[3:].strip()
+            ver, date = head, ""
+            for sep in ("—", "·", " - "):
+                if sep in head:
+                    a, b = head.split(sep, 1)
+                    ver, date = a.strip(), b.strip()
+                    break
+            cur = {"version": ver, "name": ver, "date": date, "notes": ""}
+        elif cur is not None and not line.startswith("# "):
+            cur["notes"] += line + "\n"
+    if cur:
+        out.append(cur)
+    for c in out:
+        c["notes"] = c["notes"].strip()
+    return out
+
+
+def list_releases(timeout: float = 8.0, limit: int = 30) -> list:
+    """All published releases newest-first: [{version, name, date, notes}]. For the
+    in-app patch-notes panel. Never raises (returns [] on any error)."""
+    out = []
+    try:
+        url = f"https://api.github.com/repos/{config.GITHUB_REPO}/releases?per_page={int(limit)}"
+        req = urllib.request.Request(url, headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "efootball-reroll-updater",
+        })
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = json.load(r)
+        for rel in data:
+            if rel.get("draft"):
+                continue
+            out.append({
+                "version": rel.get("tag_name") or rel.get("name") or "",
+                "name": rel.get("name") or rel.get("tag_name") or "",
+                "date": (rel.get("published_at") or "")[:10],
+                "notes": rel.get("body") or "",
+            })
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
 def check_latest(timeout: float = 8.0) -> dict:
     """Return {latest, current, newer, url, notes, error}. Never raises."""
     res = {"latest": None, "current": config.APP_VERSION, "newer": False,

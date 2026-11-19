@@ -33,7 +33,7 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;background:var(--bg);color:var(--txt);
     font-family:var(--disp);font-size:13.5px;overflow:hidden}
-  body{display:flex;flex-direction:column;transition:background .2s,color .2s}
+  body{display:flex;flex-direction:column}  /* no theme-fade: body faded slower than its children = flicker */
   .orb2{display:none}
   a{color:var(--txt);text-decoration:underline;text-underline-offset:2px}
   ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:9999px}
@@ -80,8 +80,18 @@
   .grid2{min-width:0}.grid2>*{min-width:0}
   input:focus,select:focus,textarea:focus{border-color:var(--txt3);box-shadow:0 0 0 2px rgba(59,130,246,.28)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .chk{font-size:12.5px;color:var(--txt2);display:flex;align-items:center;gap:8px;cursor:pointer}
-  .chk input{width:auto;accent-color:var(--pill-bg)}
+  /* option = bordered pill with an iOS toggle (label left, switch right) */
+  .chk{display:inline-flex;flex-direction:row-reverse;align-items:center;gap:9px;margin:3px 0;
+    align-self:flex-end;font-size:12px;color:var(--txt);cursor:pointer;border:1px solid var(--border);
+    background:var(--glass2);border-radius:8px;padding:5px 10px;line-height:1.3;text-align:right}
+  .chk:hover{border-color:var(--txt2)}
+  .chk input[type=checkbox]{appearance:none;-webkit-appearance:none;margin:0;flex:none;
+    width:34px;height:19px;border-radius:999px;background:var(--border);position:relative;
+    cursor:pointer;transition:background .18s ease}
+  .chk input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;
+    border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.35);transition:transform .18s ease}
+  .chk input[type=checkbox]:checked{background:var(--g)}
+  .chk input[type=checkbox]:checked::after{transform:translateX(15px)}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 18px;border-radius:9999px;border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;transition:var(--trans);font-family:var(--disp)}
   .btn:active{background:var(--pill-press)}.btn:disabled{opacity:.38;cursor:not-allowed}
   .btn-primary{background:var(--pill-bg);border-color:var(--pill-bg);color:var(--pill-fg)}
@@ -127,6 +137,82 @@
   .gate h2{font-size:24px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px;color:var(--txt);font-family:var(--disp)}
   .gate p{color:var(--txt2);font-size:13px;margin-bottom:20px;line-height:1.6}
   .gate .st{font-size:12px;margin-top:16px;min-height:18px;color:var(--txt2)}
+  /* split login screen — no cards, a center divider, pure-black bg, cmd/glitch flair */
+  .gate{background:#05060a}
+  .gatewrap{display:flex;gap:0;align-items:stretch;max-width:1040px;width:94vw;min-height:460px}
+  .gate .box{margin:0;flex:1;background:transparent;border:none;border-radius:0;padding:52px 56px;
+    display:flex;flex-direction:column;justify-content:center;text-align:left}
+  .gate .box.login{align-items:flex-start}
+  .gate .box.patch{border-left:1px solid var(--border);justify-content:flex-start}
+  .gate .logo{margin:0 0 22px}
+  .gate .logo,.gate .logo img{width:60px;height:60px}
+  .gate h2{font-size:36px;letter-spacing:.02em;margin-bottom:8px}
+  .gate .box.login p{font-size:13px;margin-bottom:22px}
+  .gate .box.login .btn{width:100%;max-width:360px}
+  /* Discord login button: black by default, Discord blurple on hover + white logo */
+  .gdbtn{background:#0e0f14;color:#e9eaf0;border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    transition:background .16s ease,border-color .16s ease,color .16s ease}
+  .gdbtn .dc{width:22px;height:22px;flex:none;fill:currentColor;stroke:none;transition:fill .16s ease}
+  .gdbtn:hover{background:#5865F2;border-color:#5865F2;color:#fff;box-shadow:0 6px 20px rgba(88,101,242,.35)}
+  .gate .box.login .st{text-align:left}
+  .cmdline{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:12.5px;
+    color:var(--g);margin-bottom:18px;letter-spacing:.03em;min-height:16px}
+  .cmdline .tw{display:inline-block;overflow:hidden;white-space:nowrap;vertical-align:bottom;
+    animation:tw 1.5s steps(26) 1 both}
+  .cmdline .cur{display:inline-block;width:7px;height:13px;margin-left:2px;background:var(--g);
+    vertical-align:middle;animation:blink 1.05s steps(1) infinite}
+  @keyframes tw{from{width:0}to{width:23ch}}
+  @keyframes blink{50%{opacity:0}}
+  /* glitch: idle 92% of a 5s loop, brief RGB-split burst — transform/text-shadow only (GPU, cheap) */
+  .glitch{animation:gl 5s steps(1) infinite}
+  @keyframes gl{0%,92%,100%{transform:none;text-shadow:none}
+    93%{transform:translate(-2px,0);text-shadow:2px 0 #16e0ff,-2px 0 #ff3bd4}
+    95%{transform:translate(2px,0);text-shadow:-2px 0 #16e0ff,2px 0 #ff3bd4}
+    97%{transform:translate(-1px,0);text-shadow:1px 0 #16e0ff,-1px 0 #ff3bd4}98%{transform:none;text-shadow:none}}
+  @media(prefers-reduced-motion:reduce){.glitch,.cmdline .tw,.cmdline .cur{animation:none}.cmdline .tw{width:auto}}
+  .gate .box.patch h3{font-family:var(--disp);font-size:22px;color:var(--txt);margin-bottom:2px}
+  .gate .box.patch .pv{font-size:12px;color:var(--g);margin-bottom:14px;font-family:ui-monospace,Consolas,monospace}
+  .notes{font-size:13px;color:var(--txt2);line-height:1.7;white-space:pre-wrap;overflow:auto;flex:1;min-height:150px;max-height:330px}
+  .gate .box.patch .vm{margin-top:16px;font-size:12.5px}
+  @media(max-width:760px){.gatewrap{flex-direction:column;min-height:0;max-height:94vh;overflow:auto}
+    .gate .box{padding:32px 30px}.gate .box.patch{border-left:none;border-top:1px solid var(--border)}}
+  .pmodal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center}
+  .pmodal .pbox{width:640px;max-width:92vw;max-height:84vh;background:var(--bg2);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+  .pmodal .ph{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);font-family:var(--disp);font-size:17px;color:var(--txt)}
+  .pmodal .pb{padding:8px 20px 20px;overflow:auto}
+  .pmodal .rel{padding:14px 0;border-bottom:1px solid var(--border)}
+  .pmodal .rel h4{font-size:14px;color:var(--txt);margin:0 0 2px}
+  .pmodal .rel .d{font-size:11px;color:var(--txt2);margin-bottom:6px}
+  .pmodal .rel .n{font-size:12.5px;color:var(--txt2);line-height:1.6;white-space:pre-wrap}
+  /* rich "เช็คไอดี" view */
+  .mini{font-size:11.5px;color:var(--txt2);display:inline-flex;align-items:center;gap:5px}
+  .mini input[type=number],.mini input[type=text]{padding:4px 7px;font-size:12px}
+  .rchip{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--border);
+    background:var(--glass2);color:var(--txt2);font-size:11.5px;cursor:pointer;user-select:none;margin:2px}
+  .rchip.on{background:var(--g);border-color:var(--g);color:#04120a;font-weight:600}
+  .crow2{display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid var(--border);
+    background:var(--glass2);border-radius:10px}
+  .crow2.sel{border-color:var(--g);box-shadow:0 0 0 1px var(--g) inset}
+  .crow2 .cacc{width:150px;flex:none}
+  .crow2 .cuc{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--txt);font-weight:600}
+  .crow2 .cst{font-size:10.5px;margin-top:2px}
+  .crow2 .cplayers{flex:1;display:flex;gap:5px;overflow:hidden;min-width:0}
+  .pcar{width:40px;height:52px;border-radius:5px;background:var(--bg2);flex:none;position:relative;
+    border:1px solid var(--border);overflow:hidden}
+  .pcar img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block;opacity:0;transition:opacity .2s}
+  .pcar.skel{background:linear-gradient(100deg,var(--bg2) 30%,var(--glass2) 50%,var(--bg2) 70%);
+    background-size:200% 100%;animation:skel 1.1s linear infinite}
+  @keyframes skel{to{background-position:-200% 0}}
+  .pcar .po{position:absolute;bottom:0;right:0;background:rgba(0,0,0,.72);color:#fff;font-size:9px;
+    padding:0 3px;border-radius:4px 0 0 0}
+  .crow2 .cres{width:120px;flex:none;text-align:right;font-size:12px}
+  .crow2 .cres b{color:var(--g)}
+  .crow2 .clink{width:140px;flex:none;text-align:right}
+  .crow2 .clink a{font-size:11px;word-break:break-all}
+  .crow2 input[type=checkbox]{width:16px;height:16px;flex:none;accent-color:var(--g)}
+  #cards_grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:10px;justify-items:center}
+  #cards_grid .pcar{width:74px;height:96px;cursor:zoom-in}
   .pickwrap{display:flex;flex-direction:column;gap:6px;background:var(--glass2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:4px}
   .pkpack{font-size:11px;font-weight:700;color:var(--txt);margin:6px 0 2px}
   .pkrow{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--txt);padding:2px 0}
@@ -212,6 +298,7 @@
 <symbol id="ic-check" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="7"/><path d="M20.5 20.5l-5-5"/></symbol>
 <symbol id="ic-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"/></symbol>
 <symbol id="ic-server" viewBox="0 0 24 24"><path d="M4.5 11.5a10 10 0 0 1 15 0M7.5 14.5a6 6 0 0 1 9 0"/><circle cx="12" cy="18" r="1.3"/></symbol>
+<symbol id="ic-inject" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 6.5v7M9 10.5l3 3 3-3"/></symbol>
 <symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
 <symbol id="ic-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
 <symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></symbol>
@@ -254,13 +341,55 @@
 
 <!-- LOGIN GATE -->
 <div class="gate" id="gate">
-  <div class="box">
-    <span class="logo" id="glogo"><img src="logo.png" alt="" onerror="this.remove()"></span>
-    <h2>E-FOOTBALL REROLL</h2>
-    <p>เข้าสู่ระบบด้วย Discord เพื่อตรวจสิทธิ์การเช่า<br>แล้วเริ่มใช้งานได้เลย</p>
-    <button class="btn btn-primary" id="gbtn" style="width:100%" onclick="doLogin()">เข้าสู่ระบบด้วย Discord</button>
-    <div class="st" id="gst"></div>
-    <div style="margin-top:14px"><a href="#" onclick="api('open_shop');return false" style="font-size:12px">ยังไม่ได้เช่า? ไปที่เว็บ →</a></div>
+  <div class="gatewrap">
+    <div class="box login">
+      <span class="logo" id="glogo"><img src="logo.png" alt="" onerror="this.remove()"></span>
+      <div class="cmdline"><span class="tw">&gt; e-wwdc // authenticating</span><span class="cur"></span></div>
+      <h2 class="glitch">E-FOOTBALL REROLL</h2>
+      <p>เข้าสู่ระบบด้วย Discord เพื่อตรวจสิทธิ์การเช่า<br>แล้วเริ่มใช้งานได้เลย</p>
+      <button class="btn gdbtn" id="gbtn" style="width:100%" onclick="doLogin()"><svg class="dc" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05 1.8 1.32 3.53 2.12 5.24 2.65.03.01.06 0 .07-.02.4-.55.76-1.13 1.07-1.74.02-.04 0-.08-.04-.09-.57-.22-1.11-.48-1.64-.78-.04-.02-.04-.08-.01-.11.11-.08.22-.17.33-.25.02-.02.05-.02.07-.01 3.44 1.57 7.15 1.57 10.55 0 .02-.01.05-.01.07.01.11.09.22.17.33.26.04.03.04.09-.01.11-.52.31-1.07.56-1.64.78-.04.01-.05.06-.04.09.32.61.68 1.19 1.07 1.74.03.01.06.02.09.01 1.72-.53 3.45-1.33 5.25-2.65.02-.01.03-.03.03-.05.44-4.53-.73-8.46-3.1-11.95-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12 0 1.17-.83 2.12-1.89 2.12z"/></svg><span id="gbtxt">เข้าสู่ระบบด้วย Discord</span></button>
+      <div class="st" id="gst"></div>
+      <div style="margin-top:14px"><a href="#" onclick="api('open_url','https://crgwwdc.shop/efootball');return false" style="font-size:12px">ต่ออายุ / ซื้อโปรแกรม · crgwwdc.shop/efootball →</a></div>
+    </div>
+    <div class="box patch">
+      <h3>มีอะไรใหม่</h3>
+      <div class="pv" id="patchver">กำลังโหลด…</div>
+      <div class="notes" id="patchnotes"></div>
+      <a href="#" class="vm" id="patchmore" onclick="showAllPatches();return false" style="display:none">ดูเวอร์ชันก่อนหน้า (View more) →</a>
+    </div>
+  </div>
+</div>
+
+<div class="pmodal" id="pmodal">
+  <div class="pbox">
+    <div class="ph"><span>ประวัติการอัปเดต (Patch Notes)</span><button onclick="closeAllPatches()">✕</button></div>
+    <div class="pb" id="patchall"></div>
+  </div>
+</div>
+
+<div class="pmodal" id="injmodal">
+  <div class="pbox" style="width:520px">
+    <div class="ph"><span>Inject เข้า ADB — <span id="inj2_uc" style="color:var(--g)"></span></span><button onclick="closeInjModal()">✕</button></div>
+    <div class="pb">
+      <div class="row" style="align-items:center">
+        <button class="btn btn-ghost btn-sm" id="inj2_scan" onclick="injModalRefresh()"><svg class="ic"><use href="#ic-update"/></svg>ค้นหาอุปกรณ์</button>
+        <select id="inj2_dev" style="flex:1;min-width:0"></select>
+      </div>
+      <div class="row" style="flex-wrap:wrap;margin-top:8px">
+        <label class="chk"><input id="inj2_backup" type="checkbox" checked> สำรองไอดีเดิม</label>
+        <label class="chk"><input id="inj2_clear" type="checkbox" checked> ล้าง device-bind เก่า</label>
+        <label class="chk"><input id="inj2_launch" type="checkbox" checked> เปิดเกมหลัง inject</label>
+      </div>
+      <div class="row" style="margin-top:8px"><button class="btn btn-primary" id="inj2_go" style="width:100%" onclick="injModalGo()"><svg class="ic sol"><use href="#ic-play"/></svg>Inject ไอดีนี้</button></div>
+      <div class="biglog" id="inj2_log" style="margin-top:10px;max-height:220px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="pmodal" id="cardsmodal">
+  <div class="pbox" style="width:700px">
+    <div class="ph"><span>การ์ดทั้งหมด — <span id="cards_uc" style="color:var(--g)"></span></span><button onclick="closeCardsPopup()">✕</button></div>
+    <div class="pb"><div id="cards_grid"></div></div>
   </div>
 </div>
 
@@ -284,7 +413,7 @@
   <div class="lbin" onclick="event.stopPropagation()">
     <div id="lbimg" class="lbimg"></div>
     <div id="lbcap" class="lbcap"></div>
-    <div class="lbx"><button class="btn btn-ghost btn-sm" onclick="lbClose()">ปิด</button></div>
+    <div class="lbx"><button class="btn btn-primary btn-sm" onclick="lbDownload()">ดาวน์โหลดรูป</button> <button class="btn btn-ghost btn-sm" onclick="lbClose()">ปิด</button></div>
   </div>
 </div>
 
@@ -300,7 +429,8 @@
       <button class="navitem" data-tab="gacha" onclick="tab('gacha',this)"><svg class="ic"><use href="#ic-gacha"/></svg>กาชา</button>
       <button class="navitem" data-tab="merge" onclick="tab('merge',this)"><svg class="ic"><use href="#ic-merge"/></svg>รวมไฟล์</button>
       <button class="navitem" data-tab="check" onclick="tab('check',this)"><svg class="ic"><use href="#ic-check"/></svg>เช็คไอดี</button>
-      <button class="navitem" onclick="api('open_url','https://www.crgwwdc.shop/efootball/genlink');return false"><svg class="ic"><use href="#ic-link"/></svg>Gen Link Konami (ซื้อเพิ่ม)</button>
+      <button class="navitem" data-tab="genlink" onclick="tab('genlink',this)"><svg class="ic"><use href="#ic-link"/></svg>Gen Link</button>
+      <button class="navitem" data-tab="inject" onclick="tab('inject',this)"><svg class="ic"><use href="#ic-inject"/></svg>Inject ADB</button>
     </nav>
     <div class="side-foot">ติดต่อ: <a href="#" onclick="api('open_tg');return false">t.me/j3xdr</a></div>
   </aside>
@@ -381,6 +511,8 @@
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('d_log',this)">คัดลอก log</button></div>
           </div>
           <label class="chk"><input id="d_show" type="checkbox"> ใส่ชื่อนักเตะในชื่อไฟล์ (ถ้ามี)</label>
+          <label class="chk"><input id="d_keepname" type="checkbox" checked> ไม่เปลี่ยนชื่อไฟล์เดิม (เขียนทับไฟล์เดิมในที่เดิม)</label>
+          <label class="chk"><input id="d_sugoroku" type="checkbox" checked> เล่นเกมประจำวัน (sugoroku) ให้อัตโนมัติ — รางวัลเข้ากล่อง (ช้าลง ~0.68 วิ/บัญชี)</label>
           <div class="row" style="justify-content:space-between;align-items:baseline"><span class="hint">Daily Login สำเร็จ</span><b id="d_prog" style="font-family:var(--disp);font-size:17px;color:var(--g)">0 / 0</b></div>
           <div class="pbar"><i id="d_bar"></i></div>
           <div class="biglog" id="d_log"></div>
@@ -399,6 +531,7 @@
             <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="g_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('g_log',this)">คัดลอก log</button></div>
           </div>
+          <label class="chk"><input id="g_keepname" type="checkbox" checked> ไม่เปลี่ยนชื่อไฟล์เดิม (เขียนทับไฟล์เดิมในที่เดิม)</label>
           <div id="g_pick"></div>
           <div class="pbar"><i id="g_bar"></i></div>
           <div class="biglog" id="g_log"></div>
@@ -425,15 +558,76 @@
       <section class="panel" id="p-check">
         <div class="wrap">
           <div class="row">
-            <div class="field" style="flex:1"><label>โฟลเดอร์บัญชี</label>
-              <div class="row"><input id="c_out" placeholder="เลือกโฟลเดอร์บัญชี" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('c_out')">เลือก…</button></div></div>
-            <div class="field"><label>Workers</label><input id="c_workers" type="number" value="5" min="1" max="32" style="width:90px"></div>
+            <div class="field" style="flex:1"><label>บัญชี (โฟลเดอร์ หรือเลือกไฟล์ .txt/.dat)</label>
+              <div class="row"><input id="c_out" placeholder="เลือกโฟลเดอร์ หรือไฟล์" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('c_out');window._cfiles=[]">โฟลเดอร์…</button><button class="btn btn-ghost btn-sm" onclick="pickCheckFiles()">ไฟล์…</button></div></div>
+            <div class="field"><label>Workers</label><input id="c_workers" type="number" value="8" min="1" max="32" style="width:80px"></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="c_start" onclick="startCheck()"><svg class="ic sol"><use href="#ic-play"/></svg>เช็คทั้งหมด</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="c_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('c_body',this)">คัดลอก</button></div>
+          </div>
+          <div class="row" style="flex-wrap:wrap;gap:8px;align-items:center">
+            <input id="c_search" placeholder="ค้นหา user code / ชื่อนักเตะ" oninput="renderCheck()" style="flex:1;min-width:150px">
+            <label class="mini">เหรียญ≥<input id="c_fcoin" type="number" value="0" min="0" oninput="renderCheck()" style="width:75px"></label>
+            <label class="mini">GP≥<input id="c_fgp" type="number" value="0" min="0" oninput="renderCheck()" style="width:85px"></label>
+            <select id="c_sort" onchange="renderCheck()" style="width:auto">
+              <option value="coins">เรียง: เหรียญมาก→น้อย</option>
+              <option value="gp">GP มาก→น้อย</option>
+              <option value="players">นักเตะมาก→น้อย</option>
+              <option value="uc">user_code</option></select>
+            <button class="btn btn-ghost btn-sm" onclick="clearCheckFilter()">ล้างตัวกรอง</button>
+          </div>
+          <div class="row" style="flex-wrap:wrap;gap:3px;align-items:center">
+            <span class="mini" style="margin-right:4px">ชนิดการ์ด:</span><span id="c_rar"></span>
+          </div>
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <span class="hint" id="c_stat">ยังไม่ได้เช็ค</span>
+            <div style="display:flex;gap:10px;align-items:center">
+              <label class="mini"><input type="checkbox" id="c_all" onchange="checkSelAll(this)"> เลือกทั้งหน้า</label>
+              <button class="btn btn-ghost btn-sm" onclick="exportCheck()">export ที่เลือก</button>
+            </div>
           </div>
           <div class="pbar"><i id="c_bar"></i></div>
-          <div style="flex:1;overflow:auto;min-height:0"><table><thead><tr><th>user_code</th><th>GP</th><th>เหรียญ</th><th>EFP</th><th>กล่อง</th><th>นักเตะ</th></tr></thead><tbody id="c_body"></tbody></table></div>
+          <div id="c_body" style="flex:1;overflow:auto;min-height:0;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </section>
+
+      <section class="panel" id="p-genlink">
+        <div class="wrap">
+          <div class="row">
+            <div class="field" style="flex:1"><label>วาง Code (JSON ต่อบรรทัด หรือก้อน JSON/array — ต้องมี user_id + auth_code)</label>
+              <textarea id="gl_text" rows="4" placeholder='{"user_id":2055734095,"auth_code":"....","device_identifier":"...."}' style="width:100%;resize:vertical"></textarea></div>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" onclick="pickGlFiles()">เลือกไฟล์ .txt/.dat…</button>
+            <div class="row" style="flex:1"><input id="gl_dir" placeholder="(หรือเลือกทั้งโฟลเดอร์)" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('gl_dir')">โฟลเดอร์…</button></div>
+            <div class="field"><label>Workers</label><input id="gl_workers" type="number" value="8" min="1" max="64" style="width:80px"></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="gl_start" onclick="startGenlink()"><svg class="ic sol"><use href="#ic-play"/></svg>ดึงลิงก์</button></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="gl_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
+            <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="copyAllLinks()">คัดลอกทั้งหมด</button></div>
+          </div>
+          <div id="gl_files" style="font-size:12px;opacity:.7"></div>
+          <div class="pbar"><i id="gl_bar"></i></div>
+          <div style="flex:1;overflow:auto;min-height:0"><table><thead><tr><th>user_code</th><th>ลิงก์ผูก KONAMI ID</th><th></th></tr></thead><tbody id="gl_body"></tbody></table></div>
+        </div>
+      </section>
+
+      <section class="panel" id="p-inject">
+        <div class="wrap">
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" id="inj_scan" onclick="injRefresh()"><svg class="ic"><use href="#ic-update"/></svg>ค้นหาอุปกรณ์</button>
+            <select id="inj_dev" style="flex:1;min-width:0"></select>
+          </div>
+          <div class="row">
+            <div class="field" style="flex:1"><label>บัญชีที่จะ inject (วาง Code หรือเลือกไฟล์ — ต้องมี user_code + auth_code + user_id)</label>
+              <textarea id="inj_text" rows="3" placeholder='{"user_code":"ASxxxxx","auth_code":"....","user_id":2055734095}' style="width:100%;resize:vertical"></textarea></div>
+          </div>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm" onclick="pickInjFile()">เลือกไฟล์ .txt/.dat…</button>
+            <label class="chk"><input id="inj_backup" type="checkbox" checked> สำรองไอดีเดิม</label>
+            <label class="chk"><input id="inj_clear" type="checkbox" checked> ล้าง device-bind เก่า</label>
+            <label class="chk"><input id="inj_launch" type="checkbox" checked> เปิดเกมหลัง inject</label>
+            <button class="btn btn-primary" id="inj_go" onclick="startInject()"><svg class="ic sol"><use href="#ic-play"/></svg>Inject</button>
+          </div>
+          <div style="flex:1;overflow:auto;min-height:0"><div id="inj_log" class="biglog"></div></div>
         </div>
       </section>
     </div>
@@ -478,7 +672,9 @@ const PG={reroll:['ic-reroll','Reroll','spray สร้างไอดี + เ�
   daily:['ic-daily','Daily Login','login + รับ daily ทุกบัญชี'],
   gacha:['ic-gacha','กาชา','สแกน pack ฟรี + เปิด + กรองนักเตะ'],
   merge:['ic-merge','รวมไฟล์','รวมไฟล์ user_code เดียวกันข้ามโฟลเดอร์'],
-  check:['ic-check','เช็คไอดี','รายงาน currency ของแต่ละไอดี']};
+  check:['ic-check','เช็คไอดี','รายงาน currency ของแต่ละไอดี'],
+  genlink:['ic-link','Gen Link','ดึงลิงก์ผูก KONAMI ID (ไม่จำกัด)'],
+  inject:['ic-inject','Inject ADB','ใส่ไอดีเข้า emulator ผ่าน adb']};
 function svgIc(id,extra){return '<svg class="ic'+(extra||'')+'"><use href="#'+id+'"/></svg>';}
 function fmtDur(sec){sec=Math.max(0,Math.floor(+sec||0));
   const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60;
@@ -509,10 +705,28 @@ function cpGrid(btn){cpText([...document.querySelectorAll('#grid .logarea')].map
 // ---- pywebview bridge ----
 function api(fn,...args){return (window.pywebview&&window.pywebview.api[fn])?window.pywebview.api[fn](...args):Promise.resolve({error:'no bridge'});}
 // FORCED update: on launch, block the whole app if a newer release exists.
-window.addEventListener('pywebviewready',()=>{READY=true;setVer();
+window.addEventListener('pywebviewready',()=>{READY=true;setVer();loadPatch();
   api('check_update').then(r=>{window._updurl=(r&&r.url)||window._updurl;
     if(r&&r.newer){forceUpdate(r.url,r.latest);return;}   // stale build -> hard block
     refreshEnt();});});
+
+function loadPatch(){api('changelog').then(r=>{
+  const rels=(r&&r.releases)||[];window._patches=rels;
+  if(!rels.length){$('patchver').textContent='ดูรายละเอียดบนเว็บ';$('patchnotes').textContent='';return;}
+  const cur='v'+((r&&r.current)||APPVER);
+  const top=rels.find(x=>x.version===cur)||rels[0];
+  $('patchver').textContent=(top.version||'')+(top.date?('  ·  '+top.date):'');
+  $('patchnotes').textContent=(top.notes||'').trim()||'(ไม่มีรายละเอียด)';
+  if(rels.length>1)$('patchmore').style.display='inline-block';
+}).catch(()=>{});}
+function showAllPatches(){const rels=window._patches||[];const box=$('patchall');box.innerHTML='';
+  rels.forEach(r=>{const d=document.createElement('div');d.className='rel';
+    const h=document.createElement('h4');h.textContent=r.version||'';
+    const dd=document.createElement('div');dd.className='d';dd.textContent=r.date||'';
+    const n=document.createElement('div');n.className='n';n.textContent=(r.notes||'').trim();
+    d.appendChild(h);d.appendChild(dd);d.appendChild(n);box.appendChild(d);});
+  $('pmodal').style.display='flex';}
+function closeAllPatches(){$('pmodal').style.display='none';}
 
 let APPVER='';
 function setVer(){api('app_version').then(r=>{if(r&&r.version){APPVER=r.version;$('verpill').textContent='v'+r.version+' · ตรวจอัปเดต';}});}
@@ -530,18 +744,20 @@ function checkUpd(manual){if(manual)$('verpill').textContent='กำลังต
 
 let authGen=0;
 function doLogin(){authGen++;const g=authGen;    // button stays clickable: re-click cancels + retries
-  $('gbtn').textContent='เปิดเบราว์เซอร์แล้ว — กดซ้ำเพื่อลองใหม่';
+  $('gbtxt').textContent='เปิดเบราว์เซอร์แล้ว — กดซ้ำเพื่อลองใหม่';
   $('gst').innerHTML='อนุญาตใน Discord ที่เบราว์เซอร์ที่เปิด (เปิดผิด? กดซ้ำ หรือใช้ลิงก์ด้านล่าง)';
   api('login').then(r=>{if(g!==authGen)return;   // ignore stale attempt
-    if(r.ok){$('gbtn').textContent='เข้าสู่ระบบด้วย Discord';
+    if(r.ok){$('gbtxt').textContent='เข้าสู่ระบบด้วย Discord';
       $('gst').innerHTML='<span style="color:var(--g)">เข้าสู่ระบบ: '+r.username+'</span>';
       $('userpill').innerHTML=svgIc('ic-user')+' '+r.username;refreshEnt();}
-    else{$('gbtn').textContent='เข้าสู่ระบบด้วย Discord';
+    else{$('gbtxt').textContent='เข้าสู่ระบบด้วย Discord';
       $('gst').innerHTML='<span style="color:var(--r)">'+(r.error||'ไม่สำเร็จ')+' — กดลองใหม่ได้</span>';}
   });}
 
 function refreshEnt(){api('entitlement').then(r=>{
-  if(r&&r.has_access){const mods=(r.modules||[]).join(',')||'ครบ';const exp=r.expires_at?('หมดอายุ '+String(r.expires_at).slice(0,10)):'ถาวร';
+  if(r&&r.has_access){const mods=(r.modules||[]).join(',')||'ครบ';
+    // expires_at is a unix epoch (seconds); format as a date, not the raw number
+    const exp=r.expires_at?('หมดอายุ '+new Date((r.expires_at<1e12?r.expires_at*1000:r.expires_at)).toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric'})):'ถาวร';
     $('entpill').textContent='✓ สิทธิ์ ('+mods+') · '+exp;$('entpill').className='pill ok';
     $('gate').style.display='none';$('app').style.visibility='visible';}
   else{const why=r&&r.reason?r.reason:'ยังไม่มีสิทธิ์';
@@ -556,10 +772,10 @@ function addMergeDir(){api('pick_folder').then(r=>{if(r&&r.path&&!MERGE.includes
   logln($('m_list'),'info',r.path);}});}
 
 function setLive(on){RUNNING=on;$('livedot').classList.toggle('live',on);$('livetxt').textContent=on?'RUNNING':'idle';
-  ['d_start','c_start','m_start','g_scan'].forEach(i=>{if($(i))$(i).disabled=on;});
+  ['d_start','c_start','m_start','g_scan','gl_start'].forEach(i=>{if($(i))$(i).disabled=on;});
   if($('r_start'))$('r_start').disabled=on||($('r_postgacha').checked&&!(window._wanted&&window._wanted.length));
   if($('g_start'))$('g_start').disabled=on||!gScanned;   // gacha start locked until a scan
-  ['r_stop','d_stop','g_stop','c_stop'].forEach(i=>{if($(i))$(i).disabled=!on;});}
+  ['r_stop','d_stop','g_stop','c_stop','gl_stop'].forEach(i=>{if($(i))$(i).disabled=!on;});}
 
 // ---- start actions ----
 function startReroll(){
@@ -575,14 +791,169 @@ function startReroll(){
 function startMod(mod){
   const dir=$(mod[0]+'_out').value||null;
   const p={module:mod,workers:5,verbose:false,fmt:'txt',delay:0.5,out_dir:dir,src_dir:dir};
-  if(mod==='daily'){p.workers=+$('d_workers').value;p.daily_show_players=$('d_show').checked;$('d_log').innerHTML='';$('d_prog').textContent='0 / 0';$('d_bar').style.width='0';}
-  if(mod==='gacha'){p.workers=+$('g_workers').value;p.wanted_ids=window._wanted||[];$('g_log').innerHTML='';}
+  if(mod==='daily'){p.workers=+$('d_workers').value;p.daily_show_players=$('d_show').checked;p.keep_filename=$('d_keepname').checked;p.sugoroku=$('d_sugoroku').checked;$('d_log').innerHTML='';$('d_prog').textContent='0 / 0';$('d_bar').style.width='0';}
+  if(mod==='gacha'){p.workers=+$('g_workers').value;p.wanted_ids=window._wanted||[];p.keep_filename=$('g_keepname').checked;$('g_log').innerHTML='';}
   go(p);}
-function startCheck(){$('c_body').innerHTML='';$('c_bar').style.width='0';
-  go({action:'check',module:'reroll',workers:+$('c_workers').value,delay:0.5,src_dir:$('c_out').value||null,out_dir:$('c_out').value||null});}
+window._CHK=[];window._CHKsel=new Set();window._CHKrar=new Set();window._cfiles=[];
+function pickCheckFiles(){api('pick_files').then(r=>{if(r&&r.paths&&r.paths.length){window._cfiles=r.paths;
+  $('c_out').value='ไฟล์ '+r.paths.length+' รายการ';}});}
+function startCheck(){window._CHK=[];window._CHKsel.clear();window._CHKrar.clear();
+  $('c_body').innerHTML='';$('c_bar').style.width='0';$('c_stat').textContent='กำลังเช็ค…';
+  const p={action:'check',module:'reroll',workers:+$('c_workers').value,delay:0.5};
+  if(window._cfiles&&window._cfiles.length)p.files=window._cfiles;
+  else{p.src_dir=$('c_out').value||null;p.out_dir=p.src_dir;}
+  go(p);}
+function clearCheckFilter(){$('c_search').value='';$('c_fcoin').value=0;$('c_fgp').value=0;window._CHKrar.clear();renderCheck();}
+function checkSelAll(cb){const shown=currentCheckRows();if(cb.checked)shown.forEach(r=>window._CHKsel.add(r.user_code));else shown.forEach(r=>window._CHKsel.delete(r.user_code));renderCheck();}
+function toggleRar(r){if(window._CHKrar.has(r))window._CHKrar.delete(r);else window._CHKrar.add(r);renderCheck();}
+function _art(p){return p.art||('https://efimg.com/efootballhub22/images/player_cards/'+p.id+'_l.png');}
+const _RANK={EPIC:4,LEGENDARY:4,HIGHLIGHT:3,FEATURED:3,SPECIAL:3,RARE:2,NORMAL:1,STANDARD:1};
+function _rrank(p){return _RANK[String(p.rarity||'').toUpperCase()]||0;}
+function _pcarEl(p){const c=document.createElement('div');c.className='pcar skel';c.title=(p.name||('#'+p.id))+' '+(p.rarity||'');
+  const im=document.createElement('img');im.loading='lazy';im.src=_art(p);
+  im.onload=()=>{im.style.opacity=1;c.classList.remove('skel');};im.onerror=()=>{c.classList.remove('skel');};
+  c.appendChild(im);if(p.overall){const o=document.createElement('span');o.className='po';o.textContent=p.overall;c.appendChild(o);}
+  c.style.cursor='zoom-in';c.onclick=()=>openCard(_art(p),(p.name||('#'+p.id))+'  '+(p.rarity||''),(p.name||p.id));
+  return c;}
+function openCardsPopup(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r)return;
+  let ps=(r.players||[]).slice();const rar=window._CHKrar;if(rar.size)ps=ps.filter(p=>rar.has(String(p.rarity)));
+  ps.sort((a,b)=>_rrank(b)-_rrank(a));
+  $('cards_uc').textContent=uc+' · '+ps.length+' ใบ';
+  const g=$('cards_grid');g.innerHTML='';ps.forEach(p=>g.appendChild(_pcarEl(p)));
+  $('cardsmodal').style.display='flex';}
+function closeCardsPopup(){$('cardsmodal').style.display='none';}
+function _allRarities(){const s=new Set();window._CHK.forEach(r=>(r.players||[]).forEach(p=>{if(p.rarity)s.add(String(p.rarity));}));return [...s].sort();}
+function currentCheckRows(){
+  const q=($('c_search').value||'').toLowerCase().trim();
+  const fc=+$('c_fcoin').value||0, fg=+$('c_fgp').value||0, rar=window._CHKrar;
+  let rows=window._CHK.filter(r=>!r.error);
+  rows=rows.filter(r=>(r.coins||0)>=fc && (r.gp||0)>=fg);
+  if(rar.size)rows=rows.filter(r=>(r.players||[]).some(p=>rar.has(String(p.rarity))));
+  if(q)rows=rows.filter(r=>String(r.user_code).toLowerCase().includes(q)
+      || (r.players||[]).some(p=>String(p.name||'').toLowerCase().includes(q)));
+  const s=$('c_sort').value;
+  rows.sort((a,b)=> s==='gp'?(b.gp||0)-(a.gp||0) : s==='players'?((b.players||[]).length-(a.players||[]).length)
+      : s==='uc'?String(a.user_code).localeCompare(String(b.user_code)) : (b.coins||0)-(a.coins||0));
+  return rows;}
+function renderCheck(){
+  // rarity chips
+  const rchip=$('c_rar');if(rchip){rchip.innerHTML='';_allRarities().forEach(r=>{
+    const s=document.createElement('span');s.className='rchip'+(window._CHKrar.has(r)?' on':'');s.textContent=r;
+    s.onclick=()=>toggleRar(r);rchip.appendChild(s);});}
+  const rows=currentCheckRows();const rar=window._CHKrar;
+  const body=$('c_body');body.innerHTML='';
+  rows.forEach(r=>{
+    const div=document.createElement('div');div.className='crow2'+(window._CHKsel.has(r.user_code)?' sel':'');
+    // checkbox
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=window._CHKsel.has(r.user_code);
+    cb.onchange=()=>{cb.checked?window._CHKsel.add(r.user_code):window._CHKsel.delete(r.user_code);div.classList.toggle('sel',cb.checked);updCheckStat();};
+    // account col
+    const acc=document.createElement('div');acc.className='cacc';
+    acc.innerHTML=`<div class="cuc">${r.user_code}</div><div class="cst" style="color:var(--g)">พร้อม · ${(r.players||[]).length} ใบ</div>`;
+    // players
+    const pl=document.createElement('div');pl.className='cplayers';
+    let ps=(r.players||[]).slice();if(rar.size)ps=ps.filter(p=>rar.has(String(p.rarity)));
+    ps.sort((a,b)=>_rrank(b)-_rrank(a));   // แสดง 5 ใบแรกเรียงตาม rank การ์ด
+    ps.slice(0,5).forEach(p=>pl.appendChild(_pcarEl(p)));
+    if(ps.length>5){const more=document.createElement('button');more.className='btn btn-ghost btn-sm';
+      more.style.alignSelf='center';more.textContent='+'+(ps.length-5)+' ดูทั้งหมด';
+      more.onclick=()=>openCardsPopup(r.user_code);pl.appendChild(more);}
+    // resources
+    const res=document.createElement('div');res.className='cres';
+    res.innerHTML=`<div><b>${(r.coins||0).toLocaleString()}</b> coin</div><div style="color:var(--txt2)">${(r.gp||0).toLocaleString()} GP</div>`;
+    // link
+    const lk=document.createElement('div');lk.className='clink';
+    if(r._link){const a=document.createElement('a');a.href='#';a.textContent='เปิดลิงก์';a.onclick=()=>{api('open_url',r._link);return false;};
+      const cpb=document.createElement('a');cpb.href='#';cpb.textContent=' · คัดลอก';cpb.onclick=()=>{cpText(r._link);return false;};
+      lk.appendChild(a);lk.appendChild(cpb);}
+    else{const b=document.createElement('button');b.className='btn btn-ghost btn-sm';b.textContent=r._linking?'กำลังดึง…':'Link KONAMI ID';
+      b.disabled=!!r._linking||!r.auth_code;b.onclick=()=>genCheckLink(r.user_code);lk.appendChild(b);}
+    const ib=document.createElement('button');ib.className='btn btn-ghost btn-sm';ib.textContent='Inject ADB';
+    ib.style.marginTop='5px';ib.disabled=!r.auth_code;ib.onclick=()=>openInjectFor(r.user_code);
+    lk.appendChild(document.createElement('br'));lk.appendChild(ib);
+    div.appendChild(cb);div.appendChild(acc);div.appendChild(pl);div.appendChild(res);div.appendChild(lk);
+    body.appendChild(div);});
+  updCheckStat(rows.length);}
+function updCheckStat(shown){const tot=window._CHK.filter(r=>!r.error).length;
+  if(shown===undefined)shown=currentCheckRows().length;
+  $('c_stat').textContent=`ทั้งหมด ${tot} · แสดง ${shown} · เลือก ${window._CHKsel.size}`;}
+function genCheckLink(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r||!r.auth_code)return;
+  r._linking=true;renderCheck();
+  api('start',JSON.stringify({module:'genlink',lang:'th',workers:1,
+    text:JSON.stringify({user_id:r.user_id,auth_code:r.auth_code,device_identifier:r.device_identifier,user_code:uc})}));}
+function exportCheck(){const sel=window._CHK.filter(r=>window._CHKsel.has(r.user_code));
+  if(!sel.length){alert('ยังไม่ได้เลือกบัญชี');return;}
+  const txt=sel.map(r=>r.user_code+'\t'+(r.coins||0)+' coin\t'+(r.gp||0)+' GP\t'+((r.players||[]).map(p=>p.name||('#'+p.id)).join(', ')||'-')+(r._link?('\t'+r._link):'')).join('\n');
+  cpText(txt);}
+// inject a checked account into an ADB device (popup)
+function openInjectFor(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r||!r.auth_code){alert('บัญชีนี้ไม่มี auth_code');return;}
+  window._injTarget=r;$('inj2_uc').textContent=uc;$('inj2_log').innerHTML='';
+  $('inj2_dev').innerHTML='<option value="">— กดค้นหาอุปกรณ์ —</option>';$('injmodal').style.display='flex';injModalRefresh();}
+function closeInjModal(){$('injmodal').style.display='none';}
+function injModalRefresh(){$('inj2_scan').disabled=true;const o=$('inj2_scan').innerHTML;$('inj2_scan').textContent='กำลังค้นหา…';
+  api('inject_list').then(res=>{$('inj2_scan').disabled=false;$('inj2_scan').innerHTML=o;const sel=$('inj2_dev');sel.innerHTML='';
+    if(res.error){logln($('inj2_log'),'err',res.error);const op=document.createElement('option');op.value='';op.textContent='— error —';sel.appendChild(op);return;}
+    const ds=res.devices||[];if(!ds.length){const op=document.createElement('option');op.value='';op.textContent='— ไม่พบ emulator/มือถือ —';sel.appendChild(op);return;}
+    ds.forEach(d=>{const op=document.createElement('option');op.value=d.device;
+      const tags=[d.label,d.game?'เกม✓':'ไม่มีเกม',d.root?'root✓':'root✗',d.current_id?('id:'+d.current_id):''].filter(Boolean).join(' · ');
+      op.textContent=d.device+'  ['+tags+']';if(d.state&&d.state!=='device'){op.disabled=true;op.textContent+=' ('+d.state+')';}sel.appendChild(op);});});}
+function injModalGo(){const r=window._injTarget;if(!r)return;const dev=$('inj2_dev').value;if(!dev){alert('เลือกอุปกรณ์ก่อน');return;}
+  const acct={user_code:r.user_code,auth_code:r.auth_code,user_id:r.user_id};
+  const opts={backup:$('inj2_backup').checked,clear_system:$('inj2_clear').checked,launch:$('inj2_launch').checked};
+  $('inj2_log').innerHTML='';logln($('inj2_log'),'info','inject '+r.user_code+' → '+dev+' …');$('inj2_go').disabled=true;
+  api('inject_push',dev,JSON.stringify(acct),JSON.stringify(opts)).then(res=>{$('inj2_go').disabled=false;
+    if(res.error){logln($('inj2_log'),'err',res.error);return;}
+    (res.steps||[]).forEach(s=>logln($('inj2_log'),'info','• '+s.msg+(s.out?('  '+s.out):'')));
+    logln($('inj2_log'),res.ok?'ok':'err',res.ok?('สำเร็จ → '+(res.current_id||'')):(res.error||'ไม่สำเร็จ'));});}
 function startMerge(){if(!MERGE.length){logln($('m_log'),'err','เลือกอย่างน้อย 1 โฟลเดอร์');return;}
   $('m_log').innerHTML='';go({action:'merge',module:'reroll',merge_dirs:MERGE,out_dir:$('m_out').value||MERGE[0],fmt:$('m_fmt').value});}
 function go(p){setLive(true);api('start',JSON.stringify(p)).then(r=>{if(r&&r.error){setLive(false);alert(r.error);}});}
+
+// ---- Gen Link ----
+window._glfiles=[];window._gllinks=[];
+function pickGlFiles(){api('pick_files').then(r=>{if(r&&r.paths){window._glfiles=r.paths;
+  $('gl_files').textContent=r.paths.length?('ไฟล์ '+r.paths.length+': '+r.paths.map(p=>p.split(/[\\/]/).pop()).join(', ')):'';}});}
+function startGenlink(){
+  const text=$('gl_text').value.trim();
+  const files=window._glfiles||[];const dir=$('gl_dir').value||null;
+  if(!text && !files.length && !dir){alert('วาง Code หรือเลือกไฟล์ / โฟลเดอร์ก่อน');return;}
+  $('gl_body').innerHTML='';window._gllinks=[];$('gl_bar').style.width='0';
+  go({module:'genlink',lang:'th',workers:+$('gl_workers').value||8,text:text||null,files:files,src_dir:dir});}
+function addLinkRow(uc,url,ok){
+  if(ok)window._gllinks.push({uc,url});
+  const tr=document.createElement('tr');
+  const t1=document.createElement('td');t1.textContent=uc;t1.style.color='var(--txt)';
+  const t2=document.createElement('td');t2.textContent=ok?url:('✗ '+url);t2.style.wordBreak='break-all';t2.style.color=ok?'var(--txt)':'var(--r)';
+  const t3=document.createElement('td');t3.style.whiteSpace='nowrap';
+  if(ok){const b1=document.createElement('button');b1.className='btn btn-ghost btn-sm';b1.textContent='เปิด';b1.onclick=()=>api('open_url',url);
+    const b2=document.createElement('button');b2.className='btn btn-ghost btn-sm';b2.textContent='คัดลอก';b2.onclick=()=>cpText(url,b2);
+    t3.appendChild(b1);t3.appendChild(b2);}
+  tr.appendChild(t1);tr.appendChild(t2);tr.appendChild(t3);$('gl_body').appendChild(tr);}
+function copyAllLinks(){if(!window._gllinks.length){alert('ยังไม่มีลิงก์');return;}
+  cpText(window._gllinks.map(x=>x.uc+'\t'+x.url).join('\n'),null);}
+
+// ---- Inject ----
+function injRefresh(){$('inj_scan').disabled=true;const o=$('inj_scan').innerHTML;$('inj_scan').textContent='กำลังค้นหา…';
+  api('inject_list').then(r=>{$('inj_scan').disabled=false;$('inj_scan').innerHTML=o;
+    const sel=$('inj_dev');sel.innerHTML='';
+    if(r.error){logln($('inj_log'),'err',r.error);const op=document.createElement('option');op.value='';op.textContent='— error —';sel.appendChild(op);return;}
+    const ds=r.devices||[];
+    if(!ds.length){const op=document.createElement('option');op.value='';op.textContent='— ไม่พบ emulator —';sel.appendChild(op);return;}
+    ds.forEach(d=>{const op=document.createElement('option');op.value=d.device;
+      const tags=[d.label,d.game?'เกม✓':'ไม่มีเกม',d.root?'root✓':'root✗',d.current_id?('id:'+d.current_id):''].filter(Boolean).join(' · ');
+      op.textContent=d.device+'  ['+tags+']';if(d.state&&d.state!=='device'){op.disabled=true;op.textContent+=' ('+d.state+')';}
+      sel.appendChild(op);});});}
+function pickInjFile(){api('pick_files').then(r=>{if(r&&r.paths&&r.paths[0]){
+  api('read_account_file',r.paths[0]).then(x=>{if(x.error){alert(x.error);return;}$('inj_text').value=JSON.stringify(x.account);});}});}
+function startInject(){
+  const dev=$('inj_dev').value;if(!dev){alert('เลือกอุปกรณ์ก่อน (กด "ค้นหาอุปกรณ์")');return;}
+  let acct;try{acct=JSON.parse(($('inj_text').value||'').trim());}catch(e){alert('บัญชีไม่ใช่ JSON ที่ถูกต้อง');return;}
+  const opts={backup:$('inj_backup').checked,clear_system:$('inj_clear').checked,launch:$('inj_launch').checked};
+  $('inj_log').innerHTML='';logln($('inj_log'),'info','inject → '+dev+' …');$('inj_go').disabled=true;
+  api('inject_push',dev,JSON.stringify(acct),JSON.stringify(opts)).then(r=>{$('inj_go').disabled=false;
+    if(r.error){logln($('inj_log'),'err',r.error);alert('inject ล้มเหลว: '+r.error);return;}
+    (r.steps||[]).forEach(s=>logln($('inj_log'),'info','• '+s.msg+(s.out?('  '+s.out):'')));
+    logln($('inj_log'),r.ok?'ok':'err',r.ok?('สำเร็จ → '+(r.current_id||'')):(r.error||'ไม่สำเร็จ'));});}
 
 function scanPacks(){$('scanov').style.display='flex';$('g_scan').disabled=true;$('g_scan').textContent='กำลังสแกน…';
   api('scan_packs',$('g_out').value||null).then(r=>{$('scanov').style.display='none';$('g_scan').disabled=false;$('g_scan').textContent='สแกนแพ็ค / เลือกนักเตะ';
@@ -610,11 +981,15 @@ function pcard(pl){const sel=(window._wanted||[]).includes(pl.id);
 function cardTog(card,e){if(e&&e.target&&e.target.closest('.pkeye'))return;
   const cb=card.querySelector('input');cb.checked=!cb.checked;card.classList.toggle('sel',cb.checked);syncPkCount();}
 function findPl(id){for(const pk of PACKS){for(const p of (pk.players||[]))if(p.id===id)return p;}return null;}
+function openCard(url,cap,name){window._lburl=url||'';window._lbname=name||'card';
+  $('lbimg').style.backgroundImage=url?`url('${url}')`:'';$('lbimg').innerHTML=url?'':svgIc('ic-user',' ');
+  $('lbcap').textContent=cap||'';$('lb').style.display='flex';}
 function lb(id){event&&event.stopPropagation();const pl=findPl(id);if(!pl)return;
-  $('lbimg').style.backgroundImage=pl.art?`url('${pl.art}')`:'';$('lbimg').innerHTML=pl.art?'':svgIc('ic-user',' ');
-  $('lbcap').textContent=(pl.name||('#'+pl.id))+'  ·  '+(pl.overall||'?')+'  '+(pl.position||'');
-  $('lb').style.display='flex';}
+  openCard(pl.art||_art(pl),(pl.name||('#'+pl.id))+'  ·  '+(pl.overall||'?')+'  '+(pl.position||''),(pl.name||pl.id));}
 function lbClose(){$('lb').style.display='none';}
+function lbDownload(){if(!window._lburl){return;}
+  const nm=String(window._lbname||'card').replace(/[^\w.-]+/g,'_')+'.png';
+  api('save_image',window._lburl,nm).then(r=>{if(r&&r.error)alert('ดาวน์โหลดไม่ได้: '+r.error);});}
 function setPkCols(){const v=($('pkcols')||{value:'auto'}).value;   // packs per row
   document.documentElement.style.setProperty('--ppr',
     v==='auto'?'repeat(auto-fill,minmax(380px,1fr))':('repeat('+v+',1fr)'));
@@ -672,15 +1047,20 @@ window._ev=function(m){try{
   else if(m.type==='done'){setLive(false);const s=m.summary||{};
     const map={reroll:null,daily:'d_bar',gacha:'g_bar'};const bar=map[m.module];if(bar)$(bar).style.width='100%';
     if(m.module==='daily'&&s.total!=null)$('d_prog').textContent=(s.ok||0)+' / '+s.total;}
-  else if(m.type==='cstart'){$('c_body').innerHTML='';$('c_bar').style.width='0';}
-  else if(m.type==='crow'){const r=m.rep;const tr=document.createElement('tr');
-    if(r.error)tr.innerHTML=`<td style="color:var(--txt)">${r.user_code}</td><td colspan="5" style="color:var(--r)">${r.error}</td>`;
-    else tr.innerHTML=`<td style="color:var(--txt)">${r.user_code}</td><td style="color:var(--txt)">${(r.gp||0).toLocaleString()}</td><td style="color:var(--txt)">${r.coins}</td><td style="color:var(--txt)">${r.efp}</td><td>${r.mailbox}</td><td>${r.players}</td>`;
-    $('c_body').appendChild(tr);$('c_bar').style.width=Math.round(m.done/m.total*100)+'%';}
-  else if(m.type==='cdone'){$('c_bar').style.width='100%';setLive(false);}
-  // generic progress bars for daily/gacha from progress events
+  else if(m.type==='cstart'){window._CHK=[];window._CHKsel.clear();$('c_body').innerHTML='';$('c_bar').style.width='0';}
+  else if(m.type==='crow'){if(!m.rep.error)window._CHK.push(m.rep);
+    $('c_bar').style.width=Math.round(m.done/m.total*100)+'%';
+    if(window._CHK.length%12===0||m.done===m.total)renderCheck();}
+  else if(m.type==='cdone'){$('c_bar').style.width='100%';setLive(false);renderCheck();}
+  else if(m.type==='glink'){
+    // route to the check row if this uc is there, else to the Gen Link tab
+    const cr=(window._CHK||[]).find(x=>x.user_code===m.uc);
+    if(cr){cr._linking=false;if(m.ok)cr._link=m.url;renderCheck();}
+    else addLinkRow(m.uc,m.ok?m.url:(m.err||'fail'),!!m.ok);}
+  else if(m.type==='gldone'){$('gl_bar').style.width='100%';setLive(false);}
+  // generic progress bars for daily/gacha/genlink from progress events
   if(m.type==='progress'){const tot=m.total||1,pct=Math.round((m.ok+m.fail)/tot*100);
-    const act=document.querySelector('.panel.on').id;const b={'p-daily':'d_bar','p-gacha':'g_bar'}[act];if(b)$(b).style.width=pct+'%';
+    const act=document.querySelector('.panel.on').id;const b={'p-daily':'d_bar','p-gacha':'g_bar','p-genlink':'gl_bar'}[act];if(b)$(b).style.width=pct+'%';
     if($('d_prog')&&m.total!=null)$('d_prog').textContent=(m.ok||0)+' / '+m.total;}
 }catch(e){console.error(e);}};
 
