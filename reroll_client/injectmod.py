@@ -49,6 +49,8 @@ def _adb_path():
 
 
 ADB = _adb_path()
+# hide the console window each adb/tasklist call would otherwise flash on Windows
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
 
 def _backup_dir():
@@ -64,7 +66,8 @@ def _backup_dir():
 
 def _run(args, timeout=40):
     try:
-        r = subprocess.run([ADB] + args, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run([ADB] + args, capture_output=True, text=True, timeout=timeout,
+                           creationflags=_NO_WINDOW)
         return (r.stdout or "") + (r.stderr or "")
     except FileNotFoundError:
         return "__ERR__ adb-not-found"
@@ -78,7 +81,8 @@ def _adb(dev, *args, timeout=40):
 
 def _run_raw(args, timeout=20):
     try:
-        return subprocess.run(args, capture_output=True, text=True, timeout=timeout).stdout or ""
+        return subprocess.run(args, capture_output=True, text=True, timeout=timeout,
+                              creationflags=_NO_WINDOW).stdout or ""
     except Exception:  # noqa: BLE001
         return ""
 
