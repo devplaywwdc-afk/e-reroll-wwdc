@@ -192,16 +192,19 @@ class Api:
         return {}
 
     def pick_files(self):
-        """Multi-select .txt/.dat account files (for Gen Link)."""
-        try:
-            res = self._window.create_file_dialog(
-                webview.OPEN_DIALOG, allow_multiple=True,
-                file_types=("บัญชี (*.txt;*.dat)", "ทุกไฟล์ (*.*)"))
-            if res:
-                return {"paths": list(res) if isinstance(res, (list, tuple)) else [res]}
-        except Exception as e:  # noqa: BLE001
-            return {"error": str(e)}
-        return {"paths": []}
+        """Multi-select .txt/.dat account files. pywebview validates file_types strictly
+        (a non-ASCII desc or a '*.*' pattern can make it throw and the dialog never opens),
+        so try a safe ASCII filter first, then fall back to no filter."""
+        last = None
+        for ft in (("Account files (*.txt;*.dat)",), ()):
+            try:
+                res = self._window.create_file_dialog(
+                    webview.OPEN_DIALOG, allow_multiple=True, file_types=ft)
+                return {"paths": list(res) if res else []}
+            except Exception as e:  # noqa: BLE001
+                last = str(e)
+                continue
+        return {"error": last or "dialog failed", "paths": []}
 
     # ---- inject (local adb; no gate/license) ----
     def inject_list(self):
@@ -405,6 +408,11 @@ class Api:
 
 
 def main():
+    try:
+        import procutil
+        procutil.install()   # hide the console window every adb/subprocess spawn would flash
+    except Exception:
+        pass
     for s in (sys.stdout, sys.stderr):   # never crash on non-cp874 chars (ã, Thai, ∞)
         try:
             s.reconfigure(encoding="utf-8", errors="replace")

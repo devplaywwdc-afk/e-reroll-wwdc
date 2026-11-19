@@ -124,8 +124,10 @@ def adb_ok():
 
 
 def connect_common():
-    for port in EMU_PORTS:
-        _run(["connect", f"127.0.0.1:{port}"], timeout=6)
+    # parallel + short timeout: 20 ports × 6s serial was ~2 min and froze the UI
+    import concurrent.futures as cf
+    with cf.ThreadPoolExecutor(max_workers=12) as ex:
+        list(ex.map(lambda p: _run(["connect", f"127.0.0.1:{p}"], timeout=2), EMU_PORTS))
 
 
 def list_devices(do_connect=True):

@@ -107,6 +107,7 @@ def build_exe(module_id: str, dist: str, gui: bool = False, name: str | None = N
         "--hidden-import", "requests",
         "--hidden-import", "msgpack",
         "--hidden-import", "injectmod",   # lazily imported by webgui (Inject tab)
+        "--hidden-import", "procutil",     # lazily imported by webgui (hide subprocess windows)
         "--collect-all", "Crypto",
         # the loader's crypto (X25519/HKDF/AES-GCM) lives in native .pyd (L5) that
         # PyInstaller can't scan, so collect `cryptography` submodules explicitly.
