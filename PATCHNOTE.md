@@ -1,0 +1,69 @@
+# E-WWDC — Patch Notes
+
+## v1.0.12 — 2026-11-19
+⚡ เร็วขึ้น + ลื่นขึ้น
+- Reroll เร็วขึ้นมาก (เหลือ 1 request ต่อไอดี)
+- สแกนกาชาเร็วขึ้น ~15 เท่า + จำไว้ให้ครั้งต่อไปเร็วทันที
+- UI ลื่นไม่กระตุก, log ไหลเป็นชุด, กดหยุดแล้วหยุดทันที
+
+🎁 Daily Login ครบขึ้น
+- เก็บรางวัล login ประจำวัน + กล่องจดหมายให้ครบ (เมื่อก่อนเก็บแค่ในกล่อง)
+- เล่น "เกมประจำวัน" (sugoroku) ให้อัตโนมัติ รางวัลเข้ากล่อง (เปิด/ปิดได้)
+
+🆕 ฟีเจอร์ใหม่
+- Gen Link Konami ในตัว (ไม่จำกัด) — วาง Code / เลือกไฟล์ / ทั้งโฟลเดอร์ แล้วดึงลิงก์ผูก KONAMI ID ได้เลย เปิด/คัดลอกในตัว
+- Inject ADB — ใส่ไอดีเข้า emulator หรือมือถือ USB (ฝัง adb มาให้ ไม่ต้องติดตั้งเพิ่ม)
+
+🔎 เช็คไอดี โฉมใหม่
+- โชว์รูปการ์ดนักเตะ + เหรียญ + GP ต่อไอดี
+- ตัวกรอง: เหรียญขั้นต่ำ, GP ขั้นต่ำ, ชนิดการ์ด, ค้นหา user code/ชื่อนักเตะ
+- กด Gen Link Konami / Inject ADB ได้ในแถวเดียวกัน
+- ดูการ์ดทั้งหมด + กดขยายการ์ด + ดาวน์โหลดรูปได้ (หน้ากาชาก็ดาวน์โหลดได้)
+- เลือกไฟล์ .txt/.dat เดี่ยว ๆ หรือทั้งโฟลเดอร์ก็ได้
+
+🎨 อื่น ๆ
+- หน้า Login ใหม่ + Patch Notes ในตัว (กดดูเวอร์ชันเก่าได้)
+- สวิตช์ เปิด/ปิด แบบ iOS, ปุ่ม Discord
+- แก้บั๊ก: เด้ง "discord required" บ่อย, จอกระพริบตอนสลับธีม, วันหมดอายุแสดงเป็นวันที่
+
+วิธีอัปเดต: เปิดโปรแกรม เดี๋ยวมันเด้งให้อัปเดตเอง กดโหลดตัวใหม่ได้เลย
+
+## v1.0.11 — 2026-11-18
+เร็วขึ้น + ลื่นขึ้น:
+- Reroll เหลือ 1 request/บัญชี (ตัด check/login/setup ที่ไม่จำเป็น) — ประหยัด bandwidth, บัญชียังเก็บ daily/กาชาได้ปกติ
+- Daily/Gacha ขนานจริงตามจำนวน worker (แก้คอขวดเซฟไฟล์) + กดหยุดทันใจ
+- UI ลื่นไม่กระตุก (event bus รวมชุด), log ไหลเป็นชุด
+- หน่วงขั้นต่ำ default = 0 (อัตโนมัติ)
+
+## v1.0.10 — 2026-11-17
+Daily Login live counter (สำเร็จ X / total) + coins = total myClub balance. Per-session key (gap-1) + forced-update enforced.
+
+## v1.0.9 — 2026-11-17
+UI: Ollama theme (dark default + theme toggle), vector icons (no emoji), real logo titlebar, resizable window, day/hour/min/sec timer, green success counter. Security: per-session engine key (k_brain stays server-side), module-scope + ban/expiry re-check, forced update. Reroll defaults 64 workers.
+
+## v1.0.8 — 2026-11-17
+เด้ง error จริงตอนรันไม่ได้ (seat/เน็ต/เวอร์ชัน) · pack picker เลือกคอลัมน์+packs เต็มแถว · pesdb 429 fix (ชื่อครบ)
+
+## v1.0.7 — 2026-11-17
+ชื่อนักเตะ: fallback pesdb.net เมื่อ efootbase ยังไม่มี (ครอบคลุมการ์ดใหม่)
+
+## v1.0.6 — 2026-11-17
+แก้ login Discord ขึ้น HTTP 400 (loopback รับ code แม้ state ไม่ตรง — กดซ้ำ/เปลี่ยน browser ได้)
+
+## v1.0.5 — 2026-11-17
+gacha scan crash fix · pack picker ใหม่ (2 pack/แถว การ์ดใหญ่ ปุ่มดูการ์ด) · coin price · copy log ทุกหน้า · post-reroll gacha · login กดซ้ำได้+คัดลอกลิงก์ · ปรับความไว/worker 500/governor
+
+## v1.0.4 — 2026-11-15
+แก้ช่องกรอกวินาทีล้นขอบ + เปลี่ยนชื่อเป็น หน่วงขั้นต่ำ (0=อัตโนมัติ ให้ governor คุมเอง)
+
+## v1.0.3 — 2026-11-15
+AIMD rate governor (ดัน 1 IP ให้อยู่ที่ max ปลอดภัย ลด fail) · ช่อง proxy optional (ว่าง=IP เครื่อง) · Log สูงสุด/worker + checkbox แสดง error (กันค้างตอน worker เยอะ)
+
+## v1.0.2 — 2026-11-15
+ปรับความไว (หน่วง วิ/ไอดี) ตั้งเองได้ · Workers สูงสุด 500 · reroll 0=ไม่จำกัด · tooltip อธิบาย · ตัวตรวจ/แจ้งเตือนอัปเดต
+
+## v1.0.1 — 2026-11-15
+UI ใหม่ (web dashboard) + reroll 0=ไม่จำกัด + อธิบาย Workers ตอน hover + ตัวตรวจอัปเดต/แจ้งเตือนเวอร์ชันใหม่
+
+## v1.0.0 — 2026-11-15
+Login with Discord แล้วใช้งานได้เลย (เช่าผ่าน crgwwdc.shop) — E-Reroll / E-Gacha / E-Daily
