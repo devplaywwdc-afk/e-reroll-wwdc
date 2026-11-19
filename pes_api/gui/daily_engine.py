@@ -72,6 +72,13 @@ class DailyEngine:
         sid = lr.get("session_id")
         if not sid:
             raise RuntimeError(f"login: {lr.get('result','?')}")
+        # play the Daily Game (sugoroku) first so its reward is in the mailbox before we claim
+        sug = None
+        if self.cfg.get("do_sugoroku"):
+            try:
+                sug = flows.play_sugoroku(c, int(acct["user_id"]), sid)
+            except Exception as e:
+                sug = {"played": False, "reason": str(e)}
         cd = flows.claim_daily(c, int(acct["user_id"]), sid)
         if cd.get("result") != "NOERR":
             raise RuntimeError(f"claim: {cd.get('result')}")
@@ -80,6 +87,7 @@ class DailyEngine:
             "user_code": uc, "state": "ok", "attempts": acct.get("_try", 1),
             "had_bonus": cd["had_login_bonus"],
             "rewards": cd["claimed"],
+            "sugoroku": sug,
             "gp": st["gp"], "coins": st["coins"], "efp": st["efp"],
             "ts": datetime.datetime.now(TZ).strftime("%H:%M:%S"),
         }
@@ -121,11 +129,13 @@ class DailyEngine:
         self.push_summary()
 
     # ---- control ----
-    def start(self, source="folder", uploaded=None, workers=10, max_retries=3, schedule=False):
+    def start(self, source="folder", uploaded=None, workers=10, max_retries=3, schedule=False,
+              do_sugoroku=False):
         if self.running: return False
         self.results = {}; self.failed = []; self._stop = False
         self.running = True; self.scheduler_on = schedule
-        self.cfg = {"source": source, "workers": workers, "max_retries": max_retries}
+        self.cfg = {"source": source, "workers": workers, "max_retries": max_retries,
+                    "do_sugoroku": do_sugoroku}
         accs = uploaded if (source == "upload" and uploaded) else accounts.load_all()
         threading.Thread(target=self._runner, args=(accs, workers, max_retries, schedule), daemon=True).start()
         self.emit({"type": "dstarted", "total": len(accs), "schedule": schedule})

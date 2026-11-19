@@ -236,6 +236,7 @@
                 <div class="field"><label>Retry สูงสุด</label><input id="d_retry" type="number" value="3" min="1" max="10"></div>
               </div>
               <label style="font-size:12px;color:var(--txt2)"><input id="d_sched" type="checkbox" style="width:auto;vertical-align:-1px"> เปิดค้าง รับอัตโนมัติทุก <b style="color:var(--g)">09:00</b> ไทย</label>
+              <label style="font-size:12px;color:var(--txt2)"><input id="d_sugoroku" type="checkbox" checked style="width:auto;vertical-align:-1px"> 🎲 ทำเควส "เกมประจำวัน" (sugoroku) ด้วย — เดิน 1 ช่อง/วัน, reward เข้า mailbox</label>
               <div class="hint">ปิดไว้ = รับ ณ ตอนนี้ครั้งเดียว · เปิดค้าง = รับให้ทุกวันเมื่อถึง 09:00 (reset ตาม 09:00 ไทย ไม่ใช่ 24 ชม.) · fail จะต่อคิวรันใหม่</div>
               <div style="flex:1"></div>
               <button class="btn btn-primary" id="d_start" style="width:100%">▶ เริ่ม Daily Login</button>
@@ -683,7 +684,7 @@ function dailyRow(m){const uc=m.user_code;let tr=$('dr_'+uc);
   if(m.state==='ok'){
     const rid='more_'+uc;
     tr.innerHTML=`<td style="color:#fff">${uc}</td><td>${stc}</td>
-      <td>${rewardStr(m.rewards)}${m.had_bonus?'':' <span style="color:var(--txt3)">(ไม่มี login bonus วันนี้)</span>'}</td>
+      <td>${rewardStr(m.rewards)}${m.had_bonus?'':' <span style="color:var(--txt3)">(ไม่มี login bonus วันนี้)</span>'}${m.sugoroku?(m.sugoroku.played?` <span style="color:var(--g)">· 🎲 เกมประจำวัน +${(m.sugoroku.after||0)-(m.sugoroku.before||0)} ช่อง</span>`:` <span style="color:var(--txt3)">· 🎲 ${m.sugoroku.reason==='unavailable'?'เล่นแล้ววันนี้':m.sugoroku.reason}</span>`):''}</td>
       <td style="color:var(--b)">🟦${(m.gp||0).toLocaleString()}</td>
       <td style="color:var(--y)">🟡${(m.coins||0).toLocaleString()}</td>
       <td style="color:var(--p)">⚡${(m.efp||0).toLocaleString()}</td>
@@ -709,7 +710,7 @@ function dailySum(m){$('d_done').textContent=m.done;$('d_fail').textContent=m.fa
   $('d_sum').textContent=m.scheduler?(m.next?`⏰ รอบถัดไป ${m.next}`:'⏰ เปิดค้าง (09:00)'):(m.running?'กำลังรัน...':'เสร็จ');
   $('d_failbar').style.display=m.failed>0?'flex':'none';$('d_failn').textContent=m.failed;dSetLive(m.running);}
 $('d_start').onclick=async()=>{ensureDtable();dRows={};
-  const body={source:$('d_src').value,workers:+$('d_workers').value,max_retries:+$('d_retry').value,schedule:$('d_sched').checked};
+  const body={source:$('d_src').value,workers:+$('d_workers').value,max_retries:+$('d_retry').value,schedule:$('d_sched').checked,sugoroku:$('d_sugoroku').checked};
   if(body.source==='upload')body.accounts=dUploaded||[];
   await fetch('/api/daily/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
 $('d_stop').onclick=()=>fetch('/api/daily/stop',{method:'POST'});

@@ -243,7 +243,8 @@ class H(BaseHTTPRequestHandler):
             ok = DAILY.start(source=data.get("source", "folder"), uploaded=up,
                              workers=int(data.get("workers", 10)),
                              max_retries=int(data.get("max_retries", 3)),
-                             schedule=bool(data.get("schedule", False)))
+                             schedule=bool(data.get("schedule", False)),
+                             do_sugoroku=bool(data.get("sugoroku", False)))
             self._send(200, json.dumps({"ok": ok})); return
         if self.path == "/api/daily/stop":
             DAILY.stop(); self._send(200, json.dumps({"ok": True})); return

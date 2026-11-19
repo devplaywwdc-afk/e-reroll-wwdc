@@ -254,6 +254,30 @@ def server_status(sample=None):
             "checks": checks}
 
 
+def play_sugoroku(client, user_id, session_id):
+    """Play today's Daily Game (sugoroku) once: GET board -> SET one SUCCESS roll.
+    1 play/account/day; reward lands in the mailbox (claim separately). Returns a report.
+    Verified payload: {sugoroku_result:'SUCCESS', fail_reason:3, kind:<GET.kind>, stage_id:300}."""
+    g = client.send("CMD_GET_SUGOROKU", _commons("CMD_GET_SUGOROKU", user_id, session_id, LOGIN_HASH))
+    if not isinstance(g, dict) or g.get("result") != "NOERR":
+        return {"played": False, "reason": g.get("result") if isinstance(g, dict) else "err"}
+    if g.get("is_sugoroku") != "YES":
+        return {"played": False, "reason": "unavailable"}  # already played today / not active
+    b = _commons("CMD_SET_SUGOROKU", user_id, session_id, LOGIN_HASH)
+    b.update({"sugoroku_result": "SUCCESS", "fail_reason": 3, "kind": g.get("kind", 1), "stage_id": 300})
+    r = client.send("CMD_SET_SUGOROKU", b)
+    if not isinstance(r, dict) or r.get("result") != "NOERR":
+        return {"played": False, "reason": r.get("result") if isinstance(r, dict) else "err"}
+    pres = []
+    for p in (r.get("get_squares_present_list") or []) + (r.get("get_go_around_present_list") or []):
+        pres.append({"type": p.get("present_type"),
+                     "name": (p.get("agent_info") or {}).get("title")
+                             or (p.get("item_info") or {}).get("item_type") or p.get("name"),
+                     "count": p.get("count")})
+    return {"played": True, "before": r.get("before_location"), "after": r.get("after_current_location"),
+            "around": r.get("after_go_around_num"), "presents": pres}
+
+
 def get_mailbox(client, user_id, session_id):
     return client.send("CMD_GET_MAILBOX_INFO",
                        _commons("CMD_GET_MAILBOX_INFO", user_id, session_id, LOGIN_HASH))
