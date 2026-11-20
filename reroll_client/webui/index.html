@@ -413,6 +413,7 @@
           <option value="two">ได้ครบ 2 ตัว</option>
           <option value="all">ได้ครบทุกตัวที่เลือก</option></select>
         <label class="chk"><input id="pk_pay" type="checkbox" checked> ใช้ coin สุ่มต่อ (ไม่จำกัด จนได้/coin หมด)</label>
+        <button class="btn btn-ghost btn-sm" onclick="clearPick()">ล้าง</button>
         <button class="btn btn-primary" onclick="donePk()">เลือกเสร็จ</button>
       </div></div>
   </div>
@@ -979,15 +980,22 @@ function renderPacks(packs){PACKS=packs;gScanned=true;if(!RUNNING)$('g_start').d
   if(!packs.length){logln($('g_log'),'err','ไม่พบแพ็ค');return;}
   openPk();}
 const EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
-function pcard(pl){const sel=(window._wanted||[]).includes(pl.id);
+function pcard(pl,agent){const sel=(window._wanted||[]).includes(pl.id);
   const img=pl.art?`<div class="pimg" style="background-image:url('${pl.art}')"></div>`:('<div class="pimg">'+svgIc('ic-user')+'</div>');
-  return `<div class="pkcard${sel?' sel':''}" data-id="${pl.id}" onclick="cardTog(this,event)">`
+  return `<div class="pkcard${sel?' sel':''}" data-id="${pl.id}" data-agent="${agent==null?'':agent}" onclick="cardTog(this,event)">`
     +`<input type="checkbox" value="${pl.id}"${sel?' checked':''}>`
     +`<button class="pkeye" title="ดูการ์ด" onclick="lb(${pl.id})">${EYE}</button>`
     +img+`<div class="ov">${pl.overall||''}</div>`
     +`<div class="pn">${pl.name||('#'+pl.id)}</div><div class="pp">${pl.position||''}</div></div>`;}
+function currentPickAgent(){const c=document.querySelector('#pkbody input:checked');return c?c.closest('.pkcard').dataset.agent:null;}
 function cardTog(card,e){if(e&&e.target&&e.target.closest('.pkeye'))return;
-  const cb=card.querySelector('input');cb.checked=!cb.checked;card.classList.toggle('sel',cb.checked);syncPkCount();}
+  const cb=card.querySelector('input');
+  if(!cb.checked){   // about to select — enforce one pack only
+    const cur=currentPickAgent();
+    if(cur!==null && cur!==card.dataset.agent){alert('เลือกได้แค่แพ็คเดียว — กด "ล้าง" ก่อนเปลี่ยนแพ็ค');return;}
+  }
+  cb.checked=!cb.checked;card.classList.toggle('sel',cb.checked);syncPkCount();}
+function clearPick(){document.querySelectorAll('#pkbody input:checked').forEach(c=>{c.checked=false;const k=c.closest('.pkcard');if(k)k.classList.remove('sel');});syncPkCount();}
 function findPl(id){for(const pk of PACKS){for(const p of (pk.players||[]))if(p.id===id)return p;}return null;}
 function openCard(url,cap,name){window._lburl=url||'';window._lbname=name||'card';
   $('lbimg').style.backgroundImage=url?`url('${url}')`:'';$('lbimg').innerHTML=url?'':svgIc('ic-user',' ');
@@ -1010,9 +1018,9 @@ function openPk(){try{const sv=localStorage.getItem('pkcols');if(sv&&$('pkcols')
     let badge=pk.free?'  [ฟรี]':('  ['+(pk.reason||'ซื้อไม่ได้')+']');
     if(!pk.free){if(pk.coin)badge+='  '+svgIc('ic-coin',' ')+' '+pk.coin.toLocaleString()+' coin';else if(pk.gp)badge+='  GP '+pk.gp.toLocaleString();}
     let h=`<div class="pkpk-h${pk.free?'':' nf'}">${pk.title||pk.agent_id}${badge} — แนะนำ ${feat.length} คน</div>`;
-    h+=`<div class="pkcards">${feat.map(pcard).join('')}</div>`;
+    h+=`<div class="pkcards">${feat.map(p=>pcard(p,pk.agent_id)).join('')}</div>`;
     if(more.length)h+=`<button class="pktoggle" onclick="tgMore(this,${more.length})">แสดงทั้งหมด (+${more.length})</button>`
-      +`<div class="pkcards" style="display:none">${more.map(pcard).join('')}</div>`;
+      +`<div class="pkcards" style="display:none">${more.map(p=>pcard(p,pk.agent_id)).join('')}</div>`;
     d.innerHTML=h;body.appendChild(d);});
   $('pkmodal').style.display='flex';syncPkCount();}
 function tgMore(btn,n){const g=btn.nextElementSibling;const show=g.style.display==='none';
