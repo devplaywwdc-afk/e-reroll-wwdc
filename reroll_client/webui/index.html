@@ -211,8 +211,10 @@
   .crow2 .clink{width:140px;flex:none;text-align:right}
   .crow2 .clink a{font-size:11px;word-break:break-all}
   .crow2 input[type=checkbox]{width:16px;height:16px;flex:none;accent-color:var(--g)}
-  #cards_grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:10px;justify-items:center}
+  #cards_grid{display:flex;flex-direction:column;gap:14px}
   #cards_grid .pcar{width:74px;height:96px;cursor:zoom-in}
+  .cards-gh{font-size:13px;font-weight:600;color:var(--g);margin-bottom:6px;border-bottom:1px solid var(--border);padding-bottom:4px}
+  .cards-grp{display:grid;grid-template-columns:repeat(auto-fill,74px);gap:10px}
   .pickwrap{display:flex;flex-direction:column;gap:6px;background:var(--glass2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:4px}
   .pkpack{font-size:11px;font-weight:700;color:var(--txt);margin:6px 0 2px}
   .pkrow{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--txt);padding:2px 0}
@@ -814,7 +816,7 @@ function startCheck(){window._CHK=[];window._CHKsel.clear();window._CHKrar.clear
   go(p);}
 function clearCheckFilter(){$('c_search').value='';$('c_fcoin').value=0;$('c_fgp').value=0;window._CHKrar.clear();renderCheck();}
 function checkSelAll(cb){const shown=currentCheckRows();if(cb.checked)shown.forEach(r=>window._CHKsel.add(r.user_code));else shown.forEach(r=>window._CHKsel.delete(r.user_code));renderCheck();}
-function toggleRar(r){if(window._CHKrar.has(r))window._CHKrar.delete(r);else window._CHKrar.add(r);renderCheck();}
+function toggleRar(r){if(window._CHKrar.has(r)){window._CHKrar.clear();}else{window._CHKrar.clear();window._CHKrar.add(r);}renderCheck();}
 function _art(p){return p.art||('https://efimg.com/efootballhub22/images/player_cards/'+p.id+'_l.png');}
 const _RANK={EPIC:4,LEGENDARY:4,HIGHLIGHT:3,FEATURED:3,SPECIAL:3,RARE:2,NORMAL:1,STANDARD:1};
 function _rrank(p){return _RANK[String(p.rarity||'').toUpperCase()]||0;}
@@ -826,9 +828,16 @@ function _pcarEl(p){const c=document.createElement('div');c.className='pcar skel
   return c;}
 function openCardsPopup(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r)return;
   let ps=(r.players||[]).slice();const rar=window._CHKrar;if(rar.size)ps=ps.filter(p=>rar.has(String(p.rarity)));
-  ps.sort((a,b)=>_rrank(b)-_rrank(a));
   $('cards_uc').textContent=uc+' · '+ps.length+' ใบ';
-  const g=$('cards_grid');g.innerHTML='';ps.forEach(p=>g.appendChild(_pcarEl(p)));
+  // group by rarity, groups ordered by rank (Legendary/Epic first)
+  const groups={};ps.forEach(p=>{const k=String(p.rarity||'ไม่ทราบ');(groups[k]=groups[k]||[]).push(p);});
+  const keys=Object.keys(groups).sort((a,b)=>_rrank({rarity:b})-_rrank({rarity:a})||a.localeCompare(b));
+  const g=$('cards_grid');g.innerHTML='';
+  keys.forEach(k=>{
+    const h=document.createElement('div');h.className='cards-gh';h.textContent=k+' · '+groups[k].length+' ใบ';g.appendChild(h);
+    const row=document.createElement('div');row.className='cards-grp';
+    groups[k].sort((a,b)=>(b.overall||0)-(a.overall||0)).forEach(p=>row.appendChild(_pcarEl(p)));
+    g.appendChild(row);});
   $('cardsmodal').style.display='flex';}
 function closeCardsPopup(){$('cardsmodal').style.display='none';}
 function _allRarities(){const s=new Set();window._CHK.forEach(r=>(r.players||[]).forEach(p=>{if(p.rarity)s.add(String(p.rarity));}));return [...s].sort();}
