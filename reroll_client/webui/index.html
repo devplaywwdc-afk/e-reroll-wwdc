@@ -406,7 +406,15 @@
             <option value="3">3</option><option value="4">4</option></select></label>
         <button onclick="closePk()">✕</button></div></div>
     <div class="pkbody" id="pkbody"></div>
-    <div class="pkfoot"><span id="pkcount" class="hint">เลือก 0 คน</span><button class="btn btn-primary" onclick="donePk()">เลือกเสร็จ</button></div>
+    <div class="pkfoot"><span id="pkcount" class="hint">เลือก 0 คน</span>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <select id="pk_mode" style="width:auto" title="เงื่อนไขหยุด/เซฟต่อไอดี">
+          <option value="any">ได้ตัวใดตัวนึงก็หยุด</option>
+          <option value="two">ได้ครบ 2 ตัว</option>
+          <option value="all">ได้ครบทุกตัวที่เลือก</option></select>
+        <label class="chk"><input id="pk_pay" type="checkbox"> ใช้ coin สุ่มต่อ (ไม่จำกัด จนได้/coin หมด)</label>
+        <button class="btn btn-primary" onclick="donePk()">เลือกเสร็จ</button>
+      </div></div>
   </div>
 </div>
 <div id="lb" class="lb" onclick="lbClose()">
@@ -785,13 +793,14 @@ function startReroll(){
   prefix:$('r_prefix').value.trim()||'j3xdr',claim:$('r_claim').checked,verbose:$('r_verbose').checked,
   delay:+$('r_delay').value||0,show_errors:$('r_showerr').checked,proxies:$('r_proxies').value,
   post_gacha:$('r_postgacha').checked,fmt:$('r_fmt').value,out_dir:$('r_out').value||null};
-  if(p.post_gacha)p.wanted_ids=window._wanted||[];
+  if(p.post_gacha){p.wanted_ids=window._wanted||[];p.target_mode=window._gmode||'any';p.pay_coin=!!window._gpay;p.spin_agents=window._gagents||[];}
   buildGrid(p.workers);go(p);}
 function startMod(mod){
   const dir=$(mod[0]+'_out').value||null;
   const p={module:mod,workers:5,verbose:false,fmt:'txt',delay:0.5,out_dir:dir,src_dir:dir};
   if(mod==='daily'){p.workers=+$('d_workers').value;p.daily_show_players=$('d_show').checked;p.keep_filename=$('d_keepname').checked;p.sugoroku=$('d_sugoroku').checked;$('d_log').innerHTML='';$('d_prog').textContent='0 / 0';$('d_bar').style.width='0';}
-  if(mod==='gacha'){p.workers=+$('g_workers').value;p.wanted_ids=window._wanted||[];p.keep_filename=$('g_keepname').checked;$('g_log').innerHTML='';}
+  if(mod==='gacha'){p.workers=+$('g_workers').value;p.wanted_ids=window._wanted||[];p.keep_filename=$('g_keepname').checked;
+    p.target_mode=window._gmode||'any';p.pay_coin=!!window._gpay;p.spin_agents=window._gagents||[];$('g_log').innerHTML='';}
   go(p);}
 window._CHK=[];window._CHKsel=new Set();window._CHKrar=new Set();window._cfiles=[];
 function pickCheckFiles(){api('pick_files').then(r=>{if(r&&r.paths&&r.paths.length){window._cfiles=r.paths;
@@ -1010,7 +1019,14 @@ function tgMore(btn,n){const g=btn.nextElementSibling;const show=g.style.display
   g.style.display=show?'grid':'none';btn.textContent=show?'ซ่อน':('แสดงทั้งหมด (+'+n+')');}
 function syncPkCount(){$('pkcount').textContent='เลือก '+document.querySelectorAll('#pkbody input:checked').length+' คน';}
 function closePk(){window._wanted=[...document.querySelectorAll('#pkbody input:checked')].map(c=>+c.value);
-  $('pkmodal').style.display='none';logln($('g_log'),'info','เลือกนักเตะ '+window._wanted.length+' คน');updateRerollGate();}
+  window._gmode=($('pk_mode')||{value:'any'}).value;
+  window._gpay=($('pk_pay')||{checked:false}).checked;
+  const aset=new Set();   // packs (agent_id) the chosen players came from — spin only those
+  for(const pk of PACKS){for(const p of (pk.players||[])){if(window._wanted.includes(p.id))aset.add(pk.agent_id);}}
+  window._gagents=[...aset];
+  $('pkmodal').style.display='none';
+  const md={any:'ได้ตัวใดตัวนึง',two:'ได้ครบ 2',all:'ได้ครบทุกตัว'}[window._gmode]||'';
+  logln($('g_log'),'info','เลือกนักเตะ '+window._wanted.length+' คน · โหมด '+md+(window._gpay?' · ใช้ coin':' · ฟรีเท่านั้น'));updateRerollGate();}
 function donePk(){closePk();}
 
 function srv(){$('srvpill').innerHTML=svgIc('ic-server')+' กำลังเช็ค…';api('server_status').then(r=>{

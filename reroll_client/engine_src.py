@@ -590,6 +590,58 @@ def draw_all_free(client, uid, sid, scan=None, only_agent=0):
     return drawn
 
 
+def spin_to_target(client, uid, sid, wanted_set, need, pay_coin, coins,
+                   scan=None, spin_agents=None, _stop=None):
+    """Draw packs until `need` distinct wanted players are obtained. Free draws first;
+    if pay_coin, keep drawing with the account's own coins (no cap) until the target is
+    met OR coins can't afford another draw. Returns {drawn, coins_left, got}.
+
+    spin_agents: restrict to these agent_ids (the pack(s) the wanted players came from);
+    empty/None = every free pack + (if pay_coin) every coin pack.
+    """
+    scan = scan or scan_agents(client, uid, sid)
+    want = set(wanted_set or [])
+    got = set()
+    drawn = []
+    agents = scan.get("all", [])
+    if spin_agents:
+        sset = {int(x) for x in spin_agents}
+        agents = [a for a in agents if a.get("agent_id") in sset]
+
+    def _take(players):
+        for p in players:
+            drawn.append(p)
+            if p.get("id") in want:
+                got.add(p["id"])
+
+    def _done():
+        return len(got) >= need
+
+    for a in agents:
+        if _done() or (_stop and _stop()):
+            break
+        aid = a.get("agent_id")
+        # free draws (limited by remaining)
+        if a.get("free") and not a.get("needs_ad"):
+            for _ in range(a.get("remaining") or 0):
+                if _done() or (_stop and _stop()):
+                    break
+                res = use_agent(client, uid, sid, aid, a.get("count") or 1, a.get("buy_type") or "BUY_BY_COIN")
+                if res.get("result") != "NOERR":
+                    break
+                _take(res.get("players") or [])
+        # paid draws with the account's coins (no cap — stop when it can't afford)
+        price = a.get("coin")
+        if pay_coin and price and price > 0:
+            while coins >= price and not _done() and not (_stop and _stop()):
+                res = use_agent(client, uid, sid, aid, 1, "BUY_BY_COIN")
+                if res.get("result") != "NOERR":
+                    break   # gate rejected (out of coins / price mismatch) — stop this pack
+                coins -= price
+                _take(res.get("players") or [])
+    return {"drawn": drawn, "coins_left": coins, "got": len(got)}
+
+
 # --- efootbase enrichment (public player data: name / overall / art image) ---
 import threading as _thr
 _EFB_CACHE: dict = {}
@@ -1157,6 +1209,10 @@ def _gacha(params, log):
     workers = max(1, min(500, int((params or {}).get("workers", 32) or 32)))
     wanted_order = [int(x) for x in (params or {}).get("wanted_ids", [])]
     wanted_set = set(wanted_order)
+    target_mode = (params or {}).get("target_mode") or ""   # "any" / "two" / "all"
+    pay_coin = bool((params or {}).get("pay_coin"))
+    spin_agents = [int(x) for x in (params or {}).get("spin_agents", []) if str(x).strip()]
+    spinning = bool(wanted_set and (target_mode or pay_coin))   # spin-to-target mode
     recs = list(_acc_records(src).items())
     total = len(recs)
     gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: self-tunes to the IP
@@ -1204,7 +1260,17 @@ def _gacha(params, log):
                     continue
                 if _stopped():
                     return
-                drawn = draw_all_free(c, int(a["user_id"]), sid, only_agent=only)
+                if spinning:
+                    scan = scan_agents(c, int(a["user_id"]), sid)
+                    coins0 = account_status(c, int(a["user_id"]), sid)["coins"]
+                    need = 1 if target_mode == "any" else (2 if target_mode == "two" else len(wanted_set))
+                    need = max(1, min(need, len(wanted_set)))
+                    sp = spin_to_target(c, int(a["user_id"]), sid, wanted_set, need,
+                                        pay_coin, coins0, scan=scan,
+                                        spin_agents=spin_agents, _stop=_stopped)
+                    drawn = sp["drawn"]
+                else:
+                    drawn = draw_all_free(c, int(a["user_id"]), sid, only_agent=only)
                 info = efb_many([p["id"] for p in drawn if p.get("id")])
                 by_id = {}
                 for p in drawn:
