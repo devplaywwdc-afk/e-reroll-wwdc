@@ -1,316 +1,339 @@
 """
-Local web dashboard for the reroll engine (no external deps — stdlib only).
-Run:  python pes_api/gui/server.py        (PORT from env, default 8080)
-Then open http://localhost:<PORT>
+Pure-API browser GUI server for the E-WWDC reroll/gacha/daily/genlink/merge/check engine.
+
+Mirrors the main app (E-WWDC v1.0.18) feature-for-feature, but:
+  - transport is http + SSE (opens in a browser, no pywebview),
+  - no Discord login / license / entitlement / HWID / forced-update (owner's own tool),
+  - the engine's constants come from engine_brain.BRAIN (local), not a released brain.
+
+The browser calls POST /api/<fn> with a JSON array of args; it receives server events
+on GET /events (SSE), delivered as batched JSON arrays into window._evb().
 """
 import os
 import sys
 import json
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
-HERE = os.path.dirname(__file__)
-sys.path.insert(0, HERE)
 import queue
 import threading
-from engine import ENGINE
-from daily_engine import DAILY
-import flows
-import client as cl
-import accounts
-import efootbase
-import gacha
-import injector
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-PORT = int(os.environ.get("PORT") or os.environ.get("HOST_PORT") or 8080)
-INDEX = os.path.join(HERE, "index.html")
+HERE = os.path.dirname(os.path.abspath(__file__))
+PES = os.path.dirname(HERE)
+sys.path.insert(0, PES)          # import engine_core / engine_brain / injectmod
+
+import engine_core as E
+import engine_brain
+import flows                     # server_status (standalone probe)
+try:
+    import injectmod
+except Exception:                # adb tooling optional
+    injectmod = None
+
+BRAIN = engine_brain.BRAIN
+APP_VERSION = "1.0.18"
+
+# ---------------------------------------------------------------- SSE event bus
+_listeners = []                  # list[queue.Queue]  (one per open /events connection)
+_lis_lock = threading.Lock()
 
 
-class H(BaseHTTPRequestHandler):
-    def log_message(self, *a):  # silence default logging
+def emit(ev):
+    """Fan one event out to every open SSE connection."""
+    with _lis_lock:
+        for q in list(_listeners):
+            try:
+                q.put_nowait(ev)
+            except Exception:
+                pass
+
+
+def _add_listener():
+    q = queue.Queue(maxsize=20000)
+    with _lis_lock:
+        _listeners.append(q)
+    return q
+
+
+def _drop_listener(q):
+    with _lis_lock:
+        if q in _listeners:
+            _listeners.remove(q)
+
+
+# ---------------------------------------------------------------- run control
+_run_lock = threading.Lock()
+_stop_event = None
+_worker = None
+_run_state = {"running": False, "module": "", "workers": 0}   # for grid rebuild on reconnect
+
+
+class _StdoutPush:
+    """Capture engine print() lines → applog events (daily/gacha/merge log boxes)."""
+    def __init__(self):
+        self._buf = ""
+
+    def write(self, s):
+        self._buf += s
+        while "\n" in self._buf:
+            line, self._buf = self._buf.split("\n", 1)
+            if line.strip():
+                emit({"type": "applog", "lvl": "info", "t": line})
+
+    def flush(self):
+        if self._buf.strip():
+            emit({"type": "applog", "lvl": "info", "t": self._buf})
+        self._buf = ""
+
+
+def _run_engine(params):
+    global _stop_event
+    stop = threading.Event()
+    _stop_event = stop
+    params["stop"] = stop
+    params["emit"] = emit
+    params["progress"] = lambda ok, fail, total: emit(
+        {"type": "progress", "ok": ok, "fail": fail, "total": total})
+    _run_state.update({"running": True,
+                       "module": params.get("module") or "reroll",
+                       "workers": int(params.get("workers") or 0)})
+    old = sys.stdout
+    sys.stdout = _StdoutPush()
+    try:
+        E.run(BRAIN, None, params)
+    except Exception as e:
+        emit({"type": "runerr", "t": str(e), "raw": repr(e)})
+    finally:
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
+        sys.stdout = old
+        _run_state["running"] = False
+        emit({"type": "stopped"})
+
+
+def start_run(params):
+    """Launch a reroll/daily/gacha/genlink/check run in the background (one job at a time)."""
+    global _worker
+    with _run_lock:
+        if _worker and _worker.is_alive():
+            return {"error": "กำลังทำงานอยู่ รอให้เสร็จก่อน"}
+        _worker = threading.Thread(target=_run_engine, args=(params,), daemon=True)
+        _worker.start()
+    return {"ok": True}
+
+
+def stop_run():
+    if _stop_event:
+        _stop_event.set()
+        emit({"type": "applog", "lvl": "info", "t": "กำลังหยุด…"})
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- blocking actions
+def do_scan(out_dir=None):
+    """Gacha pack scan (needs one saved account to log in with)."""
+    old = sys.stdout
+    sys.stdout = _StdoutPush()
+    try:
+        res = E.run(BRAIN, None, {"action": "scan", "out_dir": out_dir, "src_dir": out_dir})
+        return {"packs": (res or {}).get("packs", [])}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        sys.stdout = old
+
+
+def do_merge(params):
+    old = sys.stdout
+    sys.stdout = _StdoutPush()
+    try:
+        return E.run(BRAIN, None, {**params, "action": "merge", "emit": emit})
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        sys.stdout = old
+
+
+# ---------------------------------------------------------------- api dispatch
+def api_call(fn, args):
+    a = list(args or [])
+
+    if fn == "app_version":
+        return {"version": APP_VERSION}
+    if fn == "changelog":
+        return {"current": APP_VERSION, "releases": []}
+    if fn == "server_status":
+        try:
+            return flows.server_status()
+        except Exception as e:
+            return {"status": "down", "error": str(e)}
+
+    if fn == "scan_packs":
+        return do_scan(a[0] if a else None)
+
+    if fn == "start":
+        try:
+            p = json.loads(a[0]) if a and isinstance(a[0], str) else (a[0] if a else {})
+        except Exception:
+            p = {}
+        p = dict(p or {})
+        if p.get("action") == "merge":
+            return do_merge(p)
+        return start_run(p)        # reroll / daily / gacha / genlink / check (all emit live)
+    if fn == "stop":
+        return stop_run()
+
+    if fn == "inject_list":
+        if not injectmod:
+            return {"error": "injectmod ไม่พร้อม (adb tooling)"}
+        try:
+            return {"devices": injectmod.list_devices()}
+        except Exception as e:
+            return {"error": str(e)}
+    if fn == "inject_push":
+        if not injectmod:
+            return {"error": "injectmod ไม่พร้อม (adb tooling)"}
+        device = a[0] if len(a) > 0 else None
+        if not device:
+            return {"error": "เลือกอุปกรณ์ก่อน"}
+        try:
+            acct = json.loads(a[1]) if len(a) > 1 and isinstance(a[1], str) else (a[1] if len(a) > 1 else {})
+        except Exception as e:
+            return {"error": f"บัญชีไม่ถูกต้อง: {e}"}
+        if not (acct.get("user_code") and acct.get("auth_code") and acct.get("user_id") is not None):
+            return {"error": "บัญชีต้องมี user_code + auth_code + user_id"}
+        opts = {}
+        if len(a) > 2 and a[2]:
+            try:
+                opts = json.loads(a[2]) if isinstance(a[2], str) else dict(a[2])
+            except Exception:
+                opts = {}
+        try:
+            return injectmod.inject(device, acct,
+                                    backup=opts.get("backup", True),
+                                    clear_system=opts.get("clear_system", True),
+                                    launch=opts.get("launch", True))
+        except Exception as e:
+            return {"error": str(e)}
+    if fn == "read_account_file":
+        path = a[0] if a else None
+        try:
+            with open(path, encoding="utf-8") as f:
+                return {"account": json.load(f)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    return {"error": f"unknown api {fn!r}"}
+
+
+# ---------------------------------------------------------------- http handler
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *a):
         pass
 
-    def _send(self, code, body=b"", ctype="application/json"):
+    def _send(self, code, body, ctype="application/json; charset=utf-8"):
+        data = body if isinstance(body, bytes) else str(body).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
-        if body:
-            self.wfile.write(body if isinstance(body, bytes) else body.encode("utf-8"))
+        try:
+            self.wfile.write(data)
+        except Exception:
+            pass
 
     def do_GET(self):
-        if self.path == "/" or self.path.startswith("/index"):
-            with open(INDEX, "rb") as f:
-                self._send(200, f.read(), "text/html; charset=utf-8")
-        elif self.path.split("?")[0].lstrip("/") in ("logo.png", "logo.jpg", "logo.webp"):
-            name = self.path.split("?")[0].lstrip("/")
-            fp = os.path.join(HERE, name)
-            if os.path.exists(fp):
-                ctype = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}[name.split(".")[-1]]
-                with open(fp, "rb") as f:
-                    self._send(200, f.read(), ctype)
+        path = self.path.split("?", 1)[0]
+        if path in ("/", "/index.html"):
+            try:
+                with open(os.path.join(HERE, "index.html"), "rb") as f:
+                    self._send(200, f.read(), "text/html; charset=utf-8")
+            except Exception as e:
+                self._send(500, str(e), "text/plain; charset=utf-8")
+            return
+        if path == "/logo.png":
+            p = os.path.join(HERE, "logo.png")
+            if os.path.exists(p):
+                with open(p, "rb") as f:
+                    self._send(200, f.read(), "image/png")
             else:
-                self._send(404, b"")
-        elif self.path == "/events":
+                self._send(404, b"", "image/png")
+            return
+        if path == "/events":
             self._sse()
-        elif self.path == "/api/status":
-            self._send(200, json.dumps({"running": ENGINE.running, "cfg": ENGINE.cfg,
-                                        "ok": ENGINE.stats["ok"], "fail": ENGINE.stats["fail"]}))
-        elif self.path == "/api/server-status":
-            sample = next(iter(accounts.load_all()), None)
-            try:
-                self._send(200, json.dumps(flows.server_status(sample), ensure_ascii=False))
-            except Exception as e:
-                self._send(200, json.dumps({"status": "issue", "error": f"{type(e).__name__}: {e}", "checks": []}))
-        elif self.path == "/api/accounts":
-            accs = [a["user_code"] for a in accounts.load_all()]
-            self._send(200, json.dumps({"accounts": accs, "count": len(accs)}))
-        elif self.path.startswith("/api/link"):
-            from urllib.parse import urlparse, parse_qs
-            uc = (parse_qs(urlparse(self.path).query).get("user_code") or [""])[0]
-            self._send(200, json.dumps(self._konami_link(uc), ensure_ascii=False))
-        elif self.path.startswith("/api/roster"):
-            from urllib.parse import urlparse, parse_qs
-            uc = (parse_qs(urlparse(self.path).query).get("user_code") or [""])[0]
-            a = next((x for x in accounts.load_all() if x["user_code"] == uc), None)
-            self._send(200, json.dumps(self._account_report(a), ensure_ascii=False))
-        else:
-            self._send(404, b"{}")
-
-    def _account_report(self, a):
-        """Full report for an account: currencies + enriched player roster."""
-        if not a:
-            return {"error": "account not found"}
-        uc = a.get("user_code", "?")
-        try:
-            c = cl.GateClient(user_code=uc)
-            lr = flows.login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
-            sid = lr.get("session_id")
-            if not sid:
-                return {"user_code": uc, "error": "login failed"}
-            st = flows.account_status(c, int(a["user_id"]), sid)
-            roster = flows.get_roster(lr)
-            info = efootbase.lookup_many([p["id"] for p in roster])
-            players = []
-            for p in roster:
-                e = info.get(str(p["id"]), {})
-                players.append({**p, "name": e.get("name"), "overall": e.get("overall"),
-                                "position": e.get("position"), "card": e.get("card"), "art": e.get("art")})
-            players.sort(key=lambda x: (x.get("overall") or 0), reverse=True)
-            return {"user_code": uc, "gp": st["gp"], "coins": st["coins"], "efp": st["efp"],
-                    "player_count": len(players), "players": players}
-        except Exception as e:
-            return {"user_code": uc, "error": f"{type(e).__name__}: {e}"}
-
-    def _link_for(self, a):
-        """Fetch a KONAMI link for an uploaded account dict (may not be in local accounts/)."""
-        uc = a.get("user_code", "?")
-        try:
-            uid = int(a["user_id"])
-            auth = a["auth_code"]
-        except Exception:
-            return {"user_code": uc, "error": "bad account file (need user_id + auth_code)"}
-        devid = a.get("device_identifier")  # optional; login works without the original device
-        try:
-            c = cl.GateClient(user_code=uc)
-            sid = flows.login(c, uid, auth, devid).get("session_id")
-            if not sid:
-                return {"user_code": uc, "error": "login failed (bad auth_code?)"}
-            r = flows.get_konami_link(c, uid, sid)
-            r["user_code"] = uc
-            return r
-        except Exception as e:
-            return {"user_code": uc, "error": f"{type(e).__name__}: {e}"}
-
-    def _konami_link(self, user_code):
-        a = next((x for x in accounts.load_all() if x["user_code"] == user_code), None)
-        if not a:
-            return {"error": "account not found"}
-        try:
-            c = cl.GateClient(user_code=user_code)
-            sid = flows.login(c, a["user_id"], a["auth_code"], a.get("device_identifier")).get("session_id")
-            if not sid:
-                return {"error": "login failed"}
-            return flows.get_konami_link(c, a["user_id"], sid)
-        except Exception as e:
-            return {"error": f"{type(e).__name__}: {e}"}
-
-    def do_POST(self):
-        ln = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(ln) if ln else b"{}"
-        try:
-            data = json.loads(raw or b"{}")
-        except Exception:
-            data = {}
-        if self.path == "/api/check":
-            accs = data.get("accounts") or accounts.load_all()
-            report = self._account_report
-
-            def run_check(accs):
-                import concurrent.futures as cf
-                total = len(accs)
-                ENGINE.emit({"type": "cstart", "total": total})
-                done = 0
-                with cf.ThreadPoolExecutor(max_workers=5) as ex:
-                    futs = {ex.submit(report, a): a for a in accs}
-                    for fu in cf.as_completed(futs):
-                        try:
-                            rep = fu.result()
-                        except Exception as e:
-                            rep = {"user_code": futs[fu].get("user_code", "?"), "error": str(e)}
-                        done += 1
-                        ENGINE.emit({"type": "crow", "done": done, "total": total, "rep": rep})
-                ENGINE.emit({"type": "cdone", "total": total})
-
-            threading.Thread(target=run_check, args=(accs,), daemon=True).start()
-            self._send(200, json.dumps({"ok": True, "total": len(accs)})); return
-        if self.path == "/api/inject/devices":
-            try:
-                devs = injector.list_devices()
-                self._send(200, json.dumps({"devices": devs}, ensure_ascii=False))
-            except Exception as e:
-                self._send(200, json.dumps({"error": f"{type(e).__name__}: {e}"}))
             return
-        if self.path == "/api/inject/run":
-            dev = data.get("device")
-            acct = data.get("account")
-            if not acct and data.get("user_code"):
-                acct = next((x for x in accounts.load_all() if x["user_code"] == data["user_code"]), None)
-            if not dev or not acct:
-                self._send(200, json.dumps({"ok": False, "error": "ต้องมี device + account"})); return
-            try:
-                res = injector.inject(dev, acct,
-                                      backup=bool(data.get("backup", True)),
-                                      clear_system=bool(data.get("clear_system", True)),
-                                      launch=bool(data.get("launch", True)))
-                self._send(200, json.dumps(res, ensure_ascii=False))
-            except Exception as e:
-                self._send(200, json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}))
-            return
-        if self.path == "/api/gacha/pack-players":
-            agent_ids = data.get("agent_ids") or []
-            accs = data.get("accounts") or accounts.load_all()
-            if not accs:
-                self._send(200, json.dumps({"error": "ต้องมีไอดีอย่างน้อย 1 ตัวเพื่อสแกน pack"})); return
-            a = accs[0]
-            try:
-                c = cl.GateClient(user_code=a.get("user_code"))
-                sid = flows.login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier")).get("session_id")
-                if not sid:
-                    self._send(200, json.dumps({"error": "login failed"})); return
-                res = gacha.pack_players(c, int(a["user_id"]), sid, agent_ids)
-                self._send(200, json.dumps(res, ensure_ascii=False))
-            except Exception as e:
-                self._send(200, json.dumps({"error": f"{type(e).__name__}: {e}"}))
-            return
-        if self.path == "/api/gacha/scan":
-            accs = data.get("accounts") or accounts.load_all()
-            if not accs:
-                self._send(200, json.dumps({"error": "no accounts"})); return
-            a = accs[0]
-            try:
-                c = cl.GateClient(user_code=a.get("user_code"))
-                lr = flows.login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
-                sid = lr.get("session_id")
-                if not sid:
-                    self._send(200, json.dumps({"error": "login failed"})); return
-                sc = gacha.scan_agents(c, int(a["user_id"]), sid)
-                sc["sample"] = a.get("user_code")
-                self._send(200, json.dumps(sc, ensure_ascii=False))
-            except Exception as e:
-                self._send(200, json.dumps({"error": f"{type(e).__name__}: {e}"}))
-            return
-        if self.path == "/api/gacha/run":
-            accs = data.get("accounts") or accounts.load_all()
-            wanted = [w.strip() for w in (data.get("wanted") or []) if w.strip()]
-            wanted_ids = [int(x) for x in (data.get("wanted_ids") or [])]
-            agent_id = int(data.get("gacha_agent", 0) or 0)
-
-            def run_gacha(accs, wanted):
-                total = len(accs)
-                ENGINE.emit({"type": "gstart", "total": total, "wanted": wanted})
-                done = 0
-                for a in accs:
-                    rep = gacha.run_account(a, wanted, agent_id=agent_id, wanted_ids=wanted_ids)
-                    done += 1
-                    ENGINE.emit({"type": "grow", "done": done, "total": total, "rep": rep})
-                ENGINE.emit({"type": "gdone", "total": total})
-
-            threading.Thread(target=run_gacha, args=(accs, wanted), daemon=True).start()
-            self._send(200, json.dumps({"ok": True, "total": len(accs)})); return
-        if self.path == "/api/daily/start":
-            up = data.get("accounts")  # optional uploaded accounts
-            ok = DAILY.start(source=data.get("source", "folder"), uploaded=up,
-                             workers=int(data.get("workers", 10)),
-                             max_retries=int(data.get("max_retries", 3)),
-                             schedule=bool(data.get("schedule", False)),
-                             do_sugoroku=bool(data.get("sugoroku", False)))
-            self._send(200, json.dumps({"ok": ok})); return
-        if self.path == "/api/daily/stop":
-            DAILY.stop(); self._send(200, json.dumps({"ok": True})); return
-        if self.path == "/api/daily/delete-failed":
-            self._send(200, json.dumps({"deleted": DAILY.delete_failed()})); return
-        if self.path == "/api/genlink":
-            accs = data.get("accounts") or []
-            out = []
-            for a in accs:
-                out.append(self._link_for(a))
-            self._send(200, json.dumps({"results": out}, ensure_ascii=False))
-            return
-        if self.path == "/api/start":
-            proxies = [p.strip() for p in (data.get("proxies") or "").splitlines()
-                       if p.strip() and not p.strip().startswith("#")]
-            ok = ENGINE.start(
-                mode=data.get("mode", "direct"),
-                workers=int(data.get("workers", 15)),
-                target=int(data.get("target", 0)),
-                proxies=proxies,
-                do_setup=bool(data.get("setup", False)),
-                do_claim=bool(data.get("claim", True)),
-                do_gacha=bool(data.get("gacha", False)),
-                gacha_agent=int(data.get("gacha_agent", 0) or 0),
-                wanted=[w.strip() for w in (data.get("wanted") or []) if w.strip()],
-                wanted_ids=[int(x) for x in (data.get("wanted_ids") or [])],
-                name_prefix=(data.get("prefix") or "").strip() or None,
-            )
-            self._send(200, json.dumps({"ok": ok, "workers": int(data.get("workers", 15))}))
-        elif self.path == "/api/stop":
-            ENGINE.stop()
-            self._send(200, json.dumps({"ok": True}))
-        else:
-            self._send(404, b"{}")
+        self._send(404, {"error": "not found"})
 
     def _sse(self):
         self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
-        q = queue.Queue(maxsize=8000)
-        with ENGINE.listeners_lock:
-            ENGINE.listeners.append(q)
-        with DAILY.lock:
-            DAILY.listeners.append(q)
+        q = _add_listener()
+        # reconnect/reload: if a reroll run is live, replay 'started' so the grid rebuilds
+        if _run_state.get("running") and _run_state.get("module") == "reroll":
+            try:
+                q.put_nowait({"type": "started", "workers": _run_state.get("workers", 0)})
+            except Exception:
+                pass
         try:
-            self.wfile.write(b": connected\n\n")
+            self.wfile.write(b": ok\n\n")
             self.wfile.flush()
             while True:
+                batch = []
                 try:
-                    ev = q.get(timeout=15)
-                    self.wfile.write(f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode("utf-8"))
-                except Exception:
-                    self.wfile.write(b": ping\n\n")  # keepalive
+                    batch.append(q.get(timeout=15))      # block, or heartbeat on timeout
+                except queue.Empty:
+                    self.wfile.write(b": ping\n\n")
+                    self.wfile.flush()
+                    continue
+                for _ in range(500):                     # drain the tick, send one array
+                    try:
+                        batch.append(q.get_nowait())
+                    except queue.Empty:
+                        break
+                payload = json.dumps(batch, ensure_ascii=False)
+                self.wfile.write(b"data: " + payload.encode("utf-8") + b"\n\n")
                 self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError):
+                time.sleep(0.08)
+        except Exception:
             pass
         finally:
-            ENGINE.remove_listener(q)
-            DAILY.remove_listener(q)
+            _drop_listener(q)
+
+    def do_POST(self):
+        path = self.path.split("?", 1)[0]
+        if not path.startswith("/api/"):
+            self._send(404, {"error": "not found"})
+            return
+        fn = path[len("/api/"):]
+        n = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(n) if n else b"[]"
+        try:
+            args = json.loads(raw.decode("utf-8") or "[]")
+            if not isinstance(args, list):
+                args = [args]
+        except Exception:
+            args = []
+        try:
+            res = api_call(fn, args)
+        except Exception as e:
+            res = {"error": str(e)}
+        self._send(200, json.dumps(res, ensure_ascii=False).encode("utf-8"))
 
 
-def main():
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), H)
-    print(f"[+] Reroll dashboard: http://localhost:{PORT}")
+def main(port=8777):
+    for s in (sys.stdout, sys.stderr):
+        try:
+            s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    print(f"E-WWDC pure-API GUI  -  http://127.0.0.1:{port}")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
@@ -318,4 +341,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    p = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
+    main(p)
