@@ -156,8 +156,46 @@ def do_merge(params):
 
 
 # ---------------------------------------------------------------- api dispatch
+def _native_pick(kind):
+    """Open a native dialog on THIS machine (server == the user's PC) and return the
+    real filesystem path(s), so the engine can read them directly. Falls back to an
+    error (the UI fields stay editable, so the user can still type a path)."""
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        root.attributes("-topmost", True)
+    except Exception:
+        pass
+    try:
+        if kind == "folder":
+            p = filedialog.askdirectory(title="เลือกโฟลเดอร์บัญชี")
+            return {"path": p or ""}
+        files = filedialog.askopenfilenames(
+            title="เลือกไฟล์บัญชี",
+            filetypes=[("Account files", "*.txt *.dat"), ("All files", "*.*")])
+        return {"paths": list(files)}
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
 def api_call(fn, args):
     a = list(args or [])
+
+    if fn == "pick_folder":
+        try:
+            return _native_pick("folder")
+        except Exception as e:
+            return {"error": str(e), "path": ""}
+    if fn == "pick_files":
+        try:
+            return _native_pick("files")
+        except Exception as e:
+            return {"error": str(e), "paths": []}
 
     if fn == "app_version":
         return {"version": APP_VERSION}
@@ -326,13 +364,26 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, json.dumps(res, ensure_ascii=False).encode("utf-8"))
 
 
+class Server(ThreadingHTTPServer):
+    daemon_threads = True            # don't let open SSE threads block shutdown
+    allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        # a browser closing an SSE/keep-alive socket raises WinError 10053/10054 —
+        # benign client disconnect, not a server fault. Swallow it (no scary traceback).
+        e = sys.exc_info()[1]
+        if isinstance(e, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
+
+
 def main(port=8777):
     for s in (sys.stdout, sys.stderr):
         try:
             s.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
             pass
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    srv = Server(("127.0.0.1", port), Handler)
     print(f"E-WWDC pure-API GUI  -  http://127.0.0.1:{port}")
     try:
         srv.serve_forever()
@@ -341,5 +392,6 @@ def main(port=8777):
 
 
 if __name__ == "__main__":
-    p = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
+    # honor the launcher's PORT env (START_REROLL_GUI.bat picks a free one), then argv, else 8777
+    p = int(os.environ.get("PORT") or (sys.argv[1] if len(sys.argv) > 1 else 8777))
     main(p)

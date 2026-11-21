@@ -913,6 +913,25 @@ def build_uc_index(folder):
     return idx
 
 
+def start_uc_index(folder):
+    """Non-blocking dedup index: return an empty {uc:path} + its lock immediately and
+    fill it in a background thread (setdefault, so a worker's live write always wins).
+    A big output folder used to json.load every file before the first account could
+    start — that full scan is what made the run hang for seconds after pressing Start."""
+    import threading
+    idx = {}
+    lock = threading.Lock()
+
+    def _bg():
+        got = build_uc_index(folder)
+        with lock:
+            for k, v in got.items():
+                idx.setdefault(k, v)
+
+    threading.Thread(target=_bg, daemon=True).start()
+    return idx, lock
+
+
 def write_record(folder, rec, scheme, params, replace_old_uc=True,
                  uc_index=None, idx_lock=None, keep_name=False):
     """Write an account record; delete any previous file for the same user_code so
@@ -1017,8 +1036,7 @@ def _reroll(params, log):
     t0 = time.time()
     tgt = "∞" if unlimited else count
     gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: keeps 1 IP at its safe max
-    uc_index = build_uc_index(out)
-    idx_lock = threading.Lock()
+    uc_index, idx_lock = start_uc_index(out)
 
     def _stats():
         dt = max(0.001, time.time() - t0)
@@ -1231,8 +1249,7 @@ def _gacha(params, log):
             idx["i"] += 1
             return it
 
-    uc_index = build_uc_index(src)
-    idx_lock = threading.Lock()
+    uc_index, idx_lock = start_uc_index(src)
 
     def worker():
         c = GateClient()   # reused across accounts (keep-alive); user_code set per account
@@ -1348,8 +1365,7 @@ def _daily(params, log):
             idx["i"] += 1
             return it
 
-    uc_index = build_uc_index(src)
-    idx_lock = threading.Lock()
+    uc_index, idx_lock = start_uc_index(src)
 
     def worker():
         # persistent worker: pull the next account until the queue drains or stop.

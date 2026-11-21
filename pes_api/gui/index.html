@@ -724,9 +724,6 @@ const _LOCAL={
   login:()=>({ok:true,username:'owner'}),
   entitlement:()=>({has_access:true,modules:[],expires_at:null}),
   check_update:()=>({newer:false}),
-  pick_folder:()=>{const p=prompt('วางพาธโฟลเดอร์ (เครื่องนี้):','');return {path:(p||'').trim()};},
-  pick_files:()=>{const p=prompt('วางพาธไฟล์บัญชี คั่นด้วย ; (เครื่องนี้):','');
-    const a=(p||'').split(';').map(s=>s.trim()).filter(Boolean);return {paths:a};},
   save_image:(url,name)=>{if(!url)return {error:'no url'};
     fetch(url).then(r=>r.blob()).then(b=>{const a=document.createElement('a');
       a.href=URL.createObjectURL(b);a.download=name||(url.split('/').pop()||'card.png');
