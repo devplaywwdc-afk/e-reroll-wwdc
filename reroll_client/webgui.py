@@ -80,6 +80,21 @@ class Api:
         self.token = None
         self.name = None
         self.build_id = _bundled_build_id()
+        # DEV ONLY: run a local engine_src.py (not the server's) against the real session.
+        # Never active in the shipped exe (gated on not-frozen + explicit env). Lets us
+        # test engine changes before build/register. Empty in production.
+        self.local_engine = None
+        self.dev_nosession = False
+        self._dev_brain = None
+        if not getattr(sys, "frozen", False):
+            le = os.environ.get("REROLL_LOCAL_ENGINE")
+            if le and os.path.isfile(le):
+                self.local_engine = le
+            # DEV: run the engine with a locally-built brain, bypassing the M-bound
+            # license session (the frozen-exe integrity gate can't match from source).
+            # Guarded on not-frozen + explicit env + a local engine. Never in the exe.
+            if self.local_engine and os.environ.get("REROLL_NO_SESSION") == "1":
+                self.dev_nosession = True
         self.stop_event = None
         self.worker = None
         # event bus: workers enqueue (non-blocking); one flusher coalesces into a
@@ -323,6 +338,21 @@ class Api:
         except Exception as e:  # noqa: BLE001
             return {"has_access": False, "reason": str(e)}
 
+    def _dev_run(self, params):
+        """DEV ONLY: build the brain locally and exec the local engine source, calling
+        run(brain, None, params) — no license session. Mirrors the offline probe path."""
+        if self._dev_brain is None:
+            import build_brain
+            self._dev_brain = build_brain.build_brain()
+        with open(self.local_engine, "r", encoding="utf-8") as f:
+            src = f.read()
+        ns = {"__name__": "engine_dev"}
+        exec(compile(src, "<engine_dev>", "exec"), ns)  # noqa: S102
+        run = ns.get("run")
+        if not callable(run):
+            raise RuntimeError("engine has no run()")
+        return run(self._dev_brain, None, params)
+
     # ---- gacha scan (pack picker) ----
     def scan_packs(self, out_dir=None):
         if not self.token:
@@ -330,8 +360,12 @@ class Api:
         old = sys.stdout
         sys.stdout = _StdoutPush(self)   # engine print() must NOT hit the frozen
         try:                             # exe's cp874 stdout (crashes on names like Brasileirão)
-            res = run_module("gacha", self.build_id, discord_token=self.token,
-                             params={"action": "scan", "out_dir": out_dir, "src_dir": out_dir})
+            scan_p = {"module": "gacha", "action": "scan", "out_dir": out_dir, "src_dir": out_dir}
+            if self.dev_nosession:
+                res = self._dev_run(scan_p)
+            else:
+                res = run_module("gacha", self.build_id, discord_token=self.token,
+                                 local_engine=self.local_engine, params=scan_p)
             return {"packs": (res or {}).get("packs", [])}
         except Exception as e:  # noqa: BLE001
             return {"error": str(e)}
@@ -348,22 +382,26 @@ class Api:
     def start(self, params_json):
         if self.worker and self.worker.is_alive():
             return {"error": "กำลังทำงานอยู่ รอให้เสร็จก่อน"}
-        if not self.token:
+        if not self.token and not self.dev_nosession:
             return {"error": "เข้าสู่ระบบก่อน"}
         try:
             p = json.loads(params_json) if isinstance(params_json, str) else dict(params_json or {})
         except Exception:
             p = {}
         module = p.get("module") or "reroll"
-        # fresh entitlement re-check at run start (anti-patched-client)
-        try:
-            from loader import session
-            ent = session.check_entitlement(self.token)
-        except Exception as e:  # noqa: BLE001
-            return {"error": str(e)}
-        if not ent.get("has_access"):
-            return {"error": "ไม่มีสิทธิ์ใช้งาน — ไปเช่าที่เว็บก่อน"}
-        mods = ent.get("modules") or list(VALID_MODULES)
+        # fresh entitlement re-check at run start (anti-patched-client). DEV bypass: no
+        # license session, so skip the re-check and run every module locally.
+        if self.dev_nosession:
+            mods = list(VALID_MODULES)
+        else:
+            try:
+                from loader import session
+                ent = session.check_entitlement(self.token)
+            except Exception as e:  # noqa: BLE001
+                return {"error": str(e)}
+            if not ent.get("has_access"):
+                return {"error": "ไม่มีสิทธิ์ใช้งาน — ไปเช่าที่เว็บก่อน"}
+            mods = ent.get("modules") or list(VALID_MODULES)
         gate = module if module in mods else mods[0]
         if p.get("action") in ("merge", "check") and gate not in VALID_MODULES:
             gate = "reroll"
@@ -377,7 +415,12 @@ class Api:
             old = sys.stdout
             sys.stdout = _StdoutPush(self)
             try:
-                run_module(gate, self.build_id, discord_token=self.token, params=p)
+                p.setdefault("module", gate)
+                if self.dev_nosession:
+                    self._dev_run(p)
+                else:
+                    run_module(gate, self.build_id, discord_token=self.token,
+                               local_engine=self.local_engine, params=p)
             except Exception as e:  # noqa: BLE001
                 et, msg = type(e).__name__, str(e)
                 low = (et + " " + msg).lower()
@@ -422,7 +465,7 @@ def main():
     idx = os.path.join(_asset_dir(), "index.html")
     win = webview.create_window(
         "E-WWDC", url=idx, js_api=api,
-        width=1220, height=948, min_size=(940, 660),
+        width=1360, height=1000, min_size=(1060, 720),
         frameless=True, easy_drag=False, background_color="#0d0d0d")
     api._window = win
     webview.start()

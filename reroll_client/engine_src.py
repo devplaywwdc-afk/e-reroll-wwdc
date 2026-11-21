@@ -807,7 +807,60 @@ def pack_players(client, uid, sid, agent_ids):
 # EPIC/legendary highest; falls back to overall when rarities tie or are unknown.
 _RARITY_RANK = {"EPIC": 4, "LEGENDARY": 4, "HIGHLIGHT": 3, "FEATURED": 3,
                 "SPECIAL": 3, "RARE": 2, "NORMAL": 1, "STANDARD": 1}
+# the gate's own `default_rarity` is a 0..4 tier int (verified on real rosters):
+#   0 = base squad (Standard)   2 = Special   3 = Highlight/Featured   4 = Epic (top:
+#   Epic / Epic-Big Time / Legendary all land here — the roster does NOT split them).
+# This is the only card-tier signal the login roster carries, so filtering/sorting by it
+# needs ZERO per-card lookups (fast) — unlike the fine card-type which needs efootbase.
+_RARITY_TIER = {0: "Standard", 1: "Bronze", 2: "Special", 3: "Highlight", 4: "Epic"}
 _BAD = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
+
+
+def _rarity_int(r):
+    try:
+        return int(r)
+    except (TypeError, ValueError):
+        return _RARITY_RANK.get(str(r or "").upper(), 0)   # legacy string rarities
+
+
+def _tier_name(r):
+    i = _rarity_int(r)
+    return _RARITY_TIER.get(i, f"r{i}")
+
+
+def _name_cfg(params):
+    """User-configurable filename pattern (gacha / rename tool). Missing = legacy name."""
+    c = (params or {}).get("name_cfg") or {}
+    order = c.get("order") or ["coins", "names", "uc"]
+    return {
+        "coin_prefix": str(c.get("coin_prefix", "")),          # char(s) before the coin number
+        "name_join": (str(c.get("name_join", "+")) or "+"),    # join player 2,3,4...
+        "sep": (str(c.get("sep", "_")) or "_"),                # between parts
+        "max_names": int(c.get("max_names", 0) or 0),          # 0 = all names
+        "order": [k for k in order if k in ("coins", "names", "uc")] or ["coins", "names", "uc"],
+    }
+
+
+def _build_name(rec, params):
+    """Build a filename from the user's name_cfg: e.g. coin_prefix='C', order=[coins,names,uc]
+    → 'C100_Henry+Messi_<uc>.txt'. Names joined by name_join in record order (accumulated)."""
+    cfg = _name_cfg(params)
+    uc = _san(rec.get("user_code"), 24)
+    coins = rec.get("coins", 0)
+    players = rec.get("players") or []
+    nl = [_san(p.get("name") or ("#" + str(p.get("id"))), 18) for p in players]
+    if cfg["max_names"] > 0:
+        nl = nl[:cfg["max_names"]]
+    names = cfg["name_join"].join(nl) if nl else "none"
+    parts = []
+    for key in cfg["order"]:
+        if key == "coins":
+            parts.append(f"{cfg['coin_prefix']}{coins}")
+        elif key == "names":
+            parts.append(_san(names, 90))
+        elif key == "uc":
+            parts.append(uc)
+    return cfg["sep"].join(p for p in parts if p) + _ext(params)
 
 
 def _default_dir():
@@ -865,11 +918,15 @@ def _epic(players):
     """The standout card: highest rarity, then overall."""
     if not players:
         return None
-    return sorted(players, key=lambda p: (_RARITY_RANK.get(str(p.get("rarity") or "").upper(), 0),
+    return sorted(players, key=lambda p: (_rarity_int(p.get("rarity")),
                                           p.get("overall") or 0), reverse=True)[0]
 
 
 def _filename(scheme, rec, params):
+    # user-configurable pattern (gacha/rename/daily): e.g. C100_Henry+Messi_<uc>.txt
+    # daily uses it for a coin-prefixed name with no player names (order=[coins,uc]).
+    if scheme in ("gacha", "rename", "daily") and (params or {}).get("name_cfg"):
+        return _build_name(rec, params)
     uc = _san(rec.get("user_code"), 24)
     coins = rec.get("coins", 0)
     players = rec.get("players") or []
@@ -879,7 +936,7 @@ def _filename(scheme, rec, params):
             base = f"{_san(ep.get('name'))}_{coins}_{uc}"
         else:
             base = f"{coins}_{uc}"
-    elif scheme == "gacha":
+    elif scheme in ("gacha", "rename"):
         names = "+".join(_san(p.get("name"), 18) for p in players) if players else "none"
         base = f"{_san(names, 60)}_{coins}_{uc}"
     elif scheme == "merge":
@@ -1205,7 +1262,11 @@ def _gacha(params, log):
     src = _src_dir(params)
     only = int((params or {}).get("agent", 0))
     delay = float((params or {}).get("delay", 0) or 0)
-    keep_name = bool((params or {}).get("keep_filename", True))   # default: don't rename user's files
+    keep_name = bool((params or {}).get("keep_filename", True))   # legacy: overwrite in place
+    # accumulate (DEFAULT ON): when hunting a target, append each newly-hit player to the
+    # ones already named on the file (union by id) and rename → C100_Henry+Messi_<uc>.txt.
+    # This is why a 2nd/3rd hit must rename (old keep_name silently kept the stale name).
+    accumulate = bool((params or {}).get("accumulate", True))
     workers = max(1, min(500, int((params or {}).get("workers", 32) or 32)))
     wanted_order = [int(x) for x in (params or {}).get("wanted_ids", [])]
     wanted_set = set(wanted_order)
@@ -1213,6 +1274,21 @@ def _gacha(params, log):
     pay_coin = bool((params or {}).get("pay_coin"))
     spin_agents = [int(x) for x in (params or {}).get("spin_agents", []) if str(x).strip()]
     spinning = bool(wanted_set and (target_mode or pay_coin))   # spin-to-target mode
+    # split hits into their own folder: accounts that satisfy the target get moved to a
+    # separate folder (custom hit_dir, or auto = <src>/<wanted names joined by +>).
+    split_hits = bool((params or {}).get("split_hits", True)) and bool(wanted_set)
+    need_split = 1 if target_mode in ("", "any") else (2 if target_mode == "two" else len(wanted_set))
+    need_split = max(1, min(need_split, len(wanted_set))) if wanted_set else 1
+    hit_dir = None
+    if split_hits:
+        hit_dir = (params or {}).get("hit_dir") or None
+        if not hit_dir:
+            wn = efb_many(list(wanted_order))   # resolve wanted names for the folder name
+            parts = [_san((wn.get(str(i), {}).get("name") or ("id" + str(i))).lower().replace(" ", "_"), 24)
+                     for i in wanted_order]
+            hit_dir = os.path.join(src, _san("+".join(p for p in parts if p) or "hits", 100))
+        os.makedirs(hit_dir, exist_ok=True)
+        log(f"แยกไอดีที่ได้เป้าหมาย → {hit_dir}")
     recs = list(_acc_records(src).items())
     total = len(recs)
     gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: self-tunes to the IP
@@ -1284,16 +1360,47 @@ def _gacha(params, log):
                     ordered = sorted(by_id.values(), key=lambda x: x.get("overall") or 0, reverse=True)
                 st = account_status(c, int(a["user_id"]), sid)
                 rec = dict(a)   # keep _file so keep_name can overwrite in place
+                # accumulate: union previously-named players (from the record) with this
+                # run's hits, preserving old order and appending new ones → name grows with +
+                if wanted_set and accumulate:
+                    merged = list(a.get("players") or [])
+                    seen = {p.get("id") for p in merged}
+                    new_hits = [p for p in ordered if p.get("id") not in seen]
+                    for p in new_hits:
+                        merged.append(p)
+                        seen.add(p.get("id"))
+                    rec_players = merged
+                    this_keep = False   # must rename to reflect the added player(s)
+                    got_new = bool(new_hits)
+                else:
+                    rec_players = ordered
+                    this_keep = keep_name
+                    got_new = bool(ordered)
                 rec.update({"coins": st["coins"], "gp": st["gp"],
-                            "players": ordered, "module": "gacha"})
+                            "players": rec_players, "module": "gacha"})
                 gov.on_success()
-                write_record(src, rec, "gacha", params, uc_index=uc_index, idx_lock=idx_lock, keep_name=keep_name)
+                # does the (accumulated) account now satisfy the target? → move to hit folder
+                n_wanted = sum(1 for p in rec_players if p.get("id") in wanted_set)
+                is_hit = bool(wanted_set) and n_wanted >= need_split
+                if split_hits and is_hit and hit_dir:
+                    write_record(hit_dir, rec, "gacha", params, replace_old_uc=False)
+                    srcf = a.get("_file")
+                    if srcf and os.path.isfile(srcf):
+                        try:
+                            os.remove(srcf)
+                        except OSError:
+                            pass
+                        with idx_lock:
+                            uc_index.pop(uc, None)
+                else:
+                    write_record(src, rec, "gacha", params, uc_index=uc_index, idx_lock=idx_lock, keep_name=this_keep)
                 with lock:
-                    if ordered:
+                    if got_new:
                         cnt["hit"] += 1
                     results.append({"user_code": uc, "drawn": len(drawn),
-                                    "hits": [p["id"] for p in ordered]})
-                    log(f"{uc}: drawn={len(drawn)} hits={len(ordered)} coins={st['coins']}")
+                                    "hits": [p["id"] for p in ordered], "moved": bool(split_hits and is_hit)})
+                    mv = " → แยกโฟลเดอร์" if (split_hits and is_hit) else ""
+                    log(f"{uc}: drawn={len(drawn)} hits={len(ordered)} coins={st['coins']}{mv}")
                     _report(cnt["hit"], cnt["fail"], total)
             except Exception as e:
                 gov.on_throttle()
@@ -1483,6 +1590,97 @@ def _merge(params, log):
             "summary": {"merged": n, "dirs": len(dirs)}}
 
 
+def _rename(params, log):
+    """แก้ไขชื่อไฟล์: rebuild every saved file's name from a user pattern (name_cfg).
+
+    coins + player names each come from one of three sources:
+      keep   — whatever the record already stores (no login, instant)
+      live   — log in and refresh (coins from account_status; names from the owned roster,
+               filtered by card_types tiers, top `rename_top` by rarity→overall)
+      manual — a fixed value the user typed (rename_coin / rename_name)
+    Old file is removed and rewritten under the new name (dedup by user_code)."""
+    import concurrent.futures as cf
+    import threading
+    src = _src_dir(params)
+    recs = _acc_records(src)
+    total = len(recs)
+    coin_src = str((params or {}).get("rename_coin_source", "keep"))
+    name_src = str((params or {}).get("rename_name_source", "keep"))
+    manual_coin = (params or {}).get("rename_coin")
+    manual_name = (params or {}).get("rename_name")
+    top_n = int((params or {}).get("rename_top", 3) or 3)
+    _ct = (params or {}).get("card_types")
+    card_types = set(int(x) for x in _ct) if _ct else None
+    live = coin_src == "live" or name_src == "live"
+    workers = max(1, min(32, int((params or {}).get("workers", 8) or 8)))
+    log(f"แก้ไขชื่อไฟล์ {total} ไฟล์ @ {src}  (coins={coin_src}, name={name_src})")
+    uc_index = build_uc_index(src)
+    idx_lock = threading.Lock()
+    cnt = {"ok": 0, "fail": 0}
+    lock = threading.Lock()
+    _report(0, 0, total)
+
+    def one(item):
+        uc, a = item
+        if _stopped():
+            return
+        rec = dict(a)
+        err = None
+        if live:
+            try:
+                c = GateClient(user_code=uc)
+                lr = login(c, int(a["user_id"]), a["auth_code"], a.get("device_identifier"))
+                sid = lr.get("session_id")
+                if not sid:
+                    err = "login failed"
+                else:
+                    if coin_src == "live":
+                        st = account_status(c, int(a["user_id"]), sid)
+                        rec["coins"] = st["coins"]
+                    if name_src == "live":
+                        roster = (lr.get("entry_info") or {}).get("gameplayer_list") or []
+                        pl = [{"id": p.get("gameplayer_id", {}).get("id"),
+                               "rarity": _rarity_int(p.get("default_rarity"))}
+                              for p in roster if p.get("gameplayer_id", {}).get("id")]
+                        if card_types is not None:
+                            pl = [p for p in pl if p["rarity"] in card_types]
+                        pl.sort(key=lambda p: p["rarity"], reverse=True)
+                        pl = pl[:max(1, top_n)]
+                        info = efb_many([p["id"] for p in pl])
+                        for p in pl:
+                            p["name"] = info.get(str(p["id"]), {}).get("name") or ("#" + str(p["id"]))
+                        rec["players"] = pl
+            except Exception as e:  # noqa: BLE001
+                err = f"{type(e).__name__}: {e}"
+        if coin_src == "manual" and manual_coin is not None:
+            try:
+                rec["coins"] = int(manual_coin)
+            except (TypeError, ValueError):
+                rec["coins"] = manual_coin
+        if name_src == "manual" and manual_name:
+            # one or more names, split on '+' → player list the pattern joins back
+            rec["players"] = [{"id": None, "name": s.strip()} for s in str(manual_name).split("+") if s.strip()]
+        if err:
+            with lock:
+                cnt["fail"] += 1
+            log(f"  {uc}: {err}")
+            _report(cnt["ok"], cnt["fail"], total)
+            return
+        newpath = write_record(src, rec, "rename", params, uc_index=uc_index, idx_lock=idx_lock)
+        with lock:
+            cnt["ok"] += 1
+        log(f"  {uc}: → {os.path.basename(newpath)}")
+        _report(cnt["ok"], cnt["fail"], total)
+
+    with cf.ThreadPoolExecutor(max_workers=(workers if live else 1)) as ex:
+        for _ in ex.map(one, list(recs.items())):
+            pass
+    _summary(log, "RENAME", [f"เปลี่ยนชื่อ {cnt['ok']}/{total} ไฟล์  (พลาด {cnt['fail']})",
+                             f"โฟลเดอร์: {src}"])
+    return {"module": "rename", "renamed": cnt["ok"], "total": total,
+            "summary": {"renamed": cnt["ok"], "total": total}}
+
+
 def _check(params, log):
     """Audit saved accounts: login each + report currency (GP/coins/EFP). Emits
     rows to the dashboard check table. Read-only — never writes the records."""
@@ -1505,6 +1703,11 @@ def _check(params, log):
         recs = _acc_records(src)
     total = len(recs)
     workers = max(1, min(32, int((params or {}).get("workers", 5) or 5)))
+    # #5 Filter Card Type: keep only these default_rarity tiers (ints). Empty/None = all.
+    # Filtering BEFORE name-resolve means far fewer efootbase lookups → faster scan.
+    _ct = (params or {}).get("card_types")
+    card_types = set(int(x) for x in _ct) if _ct else None
+    resolve_names = bool((params or {}).get("resolve_names", True))   # #3 name search needs names
     _event({"type": "cstart", "total": total})
     log(f"เช็คไอดี {total} บัญชี @ {src} · {workers} worker")
     done = {"n": 0}
@@ -1528,10 +1731,25 @@ def _check(params, log):
                 # not the saved record — id works with efimg art, carries rarity + sell_gp.
                 roster = (lr.get("entry_info") or {}).get("gameplayer_list") or []
                 players = [{"id": p.get("gameplayer_id", {}).get("id"),
-                            "rarity": p.get("default_rarity"),
+                            "rarity": _rarity_int(p.get("default_rarity")),
                             "sell_gp": p.get("sell_gp")}
                            for p in roster if p.get("gameplayer_id", {}).get("id")]
+                n_all = len(players)
+                if card_types is not None:   # #5 pre-filter by tier (fast, no lookups)
+                    players = [p for p in players if p["rarity"] in card_types]
+                if resolve_names and players:   # resolve names only for the KEPT cards
+                    info = efb_many([p["id"] for p in players])
+                    for p in players:
+                        e = info.get(str(p["id"]), {})
+                        p["name"] = e.get("name")
+                        p["overall"] = e.get("overall")
+                        p["art"] = e.get("art")
+                        p["tier"] = _tier_name(p["rarity"])
+                else:
+                    for p in players:
+                        p["tier"] = _tier_name(p["rarity"])
                 rep.update({"gp": st["gp"], "coins": st["coins"], "efp": st["efp"],
+                            "n_all": n_all,
                             "mailbox": st["mailbox"],
                             "players": players, "n_players": len(players),
                             # creds for inline Gen Link / Inject (stay local in the app)
@@ -1731,6 +1949,8 @@ def run(brain: dict, session=None, params: dict | None = None):
         return _gacha_scan(params, log)
     if action == "check":
         return _check(params, log)
+    if action == "rename":
+        return _rename(params, log)
 
     fn = _DISPATCH.get(module_id)
     if not fn:
