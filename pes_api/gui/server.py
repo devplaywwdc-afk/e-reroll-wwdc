@@ -30,7 +30,7 @@ except Exception:                # adb tooling optional
     injectmod = None
 
 BRAIN = engine_brain.BRAIN
-APP_VERSION = "1.0.18"
+APP_VERSION = "1.0.19"
 
 # ---------------------------------------------------------------- SSE event bus
 _listeners = []                  # list[queue.Queue]  (one per open /events connection)
@@ -95,6 +95,7 @@ def _run_engine(params):
         {"type": "progress", "ok": ok, "fail": fail, "total": total})
     _run_state.update({"running": True,
                        "module": params.get("module") or "reroll",
+                       "action": params.get("action") or "",
                        "workers": int(params.get("workers") or 0)})
     old = sys.stdout
     sys.stdout = _StdoutPush()
@@ -216,9 +217,9 @@ def api_call(fn, args):
         except Exception:
             p = {}
         p = dict(p or {})
-        if p.get("action") == "merge":
-            return do_merge(p)
-        return start_run(p)        # reroll / daily / gacha / genlink / check (all emit live)
+        # reroll / daily / gacha / genlink / check / merge / rename — all run in the
+        # background and drive the UI over SSE (merge/rename/check emit live too)
+        return start_run(p)
     if fn == "stop":
         return stop_run()
 
@@ -312,8 +313,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
         q = _add_listener()
-        # reconnect/reload: if a reroll run is live, replay 'started' so the grid rebuilds
-        if _run_state.get("running") and _run_state.get("module") == "reroll":
+        # reconnect/reload: if a pure reroll run is live (no action), replay 'started' so the grid rebuilds
+        if _run_state.get("running") and _run_state.get("module") == "reroll" and not _run_state.get("action"):
             try:
                 q.put_nowait({"type": "started", "workers": _run_state.get("workers", 0)})
             except Exception:

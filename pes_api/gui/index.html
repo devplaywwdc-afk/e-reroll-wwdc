@@ -48,10 +48,20 @@
   .side-brand h1{font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--txt)}
   .side-brand small{color:var(--txt2);font-size:10.5px}
   .nav{flex:1;overflow-y:auto;padding:10px}
-  .navitem{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:9999px;border:1px solid transparent;
-    background:transparent;color:var(--txt2);cursor:pointer;font-size:13px;font-weight:600;text-align:left;transition:var(--trans);margin-bottom:2px;font-family:var(--disp)}
+  .navitem{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:12px;border:1px solid transparent;
+    position:relative;overflow:hidden;background:transparent;color:var(--txt2);cursor:pointer;font-size:13px;font-weight:600;
+    text-align:left;margin-bottom:2px;font-family:var(--disp);
+    transition:background .25s ease,border-color .25s ease,color .2s ease,transform .18s ease}
+  /* left accent bar (slides in when active) */
+  .navitem::before{content:"";position:absolute;left:0;top:50%;height:62%;width:3px;border-radius:0 3px 3px 0;
+    background:var(--nav,var(--txt3));transform:translateY(-50%) scaleY(0);transform-origin:center;
+    transition:transform .28s cubic-bezier(.34,1.3,.5,1)}
+  .navitem.on::before{transform:translateY(-50%) scaleY(1)}
   .navitem:hover{background:var(--glass2);color:var(--txt)}
-  .navitem.on{background:var(--pill-bg);border-color:transparent;color:var(--pill-fg)}
+  /* ACTIVE: bright coloured frame + a DARK fill of the item's colour (readable white
+     text in both light & dark themes — a 20% tint on white made white text vanish) */
+  .navitem.on{border-color:var(--nav);color:#fff;background:var(--navbg,#1f2430)}
+  .navitem.on .ic{color:#fff;transform:scale(1.12)}
   .navitem .em{font-size:15px;width:18px;text-align:center}
   .side-foot{padding:12px 16px;border-top:1px solid var(--border);color:var(--txt3);font-size:11px}
 
@@ -80,11 +90,15 @@
   .grid2{min-width:0}.grid2>*{min-width:0}
   input:focus,select:focus,textarea:focus{border-color:var(--txt3);box-shadow:0 0 0 2px rgba(59,130,246,.28)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  /* option = bordered pill with an iOS toggle (label left, switch right) */
-  .chk{display:inline-flex;flex-direction:row-reverse;align-items:center;gap:9px;margin:3px 0;
-    align-self:flex-end;font-size:12px;color:var(--txt);cursor:pointer;border:1px solid var(--border);
-    background:var(--glass2);border-radius:8px;padding:5px 10px;line-height:1.3;text-align:right}
+  /* option = bordered pill with an iOS toggle (label left, switch pinned right) */
+  .chk{display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:12px;
+    margin:5px 0;font-size:12px;color:var(--txt);cursor:pointer;border:1px solid var(--border);
+    background:var(--glass2);border-radius:10px;padding:10px 13px;line-height:1.35;text-align:left}
+  /* in a vertical option stack every toggle is the SAME full width → switches line up */
+  .cbody>.chk,.wrap>.chk,.togcol>.chk{width:100%;box-sizing:border-box}
+  .togcol{display:flex;flex-direction:column;gap:0}
   .chk:hover{border-color:var(--txt2)}
+  .chk>span.lbl{flex:1;min-width:0}
   .chk input[type=checkbox]{appearance:none;-webkit-appearance:none;margin:0;flex:none;
     width:34px;height:19px;border-radius:999px;background:var(--border);position:relative;
     cursor:pointer;transition:background .18s ease}
@@ -96,8 +110,9 @@
   .btn:active{background:var(--pill-press)}.btn:disabled{opacity:.38;cursor:not-allowed}
   .btn-primary{background:var(--pill-bg);border-color:var(--pill-bg);color:var(--pill-fg)}
   .btn-primary:active{background:var(--pill-press);border-color:var(--pill-press)}
-  .btn-danger{background:transparent;border-color:rgba(255,95,86,.5);color:var(--r)}
-  .btn-danger:active{background:rgba(255,95,86,.12)}
+  .btn-danger{background:var(--r);border-color:var(--r);color:#fff}
+  .btn-danger:active{background:#d8433b;border-color:#d8433b}
+  .btn-danger:disabled{opacity:.4}
   .btn-outline{background:transparent;border-color:var(--txt3);color:var(--txt)}
   .btn-outline:active{background:var(--glass2)}
   .btn-ghost{background:transparent;border-color:var(--border);color:var(--txt2)}
@@ -105,7 +120,7 @@
   .btn-sm{padding:6px 13px;font-size:12px}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
   .hint{color:var(--txt3);font-size:11px;line-height:1.5}
 
-  .two{flex:1;display:grid;grid-template-columns:336px 1fr;gap:14px;padding:14px;overflow:hidden}
+  .two{flex:1;display:grid;grid-template-columns:336px 1fr;grid-template-rows:minmax(0,1fr);gap:14px;padding:14px;overflow:hidden}
   .two>.card{min-height:0}
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
   .stat{background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
@@ -186,7 +201,30 @@
   .pmodal .rel .d{font-size:11px;color:var(--txt2);margin-bottom:6px}
   .pmodal .rel .n{font-size:12.5px;color:var(--txt2);line-height:1.6;white-space:pre-wrap}
   /* rich "เช็คไอดี" view */
-  .mini{font-size:11.5px;color:var(--txt2);display:inline-flex;align-items:center;gap:5px}
+  .mini{font-size:11.5px;color:var(--txt2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex:none}
+  .mini input[type=checkbox]{width:15px;height:15px;flex:none;accent-color:var(--g);margin:0}
+  /* player-search bento grid (image mode) */
+  .pfgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:9px}
+  .pfcell{position:relative;border:2px solid var(--border);border-radius:9px;overflow:hidden;cursor:pointer;
+    background:var(--bg2);transition:var(--trans)}
+  .pfcell:hover{border-color:var(--txt2)}
+  .pfcell.on{border-color:var(--g);box-shadow:0 0 0 2px rgba(52,199,89,.35)}
+  .pfcell img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;background:var(--bg2)}
+  .pfcell .pfnm{padding:4px 6px;font-size:10.5px;line-height:1.25;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pfcell .pfmeta{padding:0 6px 5px;font-size:9.5px;color:var(--txt3);display:flex;justify-content:space-between;gap:4px}
+  .pfcell .pfck{position:absolute;top:5px;right:5px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;opacity:0;transition:var(--trans)}
+  .pfcell.on .pfck{opacity:1;background:var(--g)}
+  /* settings popup */
+  .setsec{background:var(--glass2);border:1px solid var(--border);border-radius:12px;padding:10px 13px}
+  .setlbl{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--txt3);margin-bottom:7px}
+  .setrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px;color:var(--txt)}
+  .setrow+.setrow{border-top:1px solid var(--border)}
+  /* collapsible "more settings" */
+  .morewrap{flex-direction:column;gap:10px;animation:moreIn .22s ease}
+  @keyframes moreIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  .moretog .caret{display:inline-block;margin-left:4px;transition:transform .2s ease}
+  .moretog.open{border-color:var(--txt3);color:var(--txt)}
   .mini input[type=number],.mini input[type=text]{padding:4px 7px;font-size:12px}
   .rchip{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--border);
     background:var(--glass2);color:var(--txt2);font-size:11.5px;cursor:pointer;user-select:none;margin:2px}
@@ -264,7 +302,17 @@
   /* vector icons (no emoji) */
   .ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   .ic.sol{fill:currentColor;stroke:none}
-  .navitem .ic{width:17px;height:17px;vertical-align:-4px}
+  .navitem .ic{width:17px;height:17px;vertical-align:-4px;color:var(--nav);transition:color .2s ease,transform .2s cubic-bezier(.34,1.3,.5,1)}
+  /* two tokens per menu item: --nav (bright: icon/accent/border) + --navbg (dark fill
+     for the active state → white text stays readable in BOTH light & dark themes) */
+  .navitem[data-tab="reroll"]{--nav:#3b82f6;--navbg:#1e3a8a}
+  .navitem[data-tab="daily"]{--nav:#22c55e;--navbg:#166534}
+  .navitem[data-tab="gacha"]{--nav:#f59e0b;--navbg:#8a5a06}
+  .navitem[data-tab="merge"]{--nav:#a855f7;--navbg:#6b21a8}
+  .navitem[data-tab="check"]{--nav:#06b6d4;--navbg:#155e75}
+  .navitem[data-tab="rename"]{--nav:#ec4899;--navbg:#9d174d}
+  .navitem[data-tab="genlink"]{--nav:#14b8a6;--navbg:#115e59}
+  .navitem[data-tab="inject"]{--nav:#ef4444;--navbg:#991b1b}
   .pg-ic .ic{width:19px;height:19px;vertical-align:-4px}
   .btn .ic{width:15px;height:15px;vertical-align:-2px;margin-right:1px}
   .pill .ic{width:14px;height:14px;vertical-align:-2px}
@@ -308,6 +356,7 @@
 <symbol id="ic-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v9M9.6 9.3h3.2a1.9 1.9 0 0 1 0 3.8h-2.9"/></symbol>
 <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z" fill="currentColor" stroke="none"/></symbol>
 <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/></symbol>
+<symbol id="ic-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2L5.5 5.5"/></symbol>
 </defs></svg>
 
 <!-- custom themed title bar (frameless window) -->
@@ -420,6 +469,52 @@
       </div></div>
   </div>
 </div>
+<!-- player search / multi-select filter (check tab) -->
+<div id="pfmodal" class="pkmodal" style="display:none">
+  <div class="pkbox" style="width:560px;max-width:94vw">
+    <div class="pkhead"><span>ค้นหานักเตะในโฟลเดอร์ (เลือกหลายตัวได้)</span><button onclick="closePlayerFilter()">✕</button></div>
+    <div style="padding:10px 14px;display:flex;flex-direction:column;gap:9px;min-height:0">
+      <input id="pf_q" placeholder="พิมพ์ชื่อบางส่วน เช่น thi / henry / messi" oninput="renderPFList()" autocomplete="off">
+      <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="mini" style="font-weight:600">เงื่อนไข:</span>
+        <label class="mini"><input type="radio" name="pfmode" value="and" checked onchange="window._pfMode='and';renderCheck()"> มีครบทุกตัวที่เลือก</label>
+        <label class="mini"><input type="radio" name="pfmode" value="or" onchange="window._pfMode='or';renderCheck()"> มีตัวใดตัวนึง</label>
+        <span style="flex:1"></span>
+        <label class="mini"><input type="checkbox" id="pf_img" checked onchange="window._pfImg=this.checked;renderPFList();"> แสดงรูป</label>
+        <button class="btn btn-ghost btn-sm" onclick="pfClear()">ล้างที่เลือก</button>
+      </div>
+      <div id="pf_sel" class="row" style="flex-wrap:wrap;gap:5px;min-height:0"></div>
+      <div id="pf_list" style="max-height:52vh;overflow:auto;min-height:0"></div>
+    </div>
+  </div>
+</div>
+<!-- SETTINGS popup -->
+<div class="pmodal" id="setmodal">
+  <div class="pbox setbox" style="width:470px;max-width:94vw">
+    <div class="ph"><span><svg class="ic" style="vertical-align:-3px"><use href="#ic-gear"/></svg> ตั้งค่า</span><button onclick="closeSettings()">✕</button></div>
+    <div class="pb" style="display:flex;flex-direction:column;gap:13px">
+      <div class="setsec" style="display:none"><div class="setlbl">บัญชี</div>
+        <div class="setrow"><span>ผู้ใช้</span><span class="pill" id="userpill">—</span></div>
+        <div class="setrow"><span>สิทธิ์การใช้งาน</span><span class="pill" id="entpill">สิทธิ์: —</span></div>
+      </div>
+      <div class="setsec"><div class="setlbl">เกม</div>
+        <div class="setrow"><span>สถานะเซิร์ฟเวอร์เกม</span><span class="pill click" id="srvpill" onclick="srv()"><svg class="ic"><use href="#ic-server"/></svg> เช็คสถานะเกม</span></div>
+      </div>
+      <div class="setsec"><div class="setlbl">การแสดงผล</div>
+        <div class="setrow"><span>ธีม สว่าง / มืด</span><span class="pill click" id="themebtn" onclick="toggleTheme()"><svg class="ic"><use href="#ic-moon"/></svg> ธีม</span></div>
+        <div class="setrow"><span>ขนาดตัวอักษร / UI</span>
+          <span class="pill" style="gap:2px;padding:4px 8px">
+            <b class="click" onclick="setFs(-1)" style="padding:2px 8px;border-radius:7px;font-size:12px">A−</b>
+            <span id="fspct" onclick="setFs(0)" class="click" style="min-width:40px;text-align:center;font-size:11px;color:var(--txt2)">100%</span>
+            <b class="click" onclick="setFs(1)" style="padding:2px 8px;border-radius:7px;font-size:15px">A+</b>
+          </span></div>
+      </div>
+      <div class="setsec"><div class="setlbl">เวอร์ชัน</div>
+        <div class="setrow"><span>อัปเดตโปรแกรม</span><span class="pill click" id="verpill" onclick="checkUpd(true)">v… · ตรวจอัปเดต</span></div>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="lb" class="lb" onclick="lbClose()">
   <div class="lbin" onclick="event.stopPropagation()">
     <div id="lbimg" class="lbimg"></div>
@@ -436,10 +531,11 @@
     </div>
     <nav class="nav" id="nav">
       <button class="navitem on" data-tab="reroll" onclick="tab('reroll',this)"><svg class="ic"><use href="#ic-reroll"/></svg>Reroll</button>
-      <button class="navitem" data-tab="daily" onclick="tab('daily',this)"><svg class="ic"><use href="#ic-daily"/></svg>Daily Login</button>
+      <button class="navitem" data-tab="daily" onclick="tab('daily',this)"><svg class="ic"><use href="#ic-daily"/></svg>Daily Login(ดองทอง)</button>
       <button class="navitem" data-tab="gacha" onclick="tab('gacha',this)"><svg class="ic"><use href="#ic-gacha"/></svg>กาชา</button>
       <button class="navitem" data-tab="merge" onclick="tab('merge',this)"><svg class="ic"><use href="#ic-merge"/></svg>รวมไฟล์</button>
       <button class="navitem" data-tab="check" onclick="tab('check',this)"><svg class="ic"><use href="#ic-check"/></svg>เช็คไอดี</button>
+      <button class="navitem" data-tab="rename" onclick="tab('rename',this)"><svg class="ic"><use href="#ic-merge"/></svg>แก้ไขชื่อไฟล์</button>
       <button class="navitem" data-tab="genlink" onclick="tab('genlink',this)"><svg class="ic"><use href="#ic-link"/></svg>Gen Link</button>
       <button class="navitem" data-tab="inject" onclick="tab('inject',this)"><svg class="ic"><use href="#ic-inject"/></svg>Inject ADB</button>
     </nav>
@@ -450,13 +546,10 @@
     <div class="topbar">
       <div class="pg-ic" id="pgic"><svg class="ic"><use href="#ic-reroll"/></svg></div>
       <div><div class="pg-h" id="pgh">Reroll</div><div class="pg-sub" id="pgsub">spray สร้างไอดี + เข้า MyClub</div></div>
+      <div id="hdract" style="display:flex;gap:8px;margin-left:16px;flex-wrap:wrap"></div>
       <div style="flex:1"></div>
-      <span class="pill" id="entpill" style="display:none">สิทธิ์: —</span>
-      <span class="pill click" id="srvpill" onclick="srv()"><svg class="ic"><use href="#ic-server"/></svg> เช็คสถานะเกม</span>
-      <span class="pill"><span class="dot" id="livedot"></span><span id="livetxt">idle</span></span>
-      <span class="pill" id="userpill" style="display:none">—</span>
-      <span class="pill click" id="themebtn" onclick="toggleTheme()" title="สลับธีม สว่าง/มืด"><svg class="ic"><use href="#ic-moon"/></svg> ธีม</span>
-      <span class="pill click" id="verpill" onclick="checkUpd(true)" title="ตรวจเวอร์ชันใหม่">v… · ตรวจอัปเดต</span>
+      <span class="pill" title="สถานะการทำงาน"><span class="dot" id="livedot"></span><span id="livetxt">idle</span></span>
+      <span class="pill click" id="settingsbtn" onclick="openSettings()" title="ตั้งค่า"><svg class="ic"><use href="#ic-gear"/></svg> ตั้งค่า</span>
     </div>
 
     <div class="panels">
@@ -477,22 +570,24 @@
               <div class="field"><label>โฟลเดอร์เก็บผล</label>
                 <div class="row"><input id="r_out" placeholder="(ค่าเริ่มต้น ข้างโปรแกรม)" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('r_out')">เลือก…</button></div></div>
               <div class="field"><label>รูปแบบไฟล์</label><select id="r_fmt"><option value="txt">.txt</option><option value="dat">.dat</option></select></div>
-              <label class="chk" title="ปิดไว้ = เร็วสุด (สร้าง+เซฟอย่างเดียว ~2 วิ/ตัว) แล้วค่อยกด Daily เก็บของทีหลัง · เปิด = รับของตอนสร้างเลย แต่ของเริ่มต้นมักยังไม่มา ช้าลง ~35 วิ/ตัว"><input id="r_claim" type="checkbox"> รับของเริ่มต้นตอนสร้าง (ช้ากว่ามาก — แนะนำปิด แล้วใช้ Daily)</label>
-              <label class="chk"><input id="r_verbose" type="checkbox"> Log ดิบ (แสดงรัว ๆ ทุก request)</label>
-              <label class="chk"><input id="r_showerr" type="checkbox" checked> แสดง log error ด้วย (ปิด = โชว์เฉพาะสำเร็จ · ลื่นกว่าตอน worker เยอะ)</label>
-              <label class="chk"><input id="r_postgacha" type="checkbox" onchange="updateRerollGate()"> สุ่มกาชาฟรีต่อ หลัง reroll (ต้องสแกน + เลือกนักเตะก่อน)</label>
-              <div id="rr_pick" style="display:none;gap:9px;align-items:center" class="row">
-                <button class="btn btn-outline btn-sm" onclick="scanReroll()">สแกน + เลือกนักเตะ</button>
-                <span class="hint" id="rr_sel">ยังไม่เลือก</span></div>
-              <div class="grid2">
-                <div class="field"><label>Log สูงสุด (บรรทัด/worker)</label><input id="r_logmax" type="number" value="100" min="20" max="1000"></div>
-                <div class="field"><label>&nbsp;</label><span class="hint" style="padding-top:8px">กันโปรแกรมค้างตอน log เยอะ</span></div>
+              <button type="button" class="btn btn-outline btn-sm moretog" id="r_morebtn" onclick="toggleMore('r')" style="align-self:flex-start"><svg class="ic"><use href="#ic-gear"/></svg>ตั้งค่าเพิ่มเติม<span id="r_morecaret" class="caret">▾</span></button>
+              <div id="r_more" class="morewrap" style="display:none">
+                <label class="chk" title="ปิดไว้ = เร็วสุด (สร้าง+เซฟอย่างเดียว ~2 วิ/ตัว) แล้วค่อยกด Daily เก็บของทีหลัง · เปิด = รับของตอนสร้างเลย แต่ของเริ่มต้นมักยังไม่มา ช้าลง ~35 วิ/ตัว"><input id="r_claim" type="checkbox"> <span class="lbl">รับของเริ่มต้นตอนสร้าง (ช้ากว่ามาก — แนะนำปิด แล้วใช้ Daily)</span></label>
+                <label class="chk"><input id="r_verbose" type="checkbox"> <span class="lbl">Log ดิบ (แสดงรัว ๆ ทุก request)</span></label>
+                <label class="chk"><input id="r_showerr" type="checkbox"> <span class="lbl">แสดง log error ด้วย (ปิด = โชว์เฉพาะสำเร็จ · ลื่นกว่าตอน worker เยอะ)</span></label>
+                <label class="chk"><input id="r_postgacha" type="checkbox" onchange="updateRerollGate()"> <span class="lbl">สุ่มกาชาฟรีต่อ หลัง reroll (ต้องสแกน + เลือกนักเตะก่อน)</span></label>
+                <div id="rr_pick" style="display:none;gap:9px;align-items:center" class="row">
+                  <button class="btn btn-outline btn-sm" onclick="scanReroll()">สแกน + เลือกนักเตะ</button>
+                  <span class="hint" id="rr_sel">ยังไม่เลือก</span></div>
+                <div class="grid2">
+                  <div class="field"><label>Log สูงสุด (บรรทัด/worker)</label><input id="r_logmax" type="number" value="100" min="20" max="1000"></div>
+                  <div class="field"><label>&nbsp;</label><span class="hint" style="padding-top:8px">กันโปรแกรมค้างตอน log เยอะ</span></div>
+                </div>
+                <div class="field"><label title="ใส่ 1 proxy ต่อบรรทัด (http://user:pass@host:port หรือ socks5://host:port) — ว่าง = ใช้ IP เครื่อง · หลาย IP = กระจาย worker ข้าม IP ดันทะลุเพดาน throttle ต่อ IP" style="cursor:help">Proxy — ว่าง = IP เครื่อง &#9432;</label>
+                  <textarea id="r_proxies" rows="2" placeholder="(ว่างไว้ = ใช้ IP เครื่องนี้)&#10;http://user:pass@host:port" style="resize:vertical;width:100%;background:var(--fieldbg);border:1px solid var(--border);border-radius:12px;padding:9px 12px;color:var(--txt);font-family:var(--mono);font-size:11px;outline:none"></textarea></div>
               </div>
-              <div class="field"><label title="ใส่ 1 proxy ต่อบรรทัด (http://user:pass@host:port หรือ socks5://host:port) — ว่าง = ใช้ IP เครื่อง · หลาย IP = กระจาย worker ข้าม IP ดันทะลุเพดาน throttle ต่อ IP" style="cursor:help">Proxy — ว่าง = IP เครื่อง &#9432;</label>
-                <textarea id="r_proxies" rows="2" placeholder="(ว่างไว้ = ใช้ IP เครื่องนี้)&#10;http://user:pass@host:port" style="resize:vertical;width:100%;background:var(--fieldbg);border:1px solid var(--border);border-radius:12px;padding:9px 12px;color:var(--txt);font-family:var(--mono);font-size:11px;outline:none"></textarea></div>
               <div style="flex:1"></div>
-              <button class="btn btn-primary" id="r_start" style="width:100%" onclick="startReroll()"><svg class="ic sol"><use href="#ic-play"/></svg>เริ่ม Reroll</button>
-              <button class="btn btn-danger" id="r_stop" style="width:100%" disabled onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button>
+              <div class="hint" style="text-align:center;padding-top:4px">กดปุ่ม <b style="color:var(--txt)">เริ่ม Reroll</b> ที่หัวข้อด้านบน</div>
             </div>
           </div>
           <div class="card">
@@ -517,13 +612,15 @@
             <div class="field" style="flex:1"><label>โฟลเดอร์บัญชีต้นทาง</label>
               <div class="row"><input id="d_out" placeholder="เลือกโฟลเดอร์บัญชี" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('d_out')">เลือก…</button></div></div>
             <div class="field"><label title="เพดาน thread พร้อมกัน — governor ปรับความเร็วจริงให้เองในกรอบนี้ (เจอ throttle ลดเอง) · สูงเกินจุดพอดีจาก IP เดียวจะกลับช้าลง เพราะ retry · ต้อง proxy ถึงดันทะลุ" style="cursor:help">Workers (เพดาน) &#9432;</label><input id="d_workers" type="number" value="64" min="1" max="500" style="width:90px"></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="d_start" onclick="startMod('daily')"><svg class="ic sol"><use href="#ic-play"/></svg>เริ่ม Daily</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="d_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('d_log',this)">คัดลอก log</button></div>
           </div>
-          <label class="chk"><input id="d_show" type="checkbox"> ใส่ชื่อนักเตะในชื่อไฟล์ (ถ้ามี)</label>
-          <label class="chk"><input id="d_keepname" type="checkbox" checked> ไม่เปลี่ยนชื่อไฟล์เดิม (เขียนทับไฟล์เดิมในที่เดิม)</label>
-          <label class="chk"><input id="d_sugoroku" type="checkbox" checked> เล่นเกมประจำวัน (sugoroku) ให้อัตโนมัติ — รางวัลเข้ากล่อง (ช้าลง ~0.68 วิ/บัญชี)</label>
+          <div class="togcol">
+            <label class="chk" title="เปิด = เปลี่ยนชื่อไฟล์ให้เห็นเหรียญล่าสุด เช่น C403000_ไอดี (ไม่ยุ่งกับนักเตะ — เร็ว ไม่ต้องสแกน)"><input id="d_coinname" type="checkbox" checked onchange="fnPreviewD()"> <span class="lbl">ใส่เหรียญ (coins) นำหน้าชื่อไฟล์ — อัปเดตให้เห็นเหรียญล่าสุด</span></label>
+            <label class="chk" title="ใช้เมื่อปิด 'ใส่เหรียญนำหน้า' — เขียนทับไฟล์เดิมในที่เดิมไม่เปลี่ยนชื่อ"><input id="d_keepname" type="checkbox"> <span class="lbl">ไม่เปลี่ยนชื่อไฟล์เดิม (เขียนทับที่เดิม)</span></label>
+            <label class="chk"><input id="d_sugoroku" type="checkbox" checked> <span class="lbl">เล่นเกมประจำวัน (sugoroku) ให้อัตโนมัติ — รางวัลเข้ากล่อง (ช้าลง ~0.68 วิ/บัญชี)</span></label>
+          </div>
+          <div class="field"><label>ตัวอักษรนำหน้าเหรียญ (ชื่อไฟล์)</label>
+            <div class="row" style="gap:8px;align-items:center"><input id="d_coinpre" value="C" maxlength="4" style="width:60px" oninput="fnPreviewD()"><span class="hint" id="d_fnprev" style="font-family:var(--mono)"></span></div></div>
           <div class="row" style="justify-content:space-between;align-items:baseline"><span class="hint">Daily Login สำเร็จ</span><b id="d_prog" style="font-family:var(--disp);font-size:17px;color:var(--g)">0 / 0</b></div>
           <div class="pbar"><i id="d_bar"></i></div>
           <div class="biglog" id="d_log"></div>
@@ -538,11 +635,28 @@
               <div class="row"><input id="g_out" placeholder="เลือกโฟลเดอร์บัญชี" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('g_out')">เลือก…</button></div></div>
             <div class="field"><label title="เพดาน thread พร้อมกัน — governor ปรับความเร็วจริงให้เองในกรอบนี้ (เจอ throttle ลดเอง) · สูงเกินจุดพอดีจาก IP เดียวจะกลับช้าลง เพราะ retry · ต้อง proxy ถึงดันทะลุ" style="cursor:help">Workers (เพดาน) &#9432;</label><input id="g_workers" type="number" value="32" min="1" max="500" style="width:90px"></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-outline btn-sm" id="g_scan" onclick="scanPacks()">สแกนแพ็ค / เลือกนักเตะ</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="g_start" disabled title="สแกนแพ็คก่อน" onclick="startMod('gacha')"><svg class="ic sol"><use href="#ic-play"/></svg>เปิดกาชา + กรอง</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="g_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('g_log',this)">คัดลอก log</button></div>
           </div>
-          <label class="chk"><input id="g_keepname" type="checkbox" checked> ไม่เปลี่ยนชื่อไฟล์เดิม (เขียนทับไฟล์เดิมในที่เดิม)</label>
+          <div class="togcol">
+            <label class="chk" title="เปิดไว้ (แนะนำ) = เวลาสุ่มได้นักเตะเป้าหมายตัวใหม่ จะต่อท้ายชื่อเดิมด้วย + เช่น C100_Henry_ไอดี → C100_Henry+Messi_ไอดี (สะสมข้ามรอบ)"><input id="g_accum" type="checkbox" checked> <span class="lbl">สะสมชื่อนักเตะต่อท้ายด้วย <b style="color:var(--g)">+</b> ข้ามรอบ (แนะนำ — เปลี่ยนชื่อไฟล์ให้เห็นตัวที่เพิ่งได้)</span></label>
+            <label class="chk" title="ปิด accumulate ไว้ถึงจะใช้ได้ — เขียนทับไฟล์เดิมในที่เดิมไม่เปลี่ยนชื่อ"><input id="g_keepname" type="checkbox"> <span class="lbl">ไม่เปลี่ยนชื่อไฟล์เดิม (เขียนทับที่เดิม — ใช้เมื่อปิดสะสมชื่อ)</span></label>
+            <label class="chk" title="เปิด = ไอดีที่สุ่มได้นักเตะเป้าหมายครบตามเงื่อนไข ย้ายไปเก็บโฟลเดอร์แยก (ที่เลือกเอง หรือสร้างในโฟลเดอร์ต้นทาง ตั้งชื่อตามนักเตะที่เลือก)"><input id="g_split" type="checkbox" checked> <span class="lbl">แยกโฟลเดอร์ไอดีที่ได้เป้าหมาย (แนะนำ)</span></label>
+          </div>
+          <div class="field" id="g_splitrow"><label>โฟลเดอร์ปลายทางของไอดีที่ได้ (ว่าง = สร้างให้อัตโนมัติ ตั้งชื่อตามนักเตะ)</label>
+            <div class="row"><input id="g_hitdir" placeholder="(ว่าง = &lt;โฟลเดอร์ต้นทาง&gt;/ชื่อนักเตะ+นักเตะ)" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('g_hitdir')">เลือก…</button><button class="btn btn-ghost btn-sm" onclick="$('g_hitdir').value='';persistSave()">ล้าง</button></div></div>
+          <div class="field" style="margin-top:4px"><label>รูปแบบชื่อไฟล์ (ตัวนำหน้าเหรียญ · ตัวคั่น · ลำดับ)</label>
+            <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
+              <label class="mini">นำหน้าเหรียญ<input id="g_coinpre" value="C" maxlength="4" style="width:48px" oninput="fnPreview()"></label>
+              <label class="mini">ต่อนักเตะด้วย<input id="g_join" value="+" maxlength="3" style="width:42px" oninput="fnPreview()"></label>
+              <label class="mini">ตัวคั่น<input id="g_sep" value="_" maxlength="3" style="width:42px" oninput="fnPreview()"></label>
+              <label class="mini">สูงสุด(ชื่อ)<input id="g_maxn" type="number" value="0" min="0" style="width:56px" oninput="fnPreview()" title="0 = ทุกตัว"></label>
+              <select id="g_order" onchange="fnPreview()" style="width:auto">
+                <option value="coins,names,uc">เหรียญ_ชื่อ_ไอดี</option>
+                <option value="names,coins,uc">ชื่อ_เหรียญ_ไอดี</option>
+                <option value="coins,uc,names">เหรียญ_ไอดี_ชื่อ</option>
+                <option value="names,uc">ชื่อ_ไอดี</option></select>
+              <span class="hint" id="g_fnprev" style="font-family:var(--mono)"></span>
+            </div></div>
           <div id="g_pick"></div>
           <div class="pbar"><i id="g_bar"></i></div>
           <div class="biglog" id="g_log"></div>
@@ -559,7 +673,6 @@
           <div id="m_list" class="biglog" style="flex:none;min-height:70px;max-height:120px"></div>
           <input id="m_out" type="hidden">
           <div class="row"><select id="m_fmt" style="width:90px"><option value="txt">.txt</option><option value="dat">.dat</option></select>
-            <button class="btn btn-primary" id="m_start" onclick="startMerge()"><svg class="ic sol"><use href="#ic-play"/></svg>เริ่มรวมไฟล์</button>
             <button class="btn btn-ghost btn-sm" onclick="cp('m_log',this)">คัดลอก log</button></div>
           <div class="biglog" id="m_log"></div>
         </div>
@@ -572,11 +685,17 @@
             <div class="field" style="flex:1"><label>บัญชี (โฟลเดอร์ หรือเลือกไฟล์ .txt/.dat)</label>
               <div class="row"><input id="c_out" placeholder="เลือกโฟลเดอร์ หรือไฟล์" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('c_out');window._cfiles=[]">โฟลเดอร์…</button><button class="btn btn-ghost btn-sm" onclick="pickCheckFiles()">ไฟล์…</button></div></div>
             <div class="field"><label>Workers</label><input id="c_workers" type="number" value="8" min="1" max="32" style="width:80px"></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="c_start" onclick="startCheck()"><svg class="ic sol"><use href="#ic-play"/></svg>เช็คทั้งหมด</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="c_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
+          </div>
+          <div class="row" style="flex-wrap:wrap;gap:8px;align-items:center;background:var(--glass2);border:1px solid var(--border);border-radius:10px;padding:8px 11px">
+            <span class="mini" style="font-weight:600">กรองชนิดการ์ดก่อนสแกน (สแกนไวขึ้น):</span>
+            <span id="c_types"></span>
+            <button class="btn btn-ghost btn-sm" onclick="setCTypes([3,4])">แค่สำคัญ (Highlight+Epic)</button>
+            <button class="btn btn-ghost btn-sm" onclick="setCTypes([4])">เฉพาะ Epic</button>
+            <button class="btn btn-ghost btn-sm" onclick="setCTypes([0,1,2,3,4])">ทั้งหมด</button>
           </div>
           <div class="row" style="flex-wrap:wrap;gap:8px;align-items:center">
-            <input id="c_search" placeholder="ค้นหา user code / ชื่อนักเตะ" oninput="renderCheck()" style="flex:1;min-width:150px">
+            <input id="c_search" placeholder="ค้นหา user code / ชื่อนักเตะ (พิมพ์บางส่วนก็เจอ)" oninput="renderCheck()" style="flex:1;min-width:150px">
+            <button class="btn btn-outline btn-sm" onclick="openPlayerFilter()" title="ค้นหานักเตะแบบเลือกหลายตัว + เงื่อนไข มีครบ/มีตัวใดตัวนึง">🔎 ค้นหานักเตะ</button>
             <label class="mini">เหรียญ≥<input id="c_fcoin" type="number" value="0" min="0" oninput="renderCheck()" style="width:75px"></label>
             <label class="mini">GP≥<input id="c_fgp" type="number" value="0" min="0" oninput="renderCheck()" style="width:85px"></label>
             <select id="c_sort" onchange="renderCheck()" style="width:auto">
@@ -601,6 +720,55 @@
         </div>
       </section>
 
+      <!-- RENAME FILES -->
+      <section class="panel" id="p-rename">
+        <div class="wrap">
+          <div class="row">
+            <div class="field" style="flex:1"><label>โฟลเดอร์บัญชีต้นทาง (เปลี่ยนชื่อไฟล์ในโฟลเดอร์นี้)</label>
+              <div class="row"><input id="rn_out" placeholder="เลือกโฟลเดอร์บัญชี" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('rn_out')">เลือก…</button></div></div>
+            <div class="field"><label>รูปแบบไฟล์</label><select id="rn_fmt" style="width:80px"><option value="txt">.txt</option><option value="dat">.dat</option></select></div>
+            <div class="field"><label>Workers</label><input id="rn_workers" type="number" value="8" min="1" max="32" style="width:80px"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>เหรียญ (coins) เอามาจาก</label>
+              <select id="rn_coinsrc" onchange="rnCoinSrc()">
+                <option value="keep">คงค่าเดิมในไฟล์</option>
+                <option value="live">ล็อกอินเช็คสด</option>
+                <option value="manual">กำหนดเอง</option></select>
+              <input id="rn_coinval" type="number" value="0" min="0" placeholder="จำนวนเหรียญ" style="display:none;margin-top:6px"></div>
+            <div class="field"><label>ชื่อนักเตะ เอามาจาก</label>
+              <select id="rn_namesrc" onchange="rnNameSrc()">
+                <option value="keep">คงนักเตะเดิมในไฟล์</option>
+                <option value="live">สแกนจากในเกม (เลือกเกรด)</option>
+                <option value="manual">พิมพ์ชื่อเอง</option></select>
+              <input id="rn_nameval" placeholder="เช่น Henry+Messi (คั่นด้วย +)" style="display:none;margin-top:6px"></div>
+          </div>
+          <div class="row" id="rn_liverow" style="display:none;gap:8px;flex-wrap:wrap;align-items:center">
+            <span class="mini" style="font-weight:600">สแกนสด: เอาเกรด</span><span id="rn_types"></span>
+            <label class="mini">เอาสูงสุด<input id="rn_top" type="number" value="3" min="1" max="11" style="width:52px"> ตัว</label>
+          </div>
+          <div class="field"><label>รูปแบบชื่อไฟล์</label>
+            <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
+              <label class="mini">นำหน้าเหรียญ<input id="rn_coinpre" value="C" maxlength="4" style="width:48px" oninput="fnPreviewR()"></label>
+              <label class="mini">ต่อนักเตะด้วย<input id="rn_join" value="+" maxlength="3" style="width:42px" oninput="fnPreviewR()"></label>
+              <label class="mini">ตัวคั่น<input id="rn_sep" value="_" maxlength="3" style="width:42px" oninput="fnPreviewR()"></label>
+              <label class="mini">สูงสุด(ชื่อ)<input id="rn_maxn" type="number" value="0" min="0" style="width:56px" oninput="fnPreviewR()" title="0 = ทุกตัว"></label>
+              <select id="rn_order" onchange="fnPreviewR()" style="width:auto">
+                <option value="coins,names,uc">เหรียญ_ชื่อ_ไอดี</option>
+                <option value="names,coins,uc">ชื่อ_เหรียญ_ไอดี</option>
+                <option value="coins,uc,names">เหรียญ_ไอดี_ชื่อ</option>
+                <option value="names,uc">ชื่อ_ไอดี</option></select>
+              <span class="hint" id="rn_fnprev" style="font-family:var(--mono)"></span>
+            </div></div>
+          <div class="row" style="align-items:center">
+            <button class="btn btn-ghost btn-sm" onclick="cp('rn_log',this)">คัดลอก log</button>
+            <span class="hint" style="margin-left:auto;color:var(--r)">⚠ เปลี่ยนชื่อไฟล์จริงในโฟลเดอร์ — สำรองไว้ก่อนถ้าไม่แน่ใจ</span>
+          </div>
+          <div class="pbar"><i id="rn_bar"></i></div>
+          <div class="biglog" id="rn_log"></div>
+        </div>
+      </section>
+
       <section class="panel" id="p-genlink">
         <div class="wrap">
           <div class="row">
@@ -611,8 +779,6 @@
             <button class="btn btn-ghost btn-sm" onclick="pickGlFiles()">เลือกไฟล์ .txt/.dat…</button>
             <div class="row" style="flex:1"><input id="gl_dir" placeholder="(หรือเลือกทั้งโฟลเดอร์)" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('gl_dir')">โฟลเดอร์…</button></div>
             <div class="field"><label>Workers</label><input id="gl_workers" type="number" value="8" min="1" max="64" style="width:80px"></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-primary" id="gl_start" onclick="startGenlink()"><svg class="ic sol"><use href="#ic-play"/></svg>ดึงลิงก์</button></div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-danger btn-sm" disabled id="gl_stop" onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="copyAllLinks()">คัดลอกทั้งหมด</button></div>
           </div>
           <div id="gl_files" style="font-size:12px;opacity:.7"></div>
@@ -654,7 +820,21 @@ function applyTheme(t){document.documentElement.dataset.theme=t;
   const b=$('themebtn');if(b)b.innerHTML=svgIc(t==='dark'?'ic-moon':'ic-sun')+' ธีม';
   try{localStorage.setItem('theme',t);}catch(e){}}
 function toggleTheme(){applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');}
+function openSettings(){$('setmodal').style.display='flex';}
+function closeSettings(){$('setmodal').style.display='none';}
+function toggleMore(pfx){const m=$(pfx+'_more'),b=$(pfx+'_morebtn'),c=$(pfx+'_morecaret');if(!m)return;
+  const open=(m.style.display==='none'||!m.style.display);
+  m.style.display=open?'flex':'none';
+  if(b)b.classList.toggle('open',open);if(c)c.style.transform=open?'rotate(180deg)':'';}
 (function(){let t='dark';try{t=localStorage.getItem('theme')||'dark';}catch(e){}applyTheme(t);})();
+
+// ---- font/UI size (zoom #app only — titlebar untouched; persisted) ----
+function applyFs(z){window._fs=Math.max(0.8,Math.min(1.45,Math.round(z*100)/100));
+  const a=$('app');if(a)a.style.zoom=window._fs;
+  const e=$('fspct');if(e)e.textContent=Math.round(window._fs*100)+'%';
+  try{localStorage.setItem('fs',window._fs);}catch(e){}}
+function setFs(d){applyFs(d===0?1:(window._fs||1)+d*0.05);}   // click % = reset to 100%
+(function(){let z=1;try{z=+localStorage.getItem('fs')||1;}catch(e){}applyFs(z);})();
 
 // ---- frameless window resize via edge/corner grips ----
 (function(){
@@ -684,6 +864,7 @@ const PG={reroll:['ic-reroll','Reroll','spray สร้างไอดี + เ�
   gacha:['ic-gacha','กาชา','สแกน pack ฟรี + เปิด + กรองนักเตะ'],
   merge:['ic-merge','รวมไฟล์','รวมไฟล์ user_code เดียวกันข้ามโฟลเดอร์'],
   check:['ic-check','เช็คไอดี','รายงาน currency ของแต่ละไอดี'],
+  rename:['ic-merge','แก้ไขชื่อไฟล์','ตั้งชื่อไฟล์ใหม่ตามรูปแบบที่กำหนดเอง'],
   genlink:['ic-link','Gen Link','ดึงลิงก์ผูก KONAMI ID (ไม่จำกัด)'],
   inject:['ic-inject','Inject ADB','ใส่ไอดีเข้า emulator ผ่าน adb']};
 function svgIc(id,extra){return '<svg class="ic'+(extra||'')+'"><use href="#'+id+'"/></svg>';}
@@ -694,11 +875,27 @@ function fmtDur(sec){sec=Math.max(0,Math.floor(+sec||0));
   if(h)return h+':'+z(m)+':'+z(s);
   return m+':'+z(s);}
 
+// per-tab primary action rendered in the HEADER (start + stop). [startId,label,call,stopId?]
+const HDRACT={
+  reroll:['r_start','เริ่ม Reroll','startReroll()','r_stop'],
+  daily:['d_start','เริ่ม Daily',"startMod('daily')",'d_stop'],
+  gacha:['g_start','เปิดกาชา + กรอง',"startMod('gacha')",'g_stop'],
+  merge:['m_start','เริ่มรวมไฟล์','startMerge()',null],
+  check:['c_start','เช็คทั้งหมด','startCheck()','c_stop'],
+  rename:['rn_start','เปลี่ยนชื่อไฟล์','startRename()','rn_stop'],
+  genlink:['gl_start','ดึงลิงก์','startGenlink()','gl_stop']};
+function renderHdrAction(name){const h=$('hdract');if(!h)return;const a=HDRACT[name];
+  if(!a){h.innerHTML='';return;}
+  let s=`<button class="btn btn-primary btn-sm" id="${a[0]}" onclick="${a[2]}"><svg class="ic sol"><use href="#ic-play"/></svg>${a[1]}</button>`;
+  if(a[3])s+=`<button class="btn btn-danger btn-sm" id="${a[3]}" disabled onclick="api('stop')"><svg class="ic sol"><use href="#ic-stop"/></svg>หยุด</button>`;
+  h.innerHTML=s;
+  setLive(RUNNING);}   // re-sync the freshly-rendered buttons' enabled/disabled state
 function tab(name,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
   $('p-'+name).classList.add('on');
   document.querySelectorAll('.navitem').forEach(b=>b.classList.remove('on'));
   (btn||document.querySelector(`.navitem[data-tab="${name}"]`)).classList.add('on');
-  const [ic,h,s]=PG[name];$('pgic').innerHTML=svgIc(ic);$('pgh').textContent=h;$('pgsub').textContent=s;}
+  const [ic,h,s]=PG[name];$('pgic').innerHTML=svgIc(ic);$('pgh').textContent=h;$('pgsub').textContent=s;
+  renderHdrAction(name);}
 
 function logln(box,lvl,t){const d=document.createElement('span');d.className='ll '+(lvl||'info');d.textContent=t;
   box.appendChild(d);while(box.childNodes.length>LOGMAX)box.removeChild(box.firstChild);
@@ -715,6 +912,7 @@ function cpGrid(btn){cpText([...document.querySelectorAll('#grid .logarea')].map
 
 // ---- http/SSE bridge (pure-API browser build; no pywebview, no auth gate) ----
 // browser-native handlers for calls that were native-window/dialog in the desktop app
+// (pick_folder/pick_files are server-side now — native dialog on this same machine)
 const _LOCAL={
   win_min:()=>({}),win_max:()=>({}),win_move:()=>({}),win_resize:()=>({}),
   win_close:()=>{try{window.close();}catch(e){}return {};},
@@ -800,15 +998,16 @@ function refreshEnt(){api('entitlement').then(r=>{
 });}
 
 function pickFolder(target){api('pick_folder').then(r=>{if(r&&r.path){$(target).value=r.path;
-  if(target==='m_out')$('m_outlbl').textContent='ปลายทาง: '+r.path;}});}
+  if(target==='m_out')$('m_outlbl').textContent='ปลายทาง: '+r.path;
+  if(typeof persistSave==='function')persistSave();}});}
 function addMergeDir(){api('pick_folder').then(r=>{if(r&&r.path&&!MERGE.includes(r.path)){MERGE.push(r.path);
   logln($('m_list'),'info',r.path);}});}
 
 function setLive(on){RUNNING=on;$('livedot').classList.toggle('live',on);$('livetxt').textContent=on?'RUNNING':'idle';
-  ['d_start','c_start','m_start','g_scan','gl_start'].forEach(i=>{if($(i))$(i).disabled=on;});
+  ['d_start','c_start','m_start','g_scan','gl_start','rn_start'].forEach(i=>{if($(i))$(i).disabled=on;});
   if($('r_start'))$('r_start').disabled=on||($('r_postgacha').checked&&!(window._wanted&&window._wanted.length));
   if($('g_start'))$('g_start').disabled=on||!gScanned;   // gacha start locked until a scan
-  ['r_stop','d_stop','g_stop','c_stop','gl_stop'].forEach(i=>{if($(i))$(i).disabled=!on;});}
+  ['r_stop','d_stop','g_stop','c_stop','gl_stop','rn_stop'].forEach(i=>{if($(i))$(i).disabled=!on;});}
 
 // ---- start actions ----
 function startReroll(){
@@ -824,30 +1023,109 @@ function startReroll(){
 function startMod(mod){
   const dir=$(mod[0]+'_out').value||null;
   const p={module:mod,workers:5,verbose:false,fmt:'txt',delay:0.5,out_dir:dir,src_dir:dir};
-  if(mod==='daily'){p.workers=+$('d_workers').value;p.daily_show_players=$('d_show').checked;p.keep_filename=$('d_keepname').checked;p.sugoroku=$('d_sugoroku').checked;$('d_log').innerHTML='';$('d_prog').textContent='0 / 0';$('d_bar').style.width='0';}
-  if(mod==='gacha'){p.workers=+$('g_workers').value;p.wanted_ids=window._wanted||[];p.keep_filename=$('g_keepname').checked;
+  if(mod==='daily'){p.workers=+$('d_workers').value;p.sugoroku=$('d_sugoroku').checked;
+    const coinname=$('d_coinname').checked;
+    if(coinname){p.keep_filename=false;p.name_cfg={coin_prefix:$('d_coinpre').value,order:['coins','uc']};}
+    else{p.keep_filename=$('d_keepname').checked;}
+    $('d_log').innerHTML='';$('d_prog').textContent='0 / 0';$('d_bar').style.width='0';}
+  if(mod==='gacha'){p.workers=+$('g_workers').value;p.wanted_ids=window._wanted||[];
+    p.accumulate=$('g_accum').checked;p.keep_filename=$('g_keepname').checked;p.name_cfg=readNameCfg('g');
+    p.split_hits=$('g_split').checked;p.hit_dir=$('g_hitdir').value||null;
     p.target_mode=window._gmode||'any';p.pay_coin=!!window._gpay;p.spin_agents=window._gagents||[];$('g_log').innerHTML='';}
   go(p);}
+// shared filename-pattern reader (gacha + rename tab use the same control ids with a prefix)
+function readNameCfg(pfx){return {coin_prefix:$(pfx+'_coinpre').value,
+  name_join:$(pfx+'_join').value||'+',sep:$(pfx+'_sep').value||'_',
+  max_names:+$(pfx+'_maxn').value||0,order:($(pfx+'_order').value||'coins,names,uc').split(',')};}
+function previewName(cfg){const names=['Henry','Messi','Mbappe'];
+  let nl=names.slice(0,cfg.max_names>0?cfg.max_names:names.length);
+  const nm=nl.join(cfg.name_join);const parts=cfg.order.map(k=>k==='coins'?(cfg.coin_prefix+'100'):k==='names'?nm:'ASxxxxx');
+  return parts.filter(Boolean).join(cfg.sep)+'.txt';}
+function fnPreview(){const e=$('g_fnprev');if(e)e.textContent='→ '+previewName(readNameCfg('g'));}
+function fnPreviewR(){const e=$('rn_fnprev');if(e)e.textContent='→ '+previewName(readNameCfg('rn'));}
+function fnPreviewD(){const e=$('d_fnprev');if(!e)return;const cn=$('d_coinname');
+  const row=$('d_coinpre')?$('d_coinpre').closest('.field'):null;
+  if(cn&&!cn.checked){e.textContent='→ (คงชื่อไฟล์เดิม ไม่เปลี่ยน)';if(row)row.style.opacity=.45;return;}
+  if(row)row.style.opacity=1;
+  e.textContent='→ '+(($('d_coinpre')||{}).value||'')+'403000_ASxxxxx.txt';}
+// ---- rename tab ----
+window._rnTypes=[4,3];
+function buildRnTypes(){const host=$('rn_types');if(!host)return;host.innerHTML='';
+  [4,3,2,1,0].forEach(n=>{const on=window._rnTypes.includes(n);
+    const s=document.createElement('span');s.className='rchip'+(on?' on':'');s.textContent=_TIER[n];
+    s.onclick=()=>{const i=window._rnTypes.indexOf(n);if(i>=0)window._rnTypes.splice(i,1);else window._rnTypes.push(n);buildRnTypes();if(typeof persistSave==='function')persistSave();};
+    host.appendChild(s);});}
+function rnLiveRow(){const live=$('rn_coinsrc').value==='live'||$('rn_namesrc').value==='live';
+  $('rn_liverow').style.display=(live&&$('rn_namesrc').value==='live')?'flex':'none';}
+function rnCoinSrc(){$('rn_coinval').style.display=$('rn_coinsrc').value==='manual'?'block':'none';rnLiveRow();}
+function rnNameSrc(){$('rn_nameval').style.display=$('rn_namesrc').value==='manual'?'block':'none';rnLiveRow();}
+function startRename(){const dir=$('rn_out').value;
+  if(!dir){alert('เลือกโฟลเดอร์บัญชีก่อน');return;}
+  const cs=$('rn_coinsrc').value,ns=$('rn_namesrc').value;
+  const live=cs==='live'||ns==='live';
+  if(!confirm('ยืนยันเปลี่ยนชื่อไฟล์จริงในโฟลเดอร์นี้?'+(live?'\n(มีสแกนสด = ต้องล็อกอินทุกไอดี ช้าหน่อย)':'')))return;
+  $('rn_log').innerHTML='';$('rn_bar').style.width='0';
+  const p={action:'rename',module:'reroll',src_dir:dir,out_dir:dir,fmt:$('rn_fmt').value,
+    workers:+$('rn_workers').value,rename_coin_source:cs,rename_name_source:ns,
+    rename_coin:+$('rn_coinval').value||0,rename_name:$('rn_nameval').value||'',
+    rename_top:+$('rn_top').value||3,card_types:(window._rnTypes.length?window._rnTypes.slice():null),
+    name_cfg:readNameCfg('rn')};
+  go(p);}
+/* init calls moved to end of script (after const _TIER is declared — avoid TDZ) */
 window._CHK=[];window._CHKsel=new Set();window._CHKrar=new Set();window._cfiles=[];
 function pickCheckFiles(){api('pick_files').then(r=>{if(r&&r.paths&&r.paths.length){window._cfiles=r.paths;
   $('c_out').value='ไฟล์ '+r.paths.length+' รายการ';}});}
-function startCheck(){window._CHK=[];window._CHKsel.clear();window._CHKrar.clear();
+function startCheck(){window._CHK=[];window._CHKsel.clear();window._CHKrar.clear();if(window._pfSel)window._pfSel.clear();
   $('c_body').innerHTML='';$('c_bar').style.width='0';$('c_stat').textContent='กำลังเช็ค…';
-  const p={action:'check',module:'reroll',workers:+$('c_workers').value,delay:0.5};
+  const p={action:'check',module:'reroll',workers:+$('c_workers').value,delay:0.5,
+    card_types:(window._ctypes&&window._ctypes.length?window._ctypes.slice():null),resolve_names:true};
   if(window._cfiles&&window._cfiles.length)p.files=window._cfiles;
   else{p.src_dir=$('c_out').value||null;p.out_dir=p.src_dir;}
   go(p);}
-function clearCheckFilter(){$('c_search').value='';$('c_fcoin').value=0;$('c_fgp').value=0;window._CHKrar.clear();renderCheck();}
+function clearCheckFilter(){$('c_search').value='';$('c_fcoin').value=0;$('c_fgp').value=0;window._CHKrar.clear();if(window._pfSel)window._pfSel.clear();renderCheck();}
 function checkSelAll(cb){const shown=currentCheckRows();if(cb.checked)shown.forEach(r=>window._CHKsel.add(r.user_code));else shown.forEach(r=>window._CHKsel.delete(r.user_code));renderCheck();}
 function toggleRar(r){if(window._CHKrar.has(r)){window._CHKrar.clear();}else{window._CHKrar.clear();window._CHKrar.add(r);}renderCheck();}
 function _art(p){return p.art||('https://efimg.com/efootballhub22/images/player_cards/'+p.id+'_l.png');}
 const _RANK={EPIC:4,LEGENDARY:4,HIGHLIGHT:3,FEATURED:3,SPECIAL:3,RARE:2,NORMAL:1,STANDARD:1};
-function _rrank(p){return _RANK[String(p.rarity||'').toUpperCase()]||0;}
-function _pcarEl(p){const c=document.createElement('div');c.className='pcar skel';c.title=(p.name||('#'+p.id))+' '+(p.rarity||'');
+// gate default_rarity is a 0..4 tier int (0=Standard base … 4=Epic/top)
+const _TIER={0:'Standard',1:'Bronze',2:'Special',3:'Highlight',4:'Epic'};
+function _ri(r){const n=parseInt(r);return isNaN(n)?(_RANK[String(r||'').toUpperCase()]||0):n;}
+function _tierName(r){const n=_ri(r);return _TIER[n]||('r'+n);}
+function _rrank(p){return _ri(p.rarity);}
+// ---- pre-scan Card-Type (tier) filter ----
+window._ctypes=[2,3,4];   // default: skip the 23 base-squad cards (faster, less clutter)
+function buildCTypes(){const host=$('c_types');if(!host)return;host.innerHTML='';
+  [4,3,2,1,0].forEach(n=>{const on=window._ctypes.includes(n);
+    const s=document.createElement('span');s.className='rchip'+(on?' on':'');s.textContent=_TIER[n];
+    s.onclick=()=>{const i=window._ctypes.indexOf(n);if(i>=0)window._ctypes.splice(i,1);else window._ctypes.push(n);buildCTypes();if(typeof persistSave==='function')persistSave();};
+    host.appendChild(s);});}
+function setCTypes(a){window._ctypes=a.slice();buildCTypes();if(typeof persistSave==='function')persistSave();}
+// ---- per-machine config persistence (#2) ----
+// UI prefs ONLY (folders, numbers, toggles, filename pattern). Never touches token/
+// session/HWID — the anti-crack gate is server-side (M + entitlement), independent of
+// this, so remembering UI settings cannot weaken it.
+const PERSIST_IDS=['r_count','r_workers','r_prefix','r_delay','r_fmt','r_claim','r_verbose','r_showerr','r_logmax','r_proxies','r_out',
+ 'd_workers','d_coinname','d_coinpre','d_keepname','d_sugoroku','d_out',
+ 'g_workers','g_accum','g_keepname','g_split','g_hitdir','g_coinpre','g_join','g_sep','g_maxn','g_order','g_out',
+ 'c_workers','c_fcoin','c_fgp','c_sort','c_out',
+ 'rn_workers','rn_fmt','rn_coinsrc','rn_namesrc','rn_coinval','rn_nameval','rn_top','rn_coinpre','rn_join','rn_sep','rn_maxn','rn_order','rn_out',
+ 'gl_workers','gl_dir','m_fmt'];
+function persistSave(){try{const o={};PERSIST_IDS.forEach(id=>{const e=$(id);if(!e)return;o[id]=e.type==='checkbox'?e.checked:e.value;});
+  o._ctypes=window._ctypes;o._rnTypes=window._rnTypes;localStorage.setItem('cfg',JSON.stringify(o));}catch(e){}}
+function persistLoad(){try{const o=JSON.parse(localStorage.getItem('cfg')||'{}');
+  PERSIST_IDS.forEach(id=>{if(!(id in o))return;const e=$(id);if(!e)return;
+    if(e.type==='checkbox')e.checked=!!o[id];else e.value=o[id];});
+  if(Array.isArray(o._ctypes)&&o._ctypes.length)window._ctypes=o._ctypes;
+  if(Array.isArray(o._rnTypes)&&o._rnTypes.length)window._rnTypes=o._rnTypes;}catch(e){}}
+document.addEventListener('change',e=>{if(e.target&&PERSIST_IDS.includes(e.target.id))persistSave();});
+document.addEventListener('input',e=>{if(e.target&&PERSIST_IDS.includes(e.target.id))persistSave();});
+persistLoad();
+buildCTypes();buildRnTypes();renderHdrAction('reroll');fnPreviewR();fnPreview();fnPreviewD();
+function _pcarEl(p){const c=document.createElement('div');c.className='pcar skel';c.title=(p.name||('#'+p.id))+' · '+_tierName(p.rarity)+(p.overall?(' · '+p.overall):'');
   const im=document.createElement('img');im.loading='lazy';im.src=_art(p);
   im.onload=()=>{im.style.opacity=1;c.classList.remove('skel');};im.onerror=()=>{c.classList.remove('skel');};
   c.appendChild(im);if(p.overall){const o=document.createElement('span');o.className='po';o.textContent=p.overall;c.appendChild(o);}
-  c.style.cursor='zoom-in';c.onclick=()=>openCard(_art(p),(p.name||('#'+p.id))+'  '+(p.rarity||''),(p.name||p.id));
+  c.style.cursor='zoom-in';c.onclick=()=>openCard(_art(p),(p.name||('#'+p.id))+'  ·  '+_tierName(p.rarity),(p.name||p.id));
   return c;}
 function openCardsPopup(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r)return;
   let ps=(r.players||[]).slice();const rar=window._CHKrar;if(rar.size)ps=ps.filter(p=>rar.has(String(p.rarity)));
@@ -857,13 +1135,55 @@ function openCardsPopup(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r)
   const keys=Object.keys(groups).sort((a,b)=>_rrank({rarity:b})-_rrank({rarity:a})||a.localeCompare(b));
   const g=$('cards_grid');g.innerHTML='';
   keys.forEach(k=>{
-    const h=document.createElement('div');h.className='cards-gh';h.textContent=k+' · '+groups[k].length+' ใบ';g.appendChild(h);
+    const h=document.createElement('div');h.className='cards-gh';h.textContent=_tierName(k)+' · '+groups[k].length+' ใบ';g.appendChild(h);
     const row=document.createElement('div');row.className='cards-grp';
     groups[k].sort((a,b)=>(b.overall||0)-(a.overall||0)).forEach(p=>row.appendChild(_pcarEl(p)));
     g.appendChild(row);});
   $('cardsmodal').style.display='flex';}
 function closeCardsPopup(){$('cardsmodal').style.display='none';}
-function _allRarities(){const s=new Set();window._CHK.forEach(r=>(r.players||[]).forEach(p=>{if(p.rarity)s.add(String(p.rarity));}));return [...s].sort();}
+function _allRarities(){const s=new Set();window._CHK.forEach(r=>(r.players||[]).forEach(p=>{if(p.rarity!=null)s.add(String(p.rarity));}));return [...s].sort();}
+// ---- player multi-select filter (#3) ----
+window._pfSel=new Map();window._pfMode='and';window._pfImg=true;
+function _uniquePlayers(){const m=new Map();   // id -> {id,name,overall,rarity,count}
+  window._CHK.filter(r=>!r.error).forEach(r=>{const seen=new Set();
+    (r.players||[]).forEach(p=>{const id=String(p.id);if(!p.id||seen.has(id))return;seen.add(id);
+      let e=m.get(id);if(!e){e={id:p.id,name:p.name||('#'+p.id),overall:p.overall||0,rarity:p.rarity,art:p.art,count:0};m.set(id,e);}
+      e.count++;if((p.overall||0)>e.overall)e.overall=p.overall||0;if(!e.art&&p.art)e.art=p.art;});});
+  return [...m.values()].sort((a,b)=>_ri(b.rarity)-_ri(a.rarity)||(b.overall||0)-(a.overall||0)||String(a.name).localeCompare(b.name));}
+function _fuzzy(name,q){name=String(name||'').toLowerCase();q=q.toLowerCase();
+  if(!q)return 1;const i=name.indexOf(q);if(i>=0)return 100-i;   // substring = best
+  let qi=0;for(let c of name){if(c===q[qi]){qi++;if(qi===q.length)return 20;}}return qi===q.length?20:0;}  // subsequence
+function openPlayerFilter(){if(!window._CHK.filter(r=>!r.error).length){alert('เช็คไอดีก่อน แล้วค่อยค้นหานักเตะ');return;}
+  $('pfmodal').style.display='flex';$('pf_q').value='';renderPFList();setTimeout(()=>$('pf_q').focus(),50);}
+function closePlayerFilter(){$('pfmodal').style.display='none';}
+function pfClear(){window._pfSel.clear();renderPFList();renderCheck();}
+function pfToggle(id,name){id=String(id);if(window._pfSel.has(id))window._pfSel.delete(id);else window._pfSel.set(id,name);renderPFList();renderCheck();}
+function renderPFChips(){const host=$('pf_sel');if(!host)return;host.innerHTML='';
+  if(!window._pfSel.size){host.innerHTML='<span class="hint">ยังไม่เลือกนักเตะ</span>';return;}
+  window._pfSel.forEach((name,id)=>{const s=document.createElement('span');s.className='rchip on';
+    s.textContent=name+' ✕';s.onclick=()=>pfToggle(id,name);host.appendChild(s);});}
+function renderPFList(){renderPFChips();const q=($('pf_q').value||'').trim();const host=$('pf_list');if(!host)return;host.innerHTML='';
+  let list=_uniquePlayers();
+  if(q)list=list.map(p=>({p,s:_fuzzy(p.name,q)})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s||(b.p.overall||0)-(a.p.overall||0)).map(x=>x.p);
+  if(!list.length){host.className='';host.innerHTML='<div class="hint" style="padding:10px">ไม่พบนักเตะที่ตรงกับ "'+q+'"</div>';return;}
+  if(window._pfImg){   // bento grid with card art (default)
+    host.className='pfgrid';host.style.display='grid';
+    list.slice(0,200).forEach(p=>{const id=String(p.id);const on=window._pfSel.has(id);
+      const cell=document.createElement('div');cell.className='pfcell'+(on?' on':'');
+      const art=p.art||('https://efimg.com/efootballhub22/images/player_cards/'+p.id+'_l.png');
+      cell.innerHTML=`<div class="pfck">✓</div><img loading="lazy" src="${art}" onerror="this.style.visibility='hidden'">`
+        +`<div class="pfnm">${p.name}</div>`
+        +`<div class="pfmeta"><span>${_tierName(p.rarity)}${p.overall?(' · '+p.overall):''}</span><span>${p.count} ไอดี</span></div>`;
+      cell.onclick=()=>pfToggle(id,p.name);host.appendChild(cell);});
+  }else{             // compact list
+    host.className='';host.style.display='flex';host.style.flexDirection='column';host.style.gap='3px';
+    list.slice(0,200).forEach(p=>{const id=String(p.id);const on=window._pfSel.has(id);
+      const row=document.createElement('label');row.className='chk';row.style.margin='0';
+      row.innerHTML=`<input type="checkbox" ${on?'checked':''}><span class="lbl" style="display:flex;gap:8px;align-items:center;justify-content:space-between">`
+        +`<span>${p.name} <small style="color:var(--txt3)">${_tierName(p.rarity)}${p.overall?(' · '+p.overall):''}</small></span>`
+        +`<small style="color:var(--txt2)">${p.count} ไอดี</small></span>`;
+      row.querySelector('input').onchange=()=>pfToggle(id,p.name);host.appendChild(row);});
+  }}
 function currentCheckRows(){
   const q=($('c_search').value||'').toLowerCase().trim();
   const fc=+$('c_fcoin').value||0, fg=+$('c_fgp').value||0, rar=window._CHKrar;
@@ -872,14 +1192,26 @@ function currentCheckRows(){
   if(rar.size)rows=rows.filter(r=>(r.players||[]).some(p=>rar.has(String(p.rarity))));
   if(q)rows=rows.filter(r=>String(r.user_code).toLowerCase().includes(q)
       || (r.players||[]).some(p=>String(p.name||'').toLowerCase().includes(q)));
+  // multi-select player filter (AND = has all / OR = has any)
+  const sel=window._pfSel;
+  if(sel&&sel.size){const ids=[...sel.keys()];const mode=window._pfMode||'and';
+    rows=rows.filter(r=>{const have=new Set((r.players||[]).map(p=>String(p.id)));
+      return mode==='and'?ids.every(i=>have.has(String(i))):ids.some(i=>have.has(String(i)));});}
   const s=$('c_sort').value;
   rows.sort((a,b)=> s==='gp'?(b.gp||0)-(a.gp||0) : s==='players'?((b.players||[]).length-(a.players||[]).length)
       : s==='uc'?String(a.user_code).localeCompare(String(b.user_code)) : (b.coins||0)-(a.coins||0));
   return rows;}
+// how many card thumbs fit in a row given the current window width (adaptive, not fixed 5)
+function cardFit(){const cb=$('c_body');const w=(cb&&cb.clientWidth)||820;
+  const avail=w-500-95;   // minus fixed cols (acc/res/link/checkbox/gaps) + the "+N" slot
+  return Math.max(3,Math.min(40,Math.floor(avail/45)));}   // pcar 40px + gap 5px
+let _rzT=0;
+window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(()=>{
+  if($('p-check')&&$('p-check').classList.contains('on')&&window._CHK&&window._CHK.length)renderCheck();},150);});
 function renderCheck(){
   // rarity chips
   const rchip=$('c_rar');if(rchip){rchip.innerHTML='';_allRarities().forEach(r=>{
-    const s=document.createElement('span');s.className='rchip'+(window._CHKrar.has(r)?' on':'');s.textContent=r;
+    const s=document.createElement('span');s.className='rchip'+(window._CHKrar.has(r)?' on':'');s.textContent=_tierName(r);
     s.onclick=()=>toggleRar(r);rchip.appendChild(s);});}
   const rows=currentCheckRows();const rar=window._CHKrar;
   const body=$('c_body');body.innerHTML='';
@@ -894,10 +1226,11 @@ function renderCheck(){
     // players
     const pl=document.createElement('div');pl.className='cplayers';
     let ps=(r.players||[]).slice();if(rar.size)ps=ps.filter(p=>rar.has(String(p.rarity)));
-    ps.sort((a,b)=>_rrank(b)-_rrank(a));   // แสดง 5 ใบแรกเรียงตาม rank การ์ด
-    ps.slice(0,5).forEach(p=>pl.appendChild(_pcarEl(p)));
-    if(ps.length>5){const more=document.createElement('button');more.className='btn btn-ghost btn-sm';
-      more.style.alignSelf='center';more.textContent='+'+(ps.length-5)+' ดูทั้งหมด';
+    ps.sort((a,b)=>_rrank(b)-_rrank(a));   // เรียงตาม rank การ์ด แล้วแสดงเท่าที่กว้างพอ (adaptive)
+    const nfit=cardFit();
+    ps.slice(0,nfit).forEach(p=>pl.appendChild(_pcarEl(p)));
+    if(ps.length>nfit){const more=document.createElement('button');more.className='btn btn-ghost btn-sm';
+      more.style.alignSelf='center';more.textContent='+'+(ps.length-nfit)+' ดูทั้งหมด';
       more.onclick=()=>openCardsPopup(r.user_code);pl.appendChild(more);}
     // resources
     const res=document.createElement('div');res.className='cres';
@@ -1083,12 +1416,12 @@ window._ev=function(m){try{
   if(m.type==='log'){const el=$('w'+(m.w||0));if(el){logln(el,m.lvl,m.t);if(m.lvl==='ok'){const c=$('wc'+(m.w||0));if(c)c.textContent=+c.textContent+1;}}
     // mirror non-reroll logs to the active panel's big log
     const act=document.querySelector('.panel.on').id;
-    const map={'p-daily':'d_log','p-gacha':'g_log','p-merge':'m_log'};
+    const map={'p-daily':'d_log','p-gacha':'g_log','p-merge':'m_log','p-rename':'rn_log'};
     if(map[act]&&(m.w===0||m.w==null))logln($(map[act]),m.lvl,m.t);}
   else if(m.type==='authurl'){window._authurl=m.t;
     $('gst').innerHTML='อนุญาตใน Discord · <a href="#" onclick="api(\'open_url\',window._authurl);return false">เปิดลิงก์อีกครั้ง</a> · '
       +'<a href="#" onclick="cpText(window._authurl,this);return false">คัดลอกลิงก์</a> (วางในเบราว์เซอร์ที่ต้องการ)';}
-  else if(m.type==='applog'){const map={'p-daily':'d_log','p-gacha':'g_log','p-merge':'m_log'};
+  else if(m.type==='applog'){const map={'p-daily':'d_log','p-gacha':'g_log','p-merge':'m_log','p-rename':'rn_log'};
     const b=map[document.querySelector('.panel.on').id];if(b)logln($(b),m.lvl||'info',m.t);}
   else if(m.type==='stats'){$('s_ok').textContent=m.ok;$('s_fail').textContent=m.fail;$('s_time').textContent=fmtDur(m.elapsed);
     $('rate').textContent=`${m.rate}/วิ · ${(m.perday||0).toLocaleString()}/วัน`;}
@@ -1102,7 +1435,7 @@ window._ev=function(m){try{
     alert('รันไม่ได้: '+m.t+(m.raw?('\n\n['+m.raw+']'):''));}
   else if(m.type==='progress'){/* summary bar handled by stats */}
   else if(m.type==='done'){setLive(false);const s=m.summary||{};
-    const map={reroll:null,daily:'d_bar',gacha:'g_bar'};const bar=map[m.module];if(bar)$(bar).style.width='100%';
+    const map={reroll:null,daily:'d_bar',gacha:'g_bar',rename:'rn_bar'};const bar=map[m.module];if(bar)$(bar).style.width='100%';
     if(m.module==='daily'&&s.total!=null)$('d_prog').textContent=(s.ok||0)+' / '+s.total;}
   else if(m.type==='cstart'){window._CHK=[];window._CHKsel.clear();$('c_body').innerHTML='';$('c_bar').style.width='0';}
   else if(m.type==='crow'){if(!m.rep.error)window._CHK.push(m.rep);
@@ -1117,7 +1450,7 @@ window._ev=function(m){try{
   else if(m.type==='gldone'){$('gl_bar').style.width='100%';setLive(false);}
   // generic progress bars for daily/gacha/genlink from progress events
   if(m.type==='progress'){const tot=m.total||1,pct=Math.round((m.ok+m.fail)/tot*100);
-    const act=document.querySelector('.panel.on').id;const b={'p-daily':'d_bar','p-gacha':'g_bar','p-genlink':'gl_bar'}[act];if(b)$(b).style.width=pct+'%';
+    const act=document.querySelector('.panel.on').id;const b={'p-daily':'d_bar','p-gacha':'g_bar','p-genlink':'gl_bar','p-rename':'rn_bar'}[act];if(b)$(b).style.width=pct+'%';
     if($('d_prog')&&m.total!=null)$('d_prog').textContent=(m.ok||0)+' / '+m.total;}
 }catch(e){console.error(e);}};
 
