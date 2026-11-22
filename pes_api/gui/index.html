@@ -18,21 +18,17 @@
   /* DARK = default */
   :root,:root[data-theme="dark"]{
     --bg:#0d0d0d; --bg2:#141414; --bg3:#1b1b1b;
-    --glass:rgba(17,17,17,.72); --glass2:#1a1a1a;
+    --glass:#141414; --glass2:#1a1a1a;
     --border:#262626; --txt:#ffffff; --txt2:#a3a3a3; --txt3:#6b6b6b;
     --fieldbg:#0d0d0d;
     --pill-bg:#ffffff; --pill-fg:#000000; --pill-press:#dcdcdc;
-    --dbase:#0b0b0b;
-    --dimg:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='90'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9 0.12' numOctaves='2' seed='5' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='150' height='90' filter='url(%23g)' opacity='0.07'/></svg>");
   }
   :root[data-theme="light"]{
     --bg:#ffffff; --bg2:#ffffff; --bg3:#fafafa;
-    --glass:rgba(255,255,255,.72); --glass2:#fafafa;
+    --glass:#ffffff; --glass2:#fafafa;
     --border:#e5e5e5; --txt:#000000; --txt2:#737373; --txt3:#a3a3a3;
     --fieldbg:#ffffff;
     --pill-bg:#000000; --pill-fg:#ffffff; --pill-press:#090909;
-    --dbase:#eef0f2;
-    --dimg:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='90'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9 0.12' numOctaves='2' seed='5' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='150' height='90' filter='url(%23g)' opacity='0.06'/></svg>");
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;background:var(--bg);color:var(--txt);
@@ -85,13 +81,6 @@
   .side{overflow:hidden}
   .nav{overflow-y:auto;overflow-x:hidden}
   .navitem{white-space:nowrap;transition:background .15s,color .15s}  /* labels snap (no per-frame text reflow) */
-  /* ---- dithered work-area background ---- */
-  #dither{position:fixed;inset:0;z-index:0;pointer-events:none;background-color:var(--dbase);
-    background-image:var(--dimg);background-size:600px auto;background-repeat:repeat;
-    filter:brightness(1);transition:filter .45s ease}
-  body.dither-hot #dither{filter:brightness(1.6)}   /* glitch lifts a touch on work-area hover */   /* subtle lift on work-area hover */
-  .main{background:transparent}
-  .topbar{background:transparent}
 
   .main{display:flex;flex-direction:column;overflow:hidden}
   .topbar{display:flex;align-items:center;gap:8px;row-gap:8px;flex-wrap:wrap;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--bg)}
@@ -375,8 +364,6 @@
 </head>
 <body>
 <div class="orb2"></div>
-<!-- 8-bit work-area background: sparse big grey pixel blocks on near-black (CSS, pixelated upscale) -->
-<div id="dither" aria-hidden="true"></div>
 
 <!-- icon sprite (replaces all emoji — stroke=currentColor) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -994,11 +981,7 @@ window.addEventListener('DOMContentLoaded',()=>{READY=true;setVer();loadPatch();
   try{document.querySelectorAll('#nav .navitem').forEach(b=>{if(!b.title)b.title=b.textContent.trim();});}catch(e){}
   // restore collapsed rail
   try{if(localStorage.getItem('ewwdc_rail')==='1')$('app').classList.add('rail');}catch(e){}
-  // brighten the 8-bit background slightly while the mouse is over the work area
-  try{const mn=document.querySelector('.main');if(mn){
-    mn.addEventListener('pointerenter',()=>document.body.classList.add('dither-hot'));
-    mn.addEventListener('pointerleave',()=>document.body.classList.remove('dither-hot'));
-  }}catch(e){}});
+  });
 
 function loadPatch(){api('changelog').then(r=>{
   const rels=(r&&r.releases)||[];window._patches=rels;
