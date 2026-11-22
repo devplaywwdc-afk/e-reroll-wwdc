@@ -676,7 +676,19 @@ def _load_name_cache():
             pass
 
 
-def _save_name_cache():
+_EFB_SAVE_LOCK = _thr.Lock()
+_EFB_LAST_SAVE = [0.0]
+
+
+def _save_name_cache(force=False):
+    """Persist the resolved-name cache. DEBOUNCED: at most one full-file write per 5s
+    (force=True bypasses). Without this, a 100k-account check would rewrite the whole
+    growing cache file once per account across many threads — O(n) disk thrash."""
+    now = time.time()
+    with _EFB_SAVE_LOCK:
+        if not force and now - _EFB_LAST_SAVE[0] < 5.0:
+            return
+        _EFB_LAST_SAVE[0] = now
     try:
         with _EFB_CACHE_LOCK:
             keep = {k: v for k, v in _EFB_CACHE.items()
@@ -970,11 +982,18 @@ def build_uc_index(folder):
     return idx
 
 
+def build_uc_index_from(recs):
+    """Build the {user_code: filepath} dedup index from ALREADY-LOADED records
+    (recs = _acc_records() output) — avoids a SECOND os.listdir + json.load of the
+    whole folder. Saves one full-folder read/parse pass (big at 100k+ accounts)."""
+    return {uc: r.get("_file") for uc, r in recs.items() if r.get("_file")}
+
+
 def start_uc_index(folder):
-    """Non-blocking dedup index: return an empty {uc:path} + its lock immediately and
-    fill it in a background thread (setdefault, so a worker's live write always wins).
-    A big output folder used to json.load every file before the first account could
-    start — that full scan is what made the run hang for seconds after pressing Start."""
+    """Non-blocking dedup index for reroll (which has no pre-loaded records): return an
+    empty {uc:path} + its lock immediately and fill it in a background thread (setdefault,
+    so a worker's live write always wins). A big output folder used to json.load every
+    file before the first account — that scan is what made the run hang after Start."""
     import threading
     idx = {}
     lock = threading.Lock()
@@ -1307,7 +1326,8 @@ def _gacha(params, log):
             hit_dir = os.path.join(src, _san("+".join(p for p in parts if p) or "hits", 100))
         os.makedirs(hit_dir, exist_ok=True)
         log(f"แยกไอดีที่ได้เป้าหมาย → {hit_dir}")
-    recs = list(_acc_records(src).items())
+    _recs_d = _acc_records(src)
+    recs = list(_recs_d.items())
     total = len(recs)
     gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: self-tunes to the IP
     cnt = {"hit": 0, "fail": 0}
@@ -1325,7 +1345,8 @@ def _gacha(params, log):
             idx["i"] += 1
             return it
 
-    uc_index, idx_lock = start_uc_index(src)
+    uc_index = build_uc_index_from(_recs_d)   # reuse loaded records (no 2nd folder read)
+    idx_lock = threading.Lock()
 
     def worker():
         c = GateClient()   # reused across accounts (keep-alive); user_code set per account
@@ -1450,7 +1471,8 @@ def _daily(params, log):
     self-finds the IP's safe rate. `workers` is the ceiling, not the target."""
     import threading
     src = _src_dir(params)
-    recs = list(_acc_records(src).items())
+    _recs_d = _acc_records(src)
+    recs = list(_recs_d.items())
     total = len(recs)
     show_players = bool((params or {}).get("daily_show_players"))
     keep_name = bool((params or {}).get("keep_filename", True))   # default: don't rename user's files
@@ -1472,7 +1494,8 @@ def _daily(params, log):
             idx["i"] += 1
             return it
 
-    uc_index, idx_lock = start_uc_index(src)
+    uc_index = build_uc_index_from(_recs_d)   # reuse loaded records (no 2nd folder read)
+    idx_lock = threading.Lock()
 
     def worker():
         # persistent worker: pull the next account until the queue drains or stop.
@@ -1630,7 +1653,8 @@ def _rename(params, log):
     live = coin_src == "live" or name_src == "live"
     workers = max(1, min(32, int((params or {}).get("workers", 8) or 8)))
     log(f"แก้ไขชื่อไฟล์ {total} ไฟล์ @ {src}  (coins={coin_src}, name={name_src})")
-    uc_index, idx_lock = start_uc_index(src)
+    uc_index = build_uc_index_from(recs)   # recs already loaded — no 2nd folder read
+    idx_lock = threading.Lock()
     cnt = {"ok": 0, "fail": 0}
     lock = threading.Lock()
     _report(0, 0, total)
@@ -1783,6 +1807,7 @@ def _check(params, log):
     with cf.ThreadPoolExecutor(max_workers=workers) as ex:
         for _ in ex.map(chk, list(recs.items())):
             pass
+    _save_name_cache(force=True)   # flush any debounced names resolved during this run
     _event({"type": "cdone", "total": total})
     _summary(log, "CHECK", [f"เช็ค {len(out)}/{total} บัญชี", f"โฟลเดอร์: {src}"])
     return {"module": "check", "results": out, "summary": {"total": total, "checked": len(out)}}
