@@ -657,7 +657,7 @@
                   <div class="field"><label>Log สูงสุด (บรรทัด/worker)</label><input id="r_logmax" type="number" value="100" min="20" max="1000"></div>
                   <div class="field"><label>&nbsp;</label><span class="hint" style="padding-top:8px">กันโปรแกรมค้างตอน log เยอะ</span></div>
                 </div>
-                <div class="field"><label title="1 proxy ต่อบรรทัด (http://user:pass@host:port หรือ socks5://host:port) — ว่าง = IP เครื่องล้วน · proxy ธรรมดา = ผสม IP บ้าน+proxy อัตโนมัติ · thordata = ขยายเป็น 3 gateway (pr/na/eu) ยิงproxyล้วน ไม่ผสมบ้าน (+~19% เร็วกว่า) · แต่ละบรรทัด = 1 สัดส่วน worker (ซ้ำเพื่อเพิ่ม) · พิมพ์ direct = ดึง IP บ้านกลับเข้า pool" style="cursor:help">Proxy — ว่าง = IP เครื่อง &#9432;</label>
+                <div class="field"><label title="1 proxy ต่อบรรทัด — ไม่ใส่ scheme ก็ได้ (เดาให้: port 1080/1081/1085/9050 = socks5, นอกนั้น http) · หรือใส่เอง http://user:pass@host:port / socks5://user:pass@host:port · ว่าง = IP เครื่องล้วน · proxy ธรรมดา = ผสม IP บ้าน+proxy อัตโนมัติ · thordata = ขยาย 3 gateway (+~19%) · แต่ละบรรทัด = 1 สัดส่วน worker (ซ้ำเพื่อเพิ่ม) · direct = ดึง IP บ้านกลับ" style="cursor:help">Proxy — ว่าง = IP เครื่อง &#9432;</label>
                   <textarea id="r_proxies" rows="2" placeholder="(ว่าง = IP เครื่องล้วน · proxy = ผสม/ขยายอัตโนมัติ)&#10;http://user:pass@host:port&#10;direct   ← ดึง IP บ้านกลับเข้า pool" style="resize:vertical;width:100%;background:var(--fieldbg);border:1px solid var(--border);border-radius:12px;padding:9px 12px;color:var(--txt);font-family:var(--mono);font-size:11px;outline:none"></textarea></div>
               </div>
               <div style="flex:1"></div>

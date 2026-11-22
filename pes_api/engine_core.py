@@ -1008,6 +1008,19 @@ def build_uc_index_from(recs):
     return {uc: r.get("_file") for uc, r in recs.items() if r.get("_file")}
 
 
+_SOCKS_PORTS = {"1080", "1081", "1085", "9050"}
+
+
+def _norm_proxy(s):
+    """Add a scheme if the user typed a bare host:port (or user:pass@host:port). Guess
+    SOCKS5 for the usual SOCKS ports, else HTTP — requests needs a scheme to route."""
+    s = str(s).strip()
+    if not s or "://" in s:
+        return s
+    port = s.rsplit(":", 1)[-1] if ":" in s else ""
+    return ("socks5://" if port in _SOCKS_PORTS else "http://") + s
+
+
 _THORDATA_GATEWAYS = ["t.pr.thordata.net", "t.na.thordata.net", "t.eu.thordata.net"]
 
 
@@ -1159,7 +1172,7 @@ def _reroll(params, log):
         if s.lower() in _DIRECT:
             pool.append(None)
         else:
-            exp = _expand_thordata(s)   # thordata → 3 regional gateways (+~19%)
+            exp = _expand_thordata(_norm_proxy(s))   # add scheme if missing; thordata → 3 gateways
             pool.extend(exp)
             has_proxy = True
             if len(exp) > 1:
