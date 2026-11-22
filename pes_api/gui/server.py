@@ -263,6 +263,53 @@ def api_call(fn, args):
         except Exception as e:
             return {"error": str(e)}
 
+    if fn == "export_accounts":
+        # copy the picked accounts' files (by user_code) into a folder the user chooses
+        try:
+            ucs = set(json.loads(a[0])) if a and isinstance(a[0], str) else set(a[0] or [])
+        except Exception:
+            ucs = set()
+        if not ucs:
+            return {"error": "ยังไม่ได้เลือกบัญชี"}
+        src_dir = a[1] if len(a) > 1 else None
+        try:
+            files = json.loads(a[2]) if len(a) > 2 and isinstance(a[2], str) else (a[2] if len(a) > 2 else [])
+        except Exception:
+            files = []
+        try:
+            dest = (_native_pick("folder") or {}).get("path")
+        except Exception as e:
+            return {"error": str(e)}
+        if not dest:
+            return {"ok": False, "cancelled": True}
+        cands = []
+        if files:
+            cands = [f for f in files if str(f).lower().endswith((".txt", ".dat"))]
+        elif src_dir:
+            for root, _d, fs in os.walk(src_dir):
+                for f in fs:
+                    if f.lower().endswith((".txt", ".dat")):
+                        cands.append(os.path.join(root, f))
+        import shutil
+        copied, errors, found = 0, [], set()
+        for fp in cands:
+            try:
+                rec = json.load(open(fp, encoding="utf-8"))
+            except Exception:
+                continue
+            uc = rec.get("user_code")
+            if uc in ucs:
+                found.add(uc)
+                try:
+                    tgt = os.path.join(dest, os.path.basename(fp))
+                    if os.path.abspath(fp) != os.path.abspath(tgt):   # don't copy a file onto itself
+                        shutil.copy2(fp, tgt)
+                    copied += 1
+                except Exception as e:
+                    errors.append(str(e))
+        missing = [u for u in ucs if u not in found]
+        return {"ok": True, "count": copied, "dest": dest, "missing": missing, "errors": errors}
+
     return {"error": f"unknown api {fn!r}"}
 
 

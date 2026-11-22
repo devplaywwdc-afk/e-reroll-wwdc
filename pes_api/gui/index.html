@@ -1122,6 +1122,8 @@ function startCheck(){window._CHK=[];window._viewRows=[];window._CHKsel.clear();
     card_types:(window._ctypes&&window._ctypes.length?window._ctypes.slice():null),resolve_names:true};
   if(window._cfiles&&window._cfiles.length)p.files=window._cfiles;
   else{p.src_dir=$('c_out').value||null;p.out_dir=p.src_dir;}
+  // remember the source so "export ที่เลือก" can copy the picked accounts' files
+  window._chkSrc={files:(window._cfiles&&window._cfiles.length?window._cfiles.slice():null),dir:$('c_out').value||null};
   go(p);}
 function clearCheckFilter(){$('c_search').value='';$('c_fcoin').value=0;$('c_fgp').value=0;window._CHKrar.clear();if(window._pfSel)window._pfSel.clear();renderCheck();}
 function checkSelAll(cb){const shown=window._viewRows||currentCheckRows();if(cb.checked)shown.forEach(r=>window._CHKsel.add(r.user_code));else shown.forEach(r=>window._CHKsel.delete(r.user_code));renderCheckWindow();updCheckStat();}
@@ -1317,10 +1319,16 @@ function genCheckLink(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r||!
   r._linking=true;renderCheck();
   api('start',JSON.stringify({module:'genlink',lang:'th',workers:1,
     text:JSON.stringify({user_id:r.user_id,auth_code:r.auth_code,device_identifier:r.device_identifier,user_code:uc})}));}
-function exportCheck(){const sel=window._CHK.filter(r=>window._CHKsel.has(r.user_code));
+function exportCheck(){const sel=[...window._CHKsel];
   if(!sel.length){alert('ยังไม่ได้เลือกบัญชี');return;}
-  const txt=sel.map(r=>r.user_code+'\t'+(r.coins||0)+' coin\t'+(r.gp||0)+' GP\t'+((r.players||[]).map(p=>p.name||('#'+p.id)).join(', ')||'-')+(r._link?('\t'+r._link):'')).join('\n');
-  cpText(txt);}
+  const s=window._chkSrc||{};
+  api('export_accounts',JSON.stringify(sel),s.dir||'',JSON.stringify(s.files||[])).then(r=>{
+    if(!r||r.error){alert('export ไม่ได้: '+((r&&r.error)||'?'));return;}
+    if(r.cancelled)return;   // user closed the folder dialog
+    let m='คัดลอก '+(r.count||0)+' ไฟล์ไป\n'+r.dest;
+    if(r.missing&&r.missing.length)m+='\n\nไม่พบไฟล์ของ '+r.missing.length+' ไอดี';
+    if(r.errors&&r.errors.length)m+='\nผิดพลาด '+r.errors.length+' ไฟล์';
+    alert(m);});}
 // inject a checked account into an ADB device (popup)
 function openInjectFor(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r||!r.auth_code){alert('บัญชีนี้ไม่มี auth_code');return;}
   window._injTarget=r;$('inj2_uc').textContent=uc;$('inj2_log').innerHTML='';
