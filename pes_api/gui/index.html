@@ -22,7 +22,8 @@
     --border:#262626; --txt:#ffffff; --txt2:#a3a3a3; --txt3:#6b6b6b;
     --fieldbg:#0d0d0d;
     --pill-bg:#ffffff; --pill-fg:#000000; --pill-press:#dcdcdc;
-    --d1:#101c3e; --d2:#243a72; --d3:#090d1c; --dgrain:#5f80c8; --dga:.5;
+    --dbase:#0b0b0b;
+    --dimg:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='40'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1' seed='7' stitchTiles='stitch' result='t'/><feColorMatrix in='t' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .7 .7 .7 0 0' result='a'/><feComponentTransfer in='a' result='m'><feFuncA type='discrete' tableValues='0 0 0 0 0 1 0 0'/></feComponentTransfer><feFlood flood-color='%232e2e2e' result='f'/><feComposite in='f' in2='m' operator='in'/></filter><rect width='64' height='40' filter='url(%23n)'/></svg>");
   }
   :root[data-theme="light"]{
     --bg:#ffffff; --bg2:#ffffff; --bg3:#fafafa;
@@ -30,7 +31,8 @@
     --border:#e5e5e5; --txt:#000000; --txt2:#737373; --txt3:#a3a3a3;
     --fieldbg:#ffffff;
     --pill-bg:#000000; --pill-fg:#ffffff; --pill-press:#090909;
-    --d1:#cbd8e2; --d2:#dde7ed; --d3:#c0cdd8; --dgrain:#93a9bd; --dga:.5;
+    --dbase:#eef0f2;
+    --dimg:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='40'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1' seed='7' stitchTiles='stitch' result='t'/><feColorMatrix in='t' type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .7 .7 .7 0 0' result='a'/><feComponentTransfer in='a' result='m'><feFuncA type='discrete' tableValues='0 0 0 0 0 1 0 0'/></feComponentTransfer><feFlood flood-color='%23d6dade' result='f'/><feComposite in='f' in2='m' operator='in'/></filter><rect width='64' height='40' filter='url(%23n)'/></svg>");
   }
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%;background:var(--bg);color:var(--txt);
@@ -79,10 +81,14 @@
   .app.rail .navitem{font-size:0;gap:0;justify-content:center;padding:11px 0}
   .app.rail .navitem::before{display:none}
   .app.rail .side-foot{font-size:0;padding:12px 0;text-align:center}
-  .side,.app.rail .side{transition:none}
+  .app{transition:grid-template-columns .26s cubic-bezier(.4,0,.2,1);will-change:grid-template-columns}
+  .side{overflow:hidden}
+  .nav{overflow-y:auto;overflow-x:hidden}
+  .navitem{white-space:nowrap;transition:background .15s,color .15s}  /* labels snap (no per-frame text reflow) */
   /* ---- dithered work-area background ---- */
-  #dither{position:fixed;inset:0;z-index:0;pointer-events:none;background:var(--bg)}
-  #dither svg{width:100%;height:100%;display:block}
+  #dither{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-color:var(--dbase);background-image:var(--dimg);
+    background-size:840px auto;background-repeat:repeat;image-rendering:pixelated}
   .main{background:transparent}
   .topbar{background:transparent}
 
@@ -368,24 +374,8 @@
 </head>
 <body>
 <div class="orb2"></div>
-<!-- dithered work-area background (ordered-dither grain over a themed gradient) -->
-<div id="dither" aria-hidden="true"><svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="dg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" style="stop-color:var(--d1)"/>
-      <stop offset="0.52" style="stop-color:var(--d2)"/>
-      <stop offset="1" style="stop-color:var(--d3)"/>
-    </linearGradient>
-    <filter id="dgrain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.62" numOctaves="2" seed="11" stitchTiles="stitch" result="n"/>
-      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="na"/>
-      <feComponentTransfer in="na" result="d"><feFuncA type="discrete" tableValues="0 0 0 1 0 0 1 0 0 1"/></feComponentTransfer>
-      <feComposite operator="in" in="d" in2="SourceGraphic"/>
-    </filter>
-  </defs>
-  <rect width="1200" height="800" fill="url(#dg)"/>
-  <rect width="1200" height="800" fill="var(--dgrain)" filter="url(#dgrain)" opacity="var(--dga)"/>
-</svg></div>
+<!-- 8-bit work-area background: sparse big grey pixel blocks on near-black (CSS, pixelated upscale) -->
+<div id="dither" aria-hidden="true"></div>
 
 <!-- icon sprite (replaces all emoji — stroke=currentColor) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -590,7 +580,9 @@
       <button class="navitem" data-tab="genlink" onclick="tab('genlink',this)"><svg class="ic"><use href="#ic-link"/></svg>Gen Link</button>
       <button class="navitem" data-tab="inject" onclick="tab('inject',this)"><svg class="ic"><use href="#ic-inject"/></svg>Inject ADB</button>
     </nav>
-    <div class="side-foot">ติดต่อ: <a href="#" onclick="api('open_tg');return false">t.me/j3xdr</a></div>
+    <div class="side-foot"><a href="#" onclick="api('open_tg');return false" title="ติดต่อ/แจ้งบัค · t.me/j3xdr" style="display:flex;align-items:center;justify-content:center;gap:7px;color:var(--txt2);text-decoration:none">
+      <svg class="tg-ic" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style="flex:none"><path d="M21.94 4.3 18.9 19.12c-.22 1-.82 1.25-1.67.78l-4.6-3.39-2.22 2.14c-.25.24-.45.45-.92.45l.33-4.68 8.52-7.7c.37-.33-.08-.51-.58-.18L6.56 12.97l-4.54-1.42c-.99-.31-1-.99.2-1.46L20.5 3.17c.82-.3 1.54.2 1.44 1.13z"/></svg>
+      <span>ติดต่อ/แจ้งบัค</span></a></div>
   </aside>
 
   <div class="main">
