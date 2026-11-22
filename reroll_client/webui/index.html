@@ -230,7 +230,16 @@
     background:var(--glass2);color:var(--txt2);font-size:11.5px;cursor:pointer;user-select:none;margin:2px}
   .rchip.on{background:var(--g);border-color:var(--g);color:#04120a;font-weight:600}
   .crow2{display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid var(--border);
-    background:var(--glass2);border-radius:10px}
+    background:var(--glass2);border-radius:10px;height:80px;box-sizing:border-box}
+  /* virtualized list: rows absolutely positioned inside #c_virt (only visible ones exist) */
+  #c_virt{position:relative;width:100%}
+  #c_virt>.crow2{position:absolute;left:0;right:0}
+  /* virtualized Gen Link list */
+  #gl_virt{position:relative;width:100%}
+  .glrow{position:absolute;left:0;right:0;height:48px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 10px;border-bottom:1px solid var(--border)}
+  .glrow .glc1{width:150px;flex:none;font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--txt)}
+  .glrow .glc2{flex:1;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .glrow .glc3{width:120px;flex:none;text-align:right;white-space:nowrap}
   .crow2.sel{border-color:var(--g);box-shadow:0 0 0 1px var(--g) inset}
   .crow2 .cacc{width:150px;flex:none}
   .crow2 .cuc{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--txt);font-weight:600}
@@ -694,10 +703,10 @@
             <button class="btn btn-ghost btn-sm" onclick="setCTypes([0,1,2,3,4])">ทั้งหมด</button>
           </div>
           <div class="row" style="flex-wrap:wrap;gap:8px;align-items:center">
-            <input id="c_search" placeholder="ค้นหา user code / ชื่อนักเตะ (พิมพ์บางส่วนก็เจอ)" oninput="renderCheck()" style="flex:1;min-width:150px">
+            <input id="c_search" placeholder="ค้นหา user code / ชื่อนักเตะ (พิมพ์บางส่วนก็เจอ)" oninput="renderCheckD()" style="flex:1;min-width:150px">
             <button class="btn btn-outline btn-sm" onclick="openPlayerFilter()" title="ค้นหานักเตะแบบเลือกหลายตัว + เงื่อนไข มีครบ/มีตัวใดตัวนึง">🔎 ค้นหานักเตะ</button>
-            <label class="mini">เหรียญ≥<input id="c_fcoin" type="number" value="0" min="0" oninput="renderCheck()" style="width:75px"></label>
-            <label class="mini">GP≥<input id="c_fgp" type="number" value="0" min="0" oninput="renderCheck()" style="width:85px"></label>
+            <label class="mini">เหรียญ≥<input id="c_fcoin" type="number" value="0" min="0" oninput="renderCheckD()" style="width:75px"></label>
+            <label class="mini">GP≥<input id="c_fgp" type="number" value="0" min="0" oninput="renderCheckD()" style="width:85px"></label>
             <select id="c_sort" onchange="renderCheck()" style="width:auto">
               <option value="coins">เรียง: เหรียญมาก→น้อย</option>
               <option value="gp">GP มาก→น้อย</option>
@@ -716,7 +725,7 @@
             </div>
           </div>
           <div class="pbar"><i id="c_bar"></i></div>
-          <div id="c_body" style="flex:1;overflow:auto;min-height:0;display:flex;flex-direction:column;gap:6px"></div>
+          <div id="c_body" style="flex:1;overflow:auto;min-height:0;position:relative"><div id="c_virt"></div></div>
         </div>
       </section>
 
@@ -783,7 +792,9 @@
           </div>
           <div id="gl_files" style="font-size:12px;opacity:.7"></div>
           <div class="pbar"><i id="gl_bar"></i></div>
-          <div style="flex:1;overflow:auto;min-height:0"><table><thead><tr><th>user_code</th><th>ลิงก์ผูก KONAMI ID</th><th></th></tr></thead><tbody id="gl_body"></tbody></table></div>
+          <div style="display:flex;gap:12px;padding:6px 10px;font-size:11px;color:var(--txt3);font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--border)">
+            <span style="width:150px;flex:none">user_code</span><span style="flex:1">ลิงก์ผูก KONAMI ID</span><span style="width:120px;flex:none"></span></div>
+          <div id="gl_scroll" style="flex:1;overflow:auto;min-height:0;position:relative"><div id="gl_virt"></div></div>
         </div>
       </section>
 
@@ -1051,15 +1062,15 @@ function startRename(){const dir=$('rn_out').value;
 window._CHK=[];window._CHKsel=new Set();window._CHKrar=new Set();window._cfiles=[];
 function pickCheckFiles(){api('pick_files').then(r=>{if(r&&r.paths&&r.paths.length){window._cfiles=r.paths;
   $('c_out').value='ไฟล์ '+r.paths.length+' รายการ';}});}
-function startCheck(){window._CHK=[];window._CHKsel.clear();window._CHKrar.clear();if(window._pfSel)window._pfSel.clear();
-  $('c_body').innerHTML='';$('c_bar').style.width='0';$('c_stat').textContent='กำลังเช็ค…';
+function startCheck(){window._CHK=[];window._viewRows=[];window._CHKsel.clear();window._CHKrar.clear();if(window._pfSel)window._pfSel.clear();
+  if($('c_virt')){$('c_virt').replaceChildren();$('c_virt').style.height='0';}$('c_bar').style.width='0';$('c_stat').textContent='กำลังเช็ค…';
   const p={action:'check',module:'reroll',workers:+$('c_workers').value,delay:0.5,
     card_types:(window._ctypes&&window._ctypes.length?window._ctypes.slice():null),resolve_names:true};
   if(window._cfiles&&window._cfiles.length)p.files=window._cfiles;
   else{p.src_dir=$('c_out').value||null;p.out_dir=p.src_dir;}
   go(p);}
 function clearCheckFilter(){$('c_search').value='';$('c_fcoin').value=0;$('c_fgp').value=0;window._CHKrar.clear();if(window._pfSel)window._pfSel.clear();renderCheck();}
-function checkSelAll(cb){const shown=currentCheckRows();if(cb.checked)shown.forEach(r=>window._CHKsel.add(r.user_code));else shown.forEach(r=>window._CHKsel.delete(r.user_code));renderCheck();}
+function checkSelAll(cb){const shown=window._viewRows||currentCheckRows();if(cb.checked)shown.forEach(r=>window._CHKsel.add(r.user_code));else shown.forEach(r=>window._CHKsel.delete(r.user_code));renderCheckWindow();updCheckStat();}
 function toggleRar(r){if(window._CHKrar.has(r)){window._CHKrar.clear();}else{window._CHKrar.clear();window._CHKrar.add(r);}renderCheck();}
 function _art(p){return p.art||('https://efimg.com/efootballhub22/images/player_cards/'+p.id+'_l.png');}
 const _RANK={EPIC:4,LEGENDARY:4,HIGHLIGHT:3,FEATURED:3,SPECIAL:3,RARE:2,NORMAL:1,STANDARD:1};
@@ -1184,48 +1195,69 @@ function cardFit(){const cb=$('c_body');const w=(cb&&cb.clientWidth)||820;
 let _rzT=0;
 window.addEventListener('resize',()=>{clearTimeout(_rzT);_rzT=setTimeout(()=>{
   if($('p-check')&&$('p-check').classList.contains('on')&&window._CHK&&window._CHK.length)renderCheck();},150);});
-function renderCheck(){
-  // rarity chips
+// ---- virtualized check list: handles 100k+ rows (only visible rows exist in DOM) ----
+const ROWH=88;   // fixed row slot height (px) — must match .crow2 height(80)+gap
+let _scrAF=0,_fltT=0;
+function renderCheck(){   // recompute filtered/sorted view + size spacer + draw visible window
   const rchip=$('c_rar');if(rchip){rchip.innerHTML='';_allRarities().forEach(r=>{
     const s=document.createElement('span');s.className='rchip'+(window._CHKrar.has(r)?' on':'');s.textContent=_tierName(r);
     s.onclick=()=>toggleRar(r);rchip.appendChild(s);});}
-  const rows=currentCheckRows();const rar=window._CHKrar;
-  const body=$('c_body');body.innerHTML='';
-  rows.forEach(r=>{
-    const div=document.createElement('div');div.className='crow2'+(window._CHKsel.has(r.user_code)?' sel':'');
-    // checkbox
-    const cb=document.createElement('input');cb.type='checkbox';cb.checked=window._CHKsel.has(r.user_code);
-    cb.onchange=()=>{cb.checked?window._CHKsel.add(r.user_code):window._CHKsel.delete(r.user_code);div.classList.toggle('sel',cb.checked);updCheckStat();};
-    // account col
-    const acc=document.createElement('div');acc.className='cacc';
-    acc.innerHTML=`<div class="cuc">${r.user_code}</div><div class="cst" style="color:var(--g)">พร้อม · ${(r.players||[]).length} ใบ</div>`;
-    // players
-    const pl=document.createElement('div');pl.className='cplayers';
-    let ps=(r.players||[]).slice();if(rar.size)ps=ps.filter(p=>rar.has(String(p.rarity)));
-    ps.sort((a,b)=>_rrank(b)-_rrank(a));   // เรียงตาม rank การ์ด แล้วแสดงเท่าที่กว้างพอ (adaptive)
-    const nfit=cardFit();
-    ps.slice(0,nfit).forEach(p=>pl.appendChild(_pcarEl(p)));
-    if(ps.length>nfit){const more=document.createElement('button');more.className='btn btn-ghost btn-sm';
-      more.style.alignSelf='center';more.textContent='+'+(ps.length-nfit)+' ดูทั้งหมด';
-      more.onclick=()=>openCardsPopup(r.user_code);pl.appendChild(more);}
-    // resources
-    const res=document.createElement('div');res.className='cres';
-    res.innerHTML=`<div><b>${(r.coins||0).toLocaleString()}</b> coin</div><div style="color:var(--txt2)">${(r.gp||0).toLocaleString()} GP</div>`;
-    // link
-    const lk=document.createElement('div');lk.className='clink';
-    if(r._link){const a=document.createElement('a');a.href='#';a.textContent='เปิดลิงก์';a.onclick=()=>{api('open_url',r._link);return false;};
-      const cpb=document.createElement('a');cpb.href='#';cpb.textContent=' · คัดลอก';cpb.onclick=()=>{cpText(r._link);return false;};
-      lk.appendChild(a);lk.appendChild(cpb);}
-    else{const b=document.createElement('button');b.className='btn btn-ghost btn-sm';b.textContent=r._linking?'กำลังดึง…':'Link KONAMI ID';
-      b.disabled=!!r._linking||!r.auth_code;b.onclick=()=>genCheckLink(r.user_code);lk.appendChild(b);}
-    const ib=document.createElement('button');ib.className='btn btn-ghost btn-sm';ib.textContent='Inject ADB';
-    ib.style.marginTop='5px';ib.disabled=!r.auth_code;ib.onclick=()=>openInjectFor(r.user_code);
-    lk.appendChild(document.createElement('br'));lk.appendChild(ib);
-    div.appendChild(cb);div.appendChild(acc);div.appendChild(pl);div.appendChild(res);div.appendChild(lk);
-    body.appendChild(div);});
-  updCheckStat(rows.length);}
-function updCheckStat(shown){const tot=window._CHK.filter(r=>!r.error).length;
-  if(shown===undefined)shown=currentCheckRows().length;
+  window._viewRows=currentCheckRows();                          // O(n) filter+sort, ONCE per change
+  const virt=$('c_virt'),body=$('c_body');
+  if(virt)virt.style.height=(window._viewRows.length*ROWH)+'px';
+  if(body){const max=Math.max(0,window._viewRows.length*ROWH-body.clientHeight);
+    if(body.scrollTop>max)body.scrollTop=max;}   // never leave the viewport past the end (blank)
+  renderCheckWindow();
+  updCheckStat(window._viewRows.length);}
+function renderCheckWindow(){   // render only the rows currently in the viewport (+buffer)
+  const rows=window._viewRows||[];const body=$('c_body'),virt=$('c_virt');if(!body||!virt)return;
+  const st=body.scrollTop,h=body.clientHeight||640;
+  const first=Math.max(0,Math.floor(st/ROWH)-4);
+  const last=Math.min(rows.length,Math.ceil((st+h)/ROWH)+4);
+  const frag=document.createDocumentFragment();
+  for(let i=first;i<last;i++){const d=buildCheckRow(rows[i]);d.style.top=(i*ROWH)+'px';frag.appendChild(d);}
+  virt.replaceChildren(frag);}
+function buildCheckRow(r){
+  const rar=window._CHKrar;
+  const div=document.createElement('div');div.className='crow2'+(window._CHKsel.has(r.user_code)?' sel':'');
+  const cb=document.createElement('input');cb.type='checkbox';cb.checked=window._CHKsel.has(r.user_code);
+  cb.onchange=()=>{cb.checked?window._CHKsel.add(r.user_code):window._CHKsel.delete(r.user_code);div.classList.toggle('sel',cb.checked);updCheckStat();};
+  const acc=document.createElement('div');acc.className='cacc';
+  acc.innerHTML=`<div class="cuc">${r.user_code}</div><div class="cst" style="color:var(--g)">พร้อม · ${(r.players||[]).length} ใบ</div>`;
+  const pl=document.createElement('div');pl.className='cplayers';
+  let ps=(r.players||[]).slice();if(rar.size)ps=ps.filter(p=>rar.has(String(p.rarity)));
+  ps.sort((a,b)=>_rrank(b)-_rrank(a));
+  const nfit=cardFit();
+  ps.slice(0,nfit).forEach(p=>pl.appendChild(_pcarEl(p)));
+  if(ps.length>nfit){const more=document.createElement('button');more.className='btn btn-ghost btn-sm';
+    more.style.alignSelf='center';more.textContent='+'+(ps.length-nfit)+' ดูทั้งหมด';
+    more.onclick=()=>openCardsPopup(r.user_code);pl.appendChild(more);}
+  const res=document.createElement('div');res.className='cres';
+  res.innerHTML=`<div><b>${(r.coins||0).toLocaleString()}</b> coin</div><div style="color:var(--txt2)">${(r.gp||0).toLocaleString()} GP</div>`;
+  const lk=document.createElement('div');lk.className='clink';
+  if(r._link){const a=document.createElement('a');a.href='#';a.textContent='เปิดลิงก์';a.onclick=()=>{api('open_url',r._link);return false;};
+    const cpb=document.createElement('a');cpb.href='#';cpb.textContent=' · คัดลอก';cpb.onclick=()=>{cpText(r._link);return false;};
+    lk.appendChild(a);lk.appendChild(cpb);}
+  else{const b=document.createElement('button');b.className='btn btn-ghost btn-sm';b.textContent=r._linking?'กำลังดึง…':'Link KONAMI ID';
+    b.disabled=!!r._linking||!r.auth_code;b.onclick=()=>genCheckLink(r.user_code);lk.appendChild(b);}
+  const ib=document.createElement('button');ib.className='btn btn-ghost btn-sm';ib.textContent='Inject ADB';
+  ib.style.marginTop='5px';ib.disabled=!r.auth_code;ib.onclick=()=>openInjectFor(r.user_code);
+  lk.appendChild(document.createElement('br'));lk.appendChild(ib);
+  div.appendChild(cb);div.appendChild(acc);div.appendChild(pl);div.appendChild(res);div.appendChild(lk);
+  return div;}
+function renderCheckD(){clearTimeout(_fltT);_fltT=setTimeout(()=>{const b=$('c_body');if(b)b.scrollTop=0;renderCheck();},180);}   // debounced filter → show from top
+(function(){const b=$('c_body');if(b)b.addEventListener('scroll',()=>{if(_scrAF)return;_scrAF=requestAnimationFrame(()=>{_scrAF=0;renderCheckWindow();});});})();
+// keep only the fields the UI needs → ~100k accounts stay light in memory (art derived from id)
+function _trimRep(rep){if(rep&&Array.isArray(rep.players))rep.players=rep.players.map(p=>({id:p.id,rarity:p.rarity,name:p.name,overall:p.overall}));return rep;}
+// throttle re-render while results stream in (not once per row) so the UI never stalls under load
+let _ckRefT=0;
+function scheduleCheckRefresh(force){
+  if(force){clearTimeout(_ckRefT);_ckRefT=0;if($('p-check')&&$('p-check').classList.contains('on'))renderCheck();return;}
+  if(_ckRefT)return;
+  _ckRefT=setTimeout(()=>{_ckRefT=0;if($('p-check')&&$('p-check').classList.contains('on'))renderCheck();},250);}
+function updCheckStat(shown){
+  const tot=window._CHK.length;   // scanned count (cheap)
+  if(shown===undefined)shown=(window._viewRows||[]).length;   // cached view — no O(n) re-filter per checkbox
   $('c_stat').textContent=`ทั้งหมด ${tot} · แสดง ${shown} · เลือก ${window._CHKsel.size}`;}
 function genCheckLink(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r||!r.auth_code)return;
   r._linking=true;renderCheck();
@@ -1260,25 +1292,36 @@ function startMerge(){if(!MERGE.length){logln($('m_log'),'err','เลือก�
 function go(p){setLive(true);api('start',JSON.stringify(p)).then(r=>{if(r&&r.error){setLive(false);alert(r.error);}});}
 
 // ---- Gen Link ----
-window._glfiles=[];window._gllinks=[];
+window._glfiles=[];window._gllinks=[];window._glrows=[];
 function pickGlFiles(){api('pick_files').then(r=>{if(r&&r.paths){window._glfiles=r.paths;
   $('gl_files').textContent=r.paths.length?('ไฟล์ '+r.paths.length+': '+r.paths.map(p=>p.split(/[\\/]/).pop()).join(', ')):'';}});}
 function startGenlink(){
   const text=$('gl_text').value.trim();
   const files=window._glfiles||[];const dir=$('gl_dir').value||null;
   if(!text && !files.length && !dir){alert('วาง Code หรือเลือกไฟล์ / โฟลเดอร์ก่อน');return;}
-  $('gl_body').innerHTML='';window._gllinks=[];$('gl_bar').style.width='0';
+  if($('gl_virt')){$('gl_virt').replaceChildren();$('gl_virt').style.height='0';}window._gllinks=[];window._glrows=[];$('gl_bar').style.width='0';
   go({module:'genlink',lang:'th',workers:+$('gl_workers').value||8,text:text||null,files:files,src_dir:dir});}
+// ---- virtualized Gen Link list (handles 100k+ rows) ----
+const GLROWH=48;let _glScrAF=0,_glRefT=0;
 function addLinkRow(uc,url,ok){
   if(ok)window._gllinks.push({uc,url});
-  const tr=document.createElement('tr');
-  const t1=document.createElement('td');t1.textContent=uc;t1.style.color='var(--txt)';
-  const t2=document.createElement('td');t2.textContent=ok?url:('✗ '+url);t2.style.wordBreak='break-all';t2.style.color=ok?'var(--txt)':'var(--r)';
-  const t3=document.createElement('td');t3.style.whiteSpace='nowrap';
-  if(ok){const b1=document.createElement('button');b1.className='btn btn-ghost btn-sm';b1.textContent='เปิด';b1.onclick=()=>api('open_url',url);
-    const b2=document.createElement('button');b2.className='btn btn-ghost btn-sm';b2.textContent='คัดลอก';b2.onclick=()=>cpText(url,b2);
-    t3.appendChild(b1);t3.appendChild(b2);}
-  tr.appendChild(t1);tr.appendChild(t2);tr.appendChild(t3);$('gl_body').appendChild(tr);}
+  window._glrows.push({uc,url,ok});
+  if(_glRefT)return;_glRefT=setTimeout(()=>{_glRefT=0;renderGl();},200);}   // throttle render while streaming
+function renderGl(){const virt=$('gl_virt');if(!virt)return;virt.style.height=(window._glrows.length*GLROWH)+'px';renderGlWindow();}
+function renderGlWindow(){const rows=window._glrows||[],sc=$('gl_scroll'),virt=$('gl_virt');if(!sc||!virt)return;
+  const st=sc.scrollTop,h=sc.clientHeight||560;
+  const first=Math.max(0,Math.floor(st/GLROWH)-4),last=Math.min(rows.length,Math.ceil((st+h)/GLROWH)+4);
+  const frag=document.createDocumentFragment();
+  for(let i=first;i<last;i++){const d=buildGlRow(rows[i]);d.style.top=(i*GLROWH)+'px';frag.appendChild(d);}
+  virt.replaceChildren(frag);}
+function buildGlRow(r){const div=document.createElement('div');div.className='glrow';
+  const t1=document.createElement('span');t1.className='glc1';t1.textContent=r.uc;
+  const t2=document.createElement('span');t2.className='glc2';t2.textContent=r.ok?r.url:('✗ '+r.url);t2.style.color=r.ok?'var(--txt)':'var(--r)';t2.title=r.url;
+  const t3=document.createElement('span');t3.className='glc3';
+  if(r.ok){const b1=document.createElement('button');b1.className='btn btn-ghost btn-sm';b1.textContent='เปิด';b1.onclick=()=>api('open_url',r.url);
+    const b2=document.createElement('button');b2.className='btn btn-ghost btn-sm';b2.textContent='คัดลอก';b2.onclick=()=>cpText(r.url,b2);t3.appendChild(b1);t3.appendChild(b2);}
+  div.appendChild(t1);div.appendChild(t2);div.appendChild(t3);return div;}
+(function(){const s=$('gl_scroll');if(s)s.addEventListener('scroll',()=>{if(_glScrAF)return;_glScrAF=requestAnimationFrame(()=>{_glScrAF=0;renderGlWindow();});});})();
 function copyAllLinks(){if(!window._gllinks.length){alert('ยังไม่มีลิงก์');return;}
   cpText(window._gllinks.map(x=>x.uc+'\t'+x.url).join('\n'),null);}
 
@@ -1411,17 +1454,17 @@ window._ev=function(m){try{
   else if(m.type==='done'){setLive(false);const s=m.summary||{};
     const map={reroll:null,daily:'d_bar',gacha:'g_bar',rename:'rn_bar'};const bar=map[m.module];if(bar)$(bar).style.width='100%';
     if(m.module==='daily'&&s.total!=null)$('d_prog').textContent=(s.ok||0)+' / '+s.total;}
-  else if(m.type==='cstart'){window._CHK=[];window._CHKsel.clear();$('c_body').innerHTML='';$('c_bar').style.width='0';}
-  else if(m.type==='crow'){if(!m.rep.error)window._CHK.push(m.rep);
+  else if(m.type==='cstart'){window._CHK=[];window._viewRows=[];window._CHKsel.clear();if($('c_virt'))$('c_virt').replaceChildren();$('c_bar').style.width='0';}
+  else if(m.type==='crow'){if(!m.rep.error)window._CHK.push(_trimRep(m.rep));
     $('c_bar').style.width=Math.round(m.done/m.total*100)+'%';
-    if(window._CHK.length%12===0||m.done===m.total)renderCheck();}
+    scheduleCheckRefresh(m.done===m.total);}
   else if(m.type==='cdone'){$('c_bar').style.width='100%';setLive(false);renderCheck();}
   else if(m.type==='glink'){
     // route to the check row if this uc is there, else to the Gen Link tab
     const cr=(window._CHK||[]).find(x=>x.user_code===m.uc);
     if(cr){cr._linking=false;if(m.ok)cr._link=m.url;renderCheck();}
     else addLinkRow(m.uc,m.ok?m.url:(m.err||'fail'),!!m.ok);}
-  else if(m.type==='gldone'){$('gl_bar').style.width='100%';setLive(false);}
+  else if(m.type==='gldone'){$('gl_bar').style.width='100%';setLive(false);if(window._glrows&&window._glrows.length)renderGl();}
   // generic progress bars for daily/gacha/genlink from progress events
   if(m.type==='progress'){const tot=m.total||1,pct=Math.round((m.ok+m.fail)/tot*100);
     const act=document.querySelector('.panel.on').id;const b={'p-daily':'d_bar','p-gacha':'g_bar','p-genlink':'gl_bar','p-rename':'rn_bar'}[act];if(b)$(b).style.width=pct+'%';
