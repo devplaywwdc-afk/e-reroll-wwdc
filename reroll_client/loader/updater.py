@@ -10,6 +10,7 @@ this is for the customer-facing exe itself.
 from __future__ import annotations
 
 import json
+import os
 import urllib.request
 
 from . import config
@@ -95,7 +96,7 @@ def check_latest(timeout: float = 8.0) -> dict:
     """Return {latest, current, newer, url, notes, error}. Never raises."""
     res = {"latest": None, "current": config.APP_VERSION, "newer": False,
            "url": f"https://github.com/{config.GITHUB_REPO}/releases/latest",
-           "notes": "", "error": None}
+           "size": 0, "notes": "", "error": None}
     try:
         url = f"https://api.github.com/repos/{config.GITHUB_REPO}/releases/latest"
         req = urllib.request.Request(url, headers={
@@ -111,9 +112,39 @@ def check_latest(timeout: float = 8.0) -> dict:
         for a in data.get("assets", []):
             if (a.get("name") or "").lower().endswith(".exe"):
                 res["url"] = a.get("browser_download_url") or res["url"]
+                res["size"] = int(a.get("size") or 0)
                 break
         else:
             res["url"] = data.get("html_url") or res["url"]
     except Exception as e:  # noqa: BLE001 — 404 (no releases) / offline: treat as "up to date"
         res["error"] = str(e)
     return res
+
+
+def download_update(url: str, dest: str, expected_size: int = 0,
+                    on_progress=None, timeout: float = 30.0) -> str:
+    """Stream the new .exe to `dest`, calling on_progress(got, total). Verifies the
+    final size against the release asset's size (guards a truncated/corrupt download).
+    Raises on any failure so the caller can fall back to the web download."""
+    req = urllib.request.Request(url, headers={"User-Agent": "efootball-reroll-updater"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        total = int(r.headers.get("Content-Length") or expected_size or 0)
+        got = 0
+        with open(dest, "wb") as f:
+            while True:
+                chunk = r.read(262144)
+                if not chunk:
+                    break
+                f.write(chunk)
+                got += len(chunk)
+                if on_progress:
+                    try:
+                        on_progress(got, total)
+                    except Exception:  # noqa: BLE001
+                        pass
+    sz = os.path.getsize(dest)
+    if expected_size and sz != expected_size:
+        raise RuntimeError(f"ขนาดไฟล์ไม่ตรง ({sz} != {expected_size}) — ดาวน์โหลดไม่สมบูรณ์")
+    if sz < 1_000_000:   # a real build is ~48 MB; anything tiny is an error page
+        raise RuntimeError(f"ไฟล์เล็กผิดปกติ ({sz} bytes)")
+    return dest

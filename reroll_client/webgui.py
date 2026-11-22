@@ -366,6 +366,39 @@ class Api:
         except Exception as e:  # noqa: BLE001
             return {"error": str(e), "current": config.APP_VERSION, "releases": []}
 
+    def self_update(self):
+        """In-app update: download the latest release .exe, verify its size, then hand
+        off to a PowerShell helper that waits for THIS process to exit, swaps the exe in
+        place, and relaunches. Progress + failures are pushed as events. Only meaningful
+        in the frozen build (a running .py has nothing to swap)."""
+        if not getattr(sys, "frozen", False):
+            return {"error": "โหมด dev — อัปเดตในตัวใช้ได้เฉพาะไฟล์ exe ที่ build แล้ว"}
+        if getattr(self, "_updating", False):
+            return {"ok": True}
+        self._updating = True
+
+        def work():
+            try:
+                from loader import updater
+                info = updater.check_latest()
+                url = info.get("url") or ""
+                if not url.lower().endswith(".exe"):
+                    raise RuntimeError("ไม่พบไฟล์ .exe ในรีลีสล่าสุด")
+                cur = sys.executable
+                newp = cur + ".new"
+                updater.download_update(
+                    url, newp, expected_size=info.get("size") or 0,
+                    on_progress=lambda g, t: self._push({"type": "updprog", "got": g, "total": t}))
+                _spawn_swap(cur, newp)
+                self._push({"type": "updready"})
+                threading.Timer(1.0, lambda: os._exit(0)).start()
+            except Exception as e:  # noqa: BLE001
+                self._updating = False
+                self._push({"type": "updfail", "t": str(e)})
+
+        threading.Thread(target=work, daemon=True).start()
+        return {"ok": True}
+
     def open_url(self, url):
         try:
             if url:
@@ -509,7 +542,54 @@ class Api:
         return {"ok": True}
 
 
+def _spawn_swap(cur_exe: str, new_exe: str) -> None:
+    """Detached PowerShell helper: wait for this PID to exit, replace the exe, relaunch.
+    -LiteralPath handles Unicode (Thai OneDrive) paths; single quotes are doubled."""
+    import subprocess
+    import tempfile
+    pid = os.getpid()
+    cur_q = cur_exe.replace("'", "''")
+    new_q = new_exe.replace("'", "''")
+    ps = (
+        "$ErrorActionPreference='SilentlyContinue'\r\n"
+        f"while (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 400 }}\r\n"
+        f"Move-Item -Force -LiteralPath '{new_q}' -Destination '{cur_q}'\r\n"
+        f"Start-Process -FilePath '{cur_q}'\r\n"
+    )
+    path = os.path.join(tempfile.gettempdir(), "ewwdc_update.ps1")
+    with open(path, "w", encoding="utf-8-sig") as fp:
+        fp.write(ps)
+    subprocess.Popen(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+         "-WindowStyle", "Hidden", "-File", path],
+        creationflags=0x08000000)   # CREATE_NO_WINDOW
+
+
+def _single_instance() -> bool:
+    """True if this is the only running instance. Windows named mutex (kernel object,
+    auto-released when the holding process dies). One machine = one window, regardless
+    of how many seats the key has. Never blocks launch on a lock failure."""
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+        k = ctypes.windll.kernel32
+        _single_instance._handle = k.CreateMutexW(None, False, "E-WWDC-Reroll-SingleInstance")
+        return k.GetLastError() != 183   # 183 = ERROR_ALREADY_EXISTS
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def main():
+    if not _single_instance():
+        try:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(
+                0, "E-WWDC เปิดอยู่แล้ว — 1 เครื่องเปิดได้ครั้งละ 1 หน้าต่าง",
+                "E-WWDC", 0x40)
+        except Exception:  # noqa: BLE001
+            pass
+        return
     try:
         import procutil
         procutil.install()   # hide the console window every adb/subprocess spawn would flash
