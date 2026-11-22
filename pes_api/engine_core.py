@@ -1098,12 +1098,28 @@ def _reroll(params, log):
     fsetup = bool((params or {}).get("finish_setup", False))
     delay = float((params or {}).get("delay", 0) or 0)      # floor หน่วง (วิ) — governor คุมต่อเอง
     show_errors = bool((params or {}).get("show_errors", True))
-    # proxy pool (optional): one IP per worker, round-robin; empty = this machine's IP
+    # proxy pool (optional): one slot per worker, round-robin. Each line = one equal share
+    # (repeat a line to give it more workers). Empty box = this machine's IP only.
+    # 'direct' / 'local' / 'home' = a home-IP slot (None). If ANY real proxy is given,
+    # a home-IP slot is auto-added → mixed mode (home + proxy fire together); add more
+    # 'direct' lines, or repeat the proxy line, to shift the home:proxy ratio.
     raw_px = (params or {}).get("proxies")
     if isinstance(raw_px, str):
         raw_px = raw_px.splitlines()
-    proxies = [str(p).strip() for p in (raw_px or [])
-               if str(p).strip() and not str(p).strip().startswith("#")] or [None]
+    _DIRECT = {"direct", "local", "home", "none", "ip"}
+    pool, has_proxy = [], False
+    for p in (raw_px or []):
+        s = str(p).strip()
+        if not s or s.startswith("#"):
+            continue
+        if s.lower() in _DIRECT:
+            pool.append(None)
+        else:
+            pool.append(s)
+            has_proxy = True
+    if has_proxy and None not in pool:
+        pool.insert(0, None)          # proxy present → auto-mix in the home IP
+    proxies = pool or [None]
     out = _out_dir(params)
     made, errors = [], []
     lock = threading.Lock()
