@@ -30,7 +30,7 @@ except Exception:                # adb tooling optional
     injectmod = None
 
 BRAIN = engine_brain.BRAIN
-APP_VERSION = "1.0.20"
+APP_VERSION = "1.1.0"
 
 # ---------------------------------------------------------------- SSE event bus
 _listeners = []                  # list[queue.Queue]  (one per open /events connection)
