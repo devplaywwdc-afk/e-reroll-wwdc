@@ -903,26 +903,45 @@ def _san(s, maxlen=40):
     return (s[:maxlen]).strip() or "x"
 
 
-def _acc_records(folder):
+def _acc_records(folder, on_progress=None, workers=16):
     """Read every saved account record in a folder (any .txt/.dat), keyed by user_code.
-    Filename scheme is irrelevant — the record JSON carries user_code."""
+    Filename scheme is irrelevant — the record JSON carries user_code.
+
+    Reads files in parallel (I/O-bound: disk + json.load release the GIL), so a
+    100k-account folder loads in seconds instead of minutes. `on_progress(done,
+    total)` is called (throttled) during the load so the UI never looks frozen."""
+    import concurrent.futures as cf
     recs = {}
     try:
-        names = sorted(os.listdir(folder))
+        names = sorted(fn for fn in os.listdir(folder)
+                       if fn.lower().endswith((".txt", ".dat")))
     except OSError:
         return recs
-    for fn in names:
-        if not fn.lower().endswith((".txt", ".dat")):
-            continue
+    total = len(names)
+    if on_progress:
+        on_progress(0, total)
+
+    def _rd(fn):
         fp = os.path.join(folder, fn)
         try:
             r = json.load(open(fp, encoding="utf-8"))
         except Exception:
-            continue
+            return None
         uc = r.get("user_code")
-        if uc:
-            r["_file"] = fp
-            recs[uc] = r
+        if not uc:
+            return None
+        r["_file"] = fp
+        return (uc, r)
+
+    done = 0
+    step = max(1, total // 40)   # ~40 progress ticks max
+    with cf.ThreadPoolExecutor(max_workers=max(1, workers)) as ex:
+        for res in ex.map(_rd, names):   # ordered → sorted last-write-wins on dup uc
+            done += 1
+            if res:
+                recs[res[0]] = res[1]
+            if on_progress and (done % step == 0 or done == total):
+                on_progress(done, total)
     return recs
 
 
@@ -1295,7 +1314,7 @@ def _reroll(params, log):
 def _gacha_scan(params, log):
     """Login ONE saved account, scan free packs, return pack players (+art) to pick from."""
     src = _src_dir(params)
-    recs = _acc_records(src)
+    recs = _acc_records(src, on_progress=lambda d, t: log(f"  โหลดบัญชี {d}/{t}"))
     if not recs:
         log("ไม่พบไฟล์บัญชีในโฟลเดอร์ (เลือกโฟลเดอร์ที่มีไฟล์บัญชีก่อน)")
         return {"module": "gacha", "action": "scan", "packs": []}
@@ -1374,7 +1393,7 @@ def _gacha(params, log):
             hit_dir = os.path.join(src, _san("+".join(p for p in parts if p) or "hits", 100))
         os.makedirs(hit_dir, exist_ok=True)
         log(f"แยกไอดีที่ได้เป้าหมาย → {hit_dir}")
-    _recs_d = _acc_records(src)
+    _recs_d = _acc_records(src, on_progress=lambda d, t: log(f"  โหลดบัญชี {d}/{t}"))
     recs = list(_recs_d.items())
     total = len(recs)
     gov = Governor(start=max(0.3, delay), lo=delay)   # AIMD: self-tunes to the IP
@@ -1519,7 +1538,7 @@ def _daily(params, log):
     self-finds the IP's safe rate. `workers` is the ceiling, not the target."""
     import threading
     src = _src_dir(params)
-    _recs_d = _acc_records(src)
+    _recs_d = _acc_records(src, on_progress=lambda d, t: log(f"  โหลดบัญชี {d}/{t}"))
     recs = list(_recs_d.items())
     total = len(recs)
     show_players = bool((params or {}).get("daily_show_players"))
@@ -1689,7 +1708,7 @@ def _rename(params, log):
     import concurrent.futures as cf
     import threading
     src = _src_dir(params)
-    recs = _acc_records(src)
+    recs = _acc_records(src, on_progress=lambda d, t: log(f"  โหลดบัญชี {d}/{t}"))
     total = len(recs)
     coin_src = str((params or {}).get("rename_coin_source", "keep"))
     name_src = str((params or {}).get("rename_name_source", "keep"))
@@ -1787,7 +1806,7 @@ def _check(params, log):
                 r["_file"] = fp
                 recs[uc] = r
     else:
-        recs = _acc_records(src)
+        recs = _acc_records(src, on_progress=lambda d, t: log(f"  โหลดบัญชี {d}/{t}"))
     total = len(recs)
     workers = max(1, min(32, int((params or {}).get("workers", 5) or 5)))
     # #5 Filter Card Type: keep only these default_rarity tiers (ints). Empty/None = all.
