@@ -13,6 +13,7 @@ import base64
 import collections
 import json
 import os
+import shutil
 import sys
 import threading
 import time
@@ -221,6 +222,62 @@ class Api:
                 continue
         return {"error": last or "dialog failed", "paths": []}
 
+    def export_accounts(self, ucs_json, src_dir=None, files_json=None):
+        """Copy the account files for the selected user_codes to a folder the user
+        picks. Source = the exact files/folder the check ran on. Read-only on the
+        source; never touches the gate. Returns how many were copied + which were
+        not found."""
+        try:
+            want = set(json.loads(ucs_json) if isinstance(ucs_json, str) else (ucs_json or []))
+        except Exception as e:  # noqa: BLE001
+            return {"error": f"รายการไอดีไม่ถูกต้อง: {e}"}
+        if not want:
+            return {"error": "ยังไม่ได้เลือกบัญชี"}
+        # candidate files: explicit picks first, else every .txt/.dat under the folder
+        cands = []
+        try:
+            picks = json.loads(files_json) if isinstance(files_json, str) else (files_json or [])
+        except Exception:  # noqa: BLE001
+            picks = []
+        if picks:
+            cands = [p for p in picks if isinstance(p, str)]
+        elif src_dir and os.path.isdir(src_dir):
+            for root, _dirs, names in os.walk(src_dir):
+                for n in names:
+                    if n.lower().endswith((".txt", ".dat")):
+                        cands.append(os.path.join(root, n))
+        else:
+            return {"error": "ไม่พบแหล่งไฟล์ต้นทาง (เช็คไอดีใหม่ก่อน)"}
+        # dest folder
+        try:
+            res = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e)}
+        if not res:
+            return {"cancelled": True}
+        dest = res[0] if isinstance(res, (list, tuple)) else res
+        # match each candidate by its record's user_code; copy the ones we want
+        found, copied, errs = set(), 0, []
+        for fp in cands:
+            try:
+                uc = json.load(open(fp, encoding="utf-8")).get("user_code")
+            except Exception:  # noqa: BLE001
+                continue
+            if uc not in want or uc in found:
+                continue
+            found.add(uc)
+            try:
+                out = os.path.join(dest, os.path.basename(fp))
+                if os.path.abspath(out) == os.path.abspath(fp):
+                    copied += 1   # already there (export back onto itself) — count it
+                    continue
+                shutil.copy2(fp, out)
+                copied += 1
+            except Exception as e:  # noqa: BLE001
+                errs.append(f"{uc}: {e}")
+        return {"ok": True, "count": copied, "dest": dest,
+                "missing": sorted(want - found), "errors": errs}
+
     # ---- inject (local adb; no gate/license) ----
     def inject_list(self):
         try:
@@ -330,6 +387,8 @@ class Api:
             return {"error": str(e)}
 
     def entitlement(self):
+        if self.dev_nosession:   # DEV: no license session — unlock every module locally
+            return {"has_access": True, "modules": list(VALID_MODULES), "dev": True}
         if not self.token:
             return {"has_access": False, "reason": "ยังไม่ได้เข้าสู่ระบบ"}
         try:

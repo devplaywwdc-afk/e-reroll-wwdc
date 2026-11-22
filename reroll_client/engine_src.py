@@ -73,7 +73,7 @@ def _isleep(secs):
         return
     end = time.time() + secs
     while secs > 0 and not _stopped() and time.time() < end:
-        time.sleep(min(0.2, end - time.time()))
+        time.sleep(max(0.0, min(0.2, end - time.time())))
 
 
 def _aes_key() -> bytes:

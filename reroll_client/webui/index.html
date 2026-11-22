@@ -64,6 +64,22 @@
   .navitem.on .ic{color:#fff;transform:scale(1.12)}
   .navitem .em{font-size:15px;width:18px;text-align:center}
   .side-foot{padding:12px 16px;border-top:1px solid var(--border);color:var(--txt3);font-size:11px}
+  .side-brand{position:relative}
+  .railtog{position:absolute;right:10px;top:15px;width:27px;height:27px;display:flex;align-items:center;justify-content:center;
+    border-radius:8px;border:1px solid var(--border);background:var(--glass2);color:var(--txt2);cursor:pointer;transition:background .15s,color .15s;flex:none}
+  .railtog:hover{background:var(--bg3);color:var(--txt)}
+  .app.rail{grid-template-columns:62px 1fr}
+  .app.rail .side-brand{justify-content:center;padding:15px 0 13px}
+  .app.rail .side-brand>div,.app.rail .side-brand .logo{display:none}
+  .app.rail .railtog{position:static}
+  .app.rail .nav{padding:10px 8px}
+  .app.rail .navitem{font-size:0;gap:0;justify-content:center;padding:11px 0}
+  .app.rail .navitem::before{display:none}
+  .app.rail .side-foot{font-size:0;padding:12px 0;text-align:center}
+  .app{transition:grid-template-columns .26s cubic-bezier(.4,0,.2,1);will-change:grid-template-columns}
+  .side{overflow:hidden}
+  .nav{overflow-y:auto;overflow-x:hidden}
+  .navitem{white-space:nowrap;transition:background .15s,color .15s}
 
   .main{display:flex;flex-direction:column;overflow:hidden}
   .topbar{display:flex;align-items:center;gap:8px;row-gap:8px;flex-wrap:wrap;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--bg)}
@@ -537,6 +553,9 @@
     <div class="side-brand">
       <span class="logo" id="slogo"><img src="logo.png" alt="" onerror="this.remove()"></span>
       <div><h1>E-FOOTBALL</h1><small>REROLL · ระบบอัตโนมัติ</small></div>
+      <button class="railtog" onclick="toggleRail()" title="ย่อ/ขยายเมนู">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2" width="12" height="11" rx="2"/><line x1="5.6" y1="2" x2="5.6" y2="13"/></svg>
+      </button>
     </div>
     <nav class="nav" id="nav">
       <button class="navitem on" data-tab="reroll" onclick="tab('reroll',this)"><svg class="ic"><use href="#ic-reroll"/></svg>Reroll</button>
@@ -548,7 +567,9 @@
       <button class="navitem" data-tab="genlink" onclick="tab('genlink',this)"><svg class="ic"><use href="#ic-link"/></svg>Gen Link</button>
       <button class="navitem" data-tab="inject" onclick="tab('inject',this)"><svg class="ic"><use href="#ic-inject"/></svg>Inject ADB</button>
     </nav>
-    <div class="side-foot">ติดต่อ: <a href="#" onclick="api('open_tg');return false">t.me/j3xdr</a></div>
+    <div class="side-foot"><a href="#" onclick="api('open_tg');return false" title="ติดต่อ/แจ้งบัค · t.me/j3xdr" style="display:flex;align-items:center;justify-content:center;gap:7px;color:var(--txt2);text-decoration:none">
+      <svg class="tg-ic" width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style="flex:none"><path d="M21.94 4.3 18.9 19.12c-.22 1-.82 1.25-1.67.78l-4.6-3.39-2.22 2.14c-.25.24-.45.45-.92.45l.33-4.68 8.52-7.7c.37-.33-.08-.51-.58-.18L6.56 12.97l-4.54-1.42c-.99-.31-1-.99.2-1.46L20.5 3.17c.82-.3 1.54.2 1.44 1.13z"/></svg>
+      <span>ติดต่อ/แจ้งบัค</span></a></div>
   </aside>
 
   <div class="main">
@@ -924,7 +945,10 @@ function cpGrid(btn){cpText([...document.querySelectorAll('#grid .logarea')].map
 // ---- pywebview bridge ----
 function api(fn,...args){return (window.pywebview&&window.pywebview.api[fn])?window.pywebview.api[fn](...args):Promise.resolve({error:'no bridge'});}
 // FORCED update: on launch, block the whole app if a newer release exists.
+function toggleRail(){const a=$('app');const on=a.classList.toggle('rail');try{localStorage.setItem('ewwdc_rail',on?'1':'0');}catch(e){}}
 window.addEventListener('pywebviewready',()=>{READY=true;setVer();loadPatch();
+  try{document.querySelectorAll('#nav .navitem').forEach(b=>{if(!b.title)b.title=b.textContent.trim();});}catch(e){}
+  try{if(localStorage.getItem('ewwdc_rail')==='1')$('app').classList.add('rail');}catch(e){}
   api('check_update').then(r=>{window._updurl=(r&&r.url)||window._updurl;
     if(r&&r.newer){forceUpdate(r.url,r.latest);return;}   // stale build -> hard block
     refreshEnt();});});
@@ -1068,6 +1092,7 @@ function startCheck(){window._CHK=[];window._viewRows=[];window._CHKsel.clear();
     card_types:(window._ctypes&&window._ctypes.length?window._ctypes.slice():null),resolve_names:true};
   if(window._cfiles&&window._cfiles.length)p.files=window._cfiles;
   else{p.src_dir=$('c_out').value||null;p.out_dir=p.src_dir;}
+  window._chkSrc={files:(window._cfiles&&window._cfiles.length?window._cfiles.slice():null),dir:$('c_out').value||null};
   go(p);}
 function clearCheckFilter(){$('c_search').value='';$('c_fcoin').value=0;$('c_fgp').value=0;window._CHKrar.clear();if(window._pfSel)window._pfSel.clear();renderCheck();}
 function checkSelAll(cb){const shown=window._viewRows||currentCheckRows();if(cb.checked)shown.forEach(r=>window._CHKsel.add(r.user_code));else shown.forEach(r=>window._CHKsel.delete(r.user_code));renderCheckWindow();updCheckStat();}
@@ -1263,10 +1288,16 @@ function genCheckLink(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r||!
   r._linking=true;renderCheck();
   api('start',JSON.stringify({module:'genlink',lang:'th',workers:1,
     text:JSON.stringify({user_id:r.user_id,auth_code:r.auth_code,device_identifier:r.device_identifier,user_code:uc})}));}
-function exportCheck(){const sel=window._CHK.filter(r=>window._CHKsel.has(r.user_code));
+function exportCheck(){const sel=[...window._CHKsel];
   if(!sel.length){alert('ยังไม่ได้เลือกบัญชี');return;}
-  const txt=sel.map(r=>r.user_code+'\t'+(r.coins||0)+' coin\t'+(r.gp||0)+' GP\t'+((r.players||[]).map(p=>p.name||('#'+p.id)).join(', ')||'-')+(r._link?('\t'+r._link):'')).join('\n');
-  cpText(txt);}
+  const s=window._chkSrc||{};
+  api('export_accounts',JSON.stringify(sel),s.dir||'',JSON.stringify(s.files||[])).then(r=>{
+    if(!r||r.cancelled)return;
+    if(r.error){alert(r.error);return;}
+    let m='Export '+r.count+'/'+sel.length+' ไอดี → '+r.dest;
+    if(r.missing&&r.missing.length)m+='\nไม่พบไฟล์ '+r.missing.length+' ตัว: '+r.missing.slice(0,10).join(', ');
+    if(r.errors&&r.errors.length)m+='\nผิดพลาด '+r.errors.length+': '+r.errors.slice(0,5).join(' | ');
+    alert(m);});}
 // inject a checked account into an ADB device (popup)
 function openInjectFor(uc){const r=window._CHK.find(x=>x.user_code===uc);if(!r||!r.auth_code){alert('บัญชีนี้ไม่มี auth_code');return;}
   window._injTarget=r;$('inj2_uc').textContent=uc;$('inj2_log').innerHTML='';
