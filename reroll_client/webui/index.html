@@ -142,6 +142,8 @@
   /* in a vertical option stack every toggle is the SAME full width → switches line up */
   .cbody>.chk,.wrap>.chk,.togcol>.chk{width:100%;box-sizing:border-box}
   .togcol{display:flex;flex-direction:column;gap:0}
+  .grad{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer;font-size:13px;color:var(--txt);flex:none}
+  .grad input{margin:0;cursor:pointer;width:15px;height:15px;min-width:15px;flex:0 0 15px;appearance:auto;-webkit-appearance:auto;accent-color:var(--g)}
   .chk:hover{border-color:var(--txt2)}
   .chk>span.lbl{flex:1;min-width:0}
   .chk input[type=checkbox]{appearance:none;-webkit-appearance:none;margin:0;flex:none;
@@ -713,14 +715,39 @@
             <div class="field"><label>&nbsp;</label><button class="btn btn-outline btn-sm" id="g_scan" onclick="scanPacks()">สแกนแพ็ค / เลือกนักเตะ</button></div>
             <div class="field"><label>&nbsp;</label><button class="btn btn-ghost btn-sm" onclick="cp('g_log',this)">คัดลอก log</button></div>
           </div>
+          <div class="row" style="gap:20px;align-items:center;margin:2px 0 8px;flex-wrap:wrap">
+            <span class="hint" style="font-weight:600;flex:none">โหมดกาชา:</span>
+            <label class="grad"><input type="radio" name="gkind" value="hunt" checked onchange="gpKind()"> ล่านักเตะ (ฟรี/ใช้ coin)</label>
+            <label class="grad"><input type="radio" name="gkind" value="pay" onchange="gpKind()"> สุ่มด้วยทอง x1/x10</label>
+          </div>
+          <div id="g_paybox" style="display:none">
+            <div class="hint">สแกนแพ็คก่อน → เลือกแพ็ค → เลือกโหมด → กดเปิดกาชา · ระบบเปิดด้วยทองของไอดีเอง · ไอดีทองไม่พอจะข้ามให้อัตโนมัติ</div>
+            <div class="field" style="margin-top:4px"><label>แพ็คที่จะเปิด</label>
+              <select id="g_paypack" onchange="gpPreview()"><option value="">— สแกนแพ็คก่อน —</option></select></div>
+            <div class="row" style="gap:18px;flex-wrap:wrap;align-items:center;margin-top:8px">
+              <span class="hint" style="flex:none;font-weight:600">โหมด:</span>
+              <label class="grad"><input type="radio" name="gpm" value="x1" onchange="gpPreview()"> x1 (ทีละใบ)</label>
+              <label class="grad"><input type="radio" name="gpm" value="x10" checked onchange="gpPreview()"> x10 (คุ้มกว่า)</label>
+              <span style="flex:none;width:1px;height:20px;background:var(--border)"></span>
+              <label class="grad">จำนวนครั้ง/ไอดี <input id="g_pulls" type="number" value="1" min="1" style="width:72px;margin-left:4px" oninput="gpPreview()"></label>
+              <label class="grad"><input id="g_untilbroke" type="checkbox" onchange="gpPreview()"> จนทองหมด</label>
+            </div>
+            <div class="hint" id="g_payexplain" style="margin-top:6px">เลือกแพ็คก่อน</div>
+          </div>
+          <div id="g_huntbox">
           <div class="togcol">
             <label class="chk" title="เปิดไว้ (แนะนำ) = เวลาสุ่มได้นักเตะเป้าหมายตัวใหม่ จะต่อท้ายชื่อเดิมด้วย + เช่น C100_Henry_ไอดี → C100_Henry+Messi_ไอดี (สะสมข้ามรอบ)"><input id="g_accum" type="checkbox" checked> <span class="lbl">สะสมชื่อนักเตะต่อท้ายด้วย <b style="color:var(--g)">+</b> ข้ามรอบ (แนะนำ — เปลี่ยนชื่อไฟล์ให้เห็นตัวที่เพิ่งได้)</span></label>
-            <label class="chk" title="ปิด accumulate ไว้ถึงจะใช้ได้ — เขียนทับไฟล์เดิมในที่เดิมไม่เปลี่ยนชื่อ"><input id="g_keepname" type="checkbox"> <span class="lbl">ไม่เปลี่ยนชื่อไฟล์เดิม (เขียนทับที่เดิม — ใช้เมื่อปิดสะสมชื่อ)</span></label>
             <label class="chk" title="เปิด = ไอดีที่สุ่มได้นักเตะเป้าหมายครบตามเงื่อนไข ย้ายไปเก็บโฟลเดอร์แยก (ที่เลือกเอง หรือสร้างในโฟลเดอร์ต้นทาง ตั้งชื่อตามนักเตะที่เลือก)"><input id="g_split" type="checkbox" checked> <span class="lbl">แยกโฟลเดอร์ไอดีที่ได้เป้าหมาย (แนะนำ)</span></label>
           </div>
           <div class="field" id="g_splitrow"><label>โฟลเดอร์ปลายทางของไอดีที่ได้ (ว่าง = สร้างให้อัตโนมัติ ตั้งชื่อตามนักเตะ)</label>
             <div class="row"><input id="g_hitdir" placeholder="(ว่าง = &lt;โฟลเดอร์ต้นทาง&gt;/ชื่อนักเตะ+นักเตะ)" readonly style="flex:1"><button class="btn btn-ghost btn-sm" onclick="pickFolder('g_hitdir')">เลือก…</button><button class="btn btn-ghost btn-sm" onclick="$('g_hitdir').value='';persistSave()">ล้าง</button></div></div>
-          <div class="field" style="margin-top:4px"><label>รูปแบบชื่อไฟล์ (ตัวนำหน้าเหรียญ · ตัวคั่น · ลำดับ)</label>
+          <div id="g_pick"></div>
+          </div>
+          <!-- การบันทึกไฟล์ (ใช้ทั้ง 2 โหมด) -->
+          <div class="togcol" style="margin-top:4px">
+            <label class="chk" title="เปิด = เขียนทับไฟล์เดิมที่เดิม ไม่เปลี่ยนชื่อ · ปิด = ตั้งชื่อใหม่ตามรูปแบบด้านล่าง (เหรียญ+นักเตะที่ได้)"><input id="g_keepname" type="checkbox"> <span class="lbl">ไม่เปลี่ยนชื่อไฟล์เดิม (เขียนทับที่เดิม — ปิดไว้ถ้าอยากตั้งชื่อใหม่ตามเหรียญ/นักเตะที่ได้)</span></label>
+          </div>
+          <div class="field" id="g_fnrow" style="margin-top:4px"><label>รูปแบบชื่อไฟล์ (เมื่อปิด "ไม่เปลี่ยนชื่อเดิม") — ตัวนำหน้าเหรียญ · ตัวคั่น · ลำดับ</label>
             <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
               <label class="mini">นำหน้าเหรียญ<input id="g_coinpre" value="C" maxlength="4" style="width:48px" oninput="fnPreview()"></label>
               <label class="mini">ต่อนักเตะด้วย<input id="g_join" value="+" maxlength="3" style="width:42px" oninput="fnPreview()"></label>
@@ -733,7 +760,6 @@
                 <option value="names,uc">ชื่อ_ไอดี</option></select>
               <span class="hint" id="g_fnprev" style="font-family:var(--mono)"></span>
             </div></div>
-          <div id="g_pick"></div>
           <div class="pbar"><i id="g_bar"></i></div>
           <div class="biglog" id="g_log"></div>
         </div>
@@ -1160,10 +1186,23 @@ function startMod(mod){
     if(coinname){p.keep_filename=false;p.name_cfg={coin_prefix:$('d_coinpre').value,order:['coins','uc']};}
     else{p.keep_filename=$('d_keepname').checked;}
     $('d_log').innerHTML='';$('d_prog').textContent='0 / 0';$('d_bar').style.width='0';}
-  if(mod==='gacha'){p.workers=+$('g_workers').value;p.wanted_ids=window._wanted||[];
-    p.accumulate=$('g_accum').checked;p.keep_filename=$('g_keepname').checked;p.name_cfg=readNameCfg('g');
-    p.split_hits=$('g_split').checked;p.hit_dir=$('g_hitdir').value||null;
-    p.target_mode=window._gmode||'any';p.pay_coin=!!window._gpay;p.spin_agents=window._gagents||[];$('g_log').innerHTML='';}
+  if(mod==='gacha'){p.workers=+$('g_workers').value;
+    if(gKind()==='pay'){
+      const pid=+($('g_paypack').value||0);
+      if(!pid){alert('เลือกแพ็คที่จะเปิดก่อน');return;}
+      const pm=(document.querySelector('input[name=gpm]:checked')||{value:'x10'}).value;
+      p.pay_mode=pm;p.agent=pid;p.pay_pulls=$('g_untilbroke').checked?0:(+$('g_pulls').value||1);
+      // target filter/accumulate/split work in paid mode too (optional — เลือกนักเตะหรือไม่ก็ได้)
+      p.wanted_ids=window._wanted||[];p.target_mode=window._gmode||'any';
+      p.accumulate=$('g_accum').checked;p.split_hits=$('g_split').checked;p.hit_dir=$('g_hitdir').value||null;
+      p.keep_filename=$('g_keepname').checked;p.name_cfg=readNameCfg('g');
+    } else {
+      p.wanted_ids=window._wanted||[];
+      p.accumulate=$('g_accum').checked;p.keep_filename=$('g_keepname').checked;p.name_cfg=readNameCfg('g');
+      p.split_hits=$('g_split').checked;p.hit_dir=$('g_hitdir').value||null;
+      p.target_mode=window._gmode||'any';p.pay_coin=!!window._gpay;p.spin_agents=window._gagents||[];
+    }
+    $('g_log').innerHTML='';}
   go(p);}
 // shared filename-pattern reader (gacha + rename tab use the same control ids with a prefix)
 function readNameCfg(pfx){return {coin_prefix:$(pfx+'_coinpre').value,
@@ -1518,7 +1557,36 @@ function updateRerollGate(){const need=$('r_postgacha').checked,have=(window._wa
   if(!RUNNING)$('r_start').disabled=need&&!have;}
 function renderPacks(packs){PACKS=packs;gScanned=true;if(!RUNNING)$('g_start').disabled=false;
   if(!packs.length){logln($('g_log'),'err','ไม่พบแพ็ค');return;}
-  openPk();}
+  fillPayPacks();
+  if(gKind()==='pay'){gpPreview();logln($('g_log'),'info','สแกนเจอ '+packs.length+' แพ็ค — เลือกแพ็คแล้วกด เปิดกาชา');}
+  else openPk();}
+function gKind(){return (document.querySelector('input[name=gkind]:checked')||{value:'hunt'}).value;}
+function gpKind(){const pay=gKind()==='pay';
+  if($('g_paybox'))$('g_paybox').style.display=pay?'':'none';
+  // huntbox (เลือกนักเตะเป้าหมาย/สะสม/แยกโฟลเดอร์) ใช้ได้ทั้ง 2 โหมด — โหมดทองก็กรองเป้าหมายได้
+  if($('g_huntbox'))$('g_huntbox').style.display='';
+  if(pay)gpPreview();}
+function fillPayPacks(){const s=$('g_paypack');if(!s)return;const prev=s.value;
+  const paid=(PACKS||[]).filter(p=>(p.coin_options||[]).length);
+  s.innerHTML='<option value="">— เลือกแพ็ค —</option>'+paid.map(p=>{
+    const o1=(p.coin_options.find(o=>o.count===1)||{}).coin_price;
+    const o10=(p.coin_options.find(o=>o.count===10)||{}).coin_price;
+    const pr=[];if(o1)pr.push('x1 '+o1);if(o10)pr.push('x10 '+o10);
+    let lab=(p.title||p.agent_id)+(pr.length?(' · '+pr.join(' / ')+' coin'):'');
+    return `<option value="${p.agent_id}">${lab}</option>`;}).join('');
+  if(prev)s.value=prev;}
+function gpPreview(){const box=$('g_payexplain');if(!box)return;
+  const ub=$('g_untilbroke').checked;$('g_pulls').disabled=ub;
+  const pm=(document.querySelector('input[name=gpm]:checked')||{value:'x10'}).value;const cnt=pm==='x10'?10:1;
+  const pid=+($('g_paypack').value||0);const pk=(PACKS||[]).find(p=>p.agent_id===pid);
+  if(!pk){box.textContent='เลือกแพ็คก่อน';return;}
+  const o=(pk.coin_options||[]).find(o=>o.count===cnt);
+  if(!o){box.innerHTML='<b style="color:#ef4444">แพ็คนี้ไม่มีตัวเลือก '+pm+'</b>';return;}
+  const price=o.coin_price;const when=ub?'จนทองหมด':((+$('g_pulls').value||1)+' ครั้ง');
+  let t=`เปิด <b>${pm}</b> (${cnt} ใบ/ครั้ง) · ${when}/ไอดี · ราคาปัจจุบัน <b>${price}</b> coin/ครั้ง`;
+  if(cnt===10&&price<=500)t+=` <span style="color:#22c55e">— ครั้งแรกลดเหลือ ${price}! ครั้งต่อไปคิดราคาปกติให้อัตโนมัติ</span>`;
+  else if(cnt===10)t+=` <span style="color:var(--txt3)">— ราคาปกติ (สิทธิ์ลดครั้งแรกใช้ไปแล้ว หรือแพ็คนี้ไม่มีส่วนลด)</span>`;
+  box.innerHTML=t;}
 const EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function pcard(pl,agent){const sel=(window._wanted||[]).includes(pl.id);
   const img=pl.art?`<div class="pimg" style="background-image:url('${pl.art}')"></div>`:('<div class="pimg">'+svgIc('ic-user')+'</div>');

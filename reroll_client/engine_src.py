@@ -543,18 +543,23 @@ def scan_agents(client, uid, sid):
         if pr.get("can_use_gp") == "YES":
             bt = "BUY_BY_GP"
         coin_p = gp_p = None   # cheapest non-zero coin / gp price across options
+        coin_options = []      # every paid COIN option: {coin_price, count(=multiple_count), buy_type}
         for opt in prices.get(aid, {}).get("price_list", []):
             pr2 = opt.get("price", {})
             cp, gpp = pr2.get("coin_price") or 0, pr2.get("gp_price") or 0
             if cp > 0:
                 coin_p = cp if coin_p is None else min(coin_p, cp)
+                if pr2.get("can_use_coin") == "YES":
+                    coin_options.append({"coin_price": cp,
+                                         "count": opt.get("multiple_count") or 1,
+                                         "buy_type": "BUY_BY_COIN"})
             if gpp > 0:
                 gp_p = gpp if gp_p is None else min(gp_p, gpp)
         out.append({"agent_id": aid, "title": ag.get("title"),
                     "free": bool(free_opt), "needs_ad": needs_ad,
                     "count": free_opt.get("multiple_count") if free_opt else None,
                     "buy_type": bt if free_opt else None,
-                    "coin": coin_p, "gp": gp_p,
+                    "coin": coin_p, "gp": gp_p, "coin_options": coin_options,
                     "remaining": max(0, limit - used)})
     free = [a for a in out if a["free"] and a["remaining"] > 0 and not a["needs_ad"]]
     return {"all": out, "free": free, "free_count": len(free)}
@@ -640,6 +645,47 @@ def spin_to_target(client, uid, sid, wanted_set, need, pay_coin, coins,
                 coins -= price
                 _take(res.get("players") or [])
     return {"drawn": drawn, "coins_left": coins, "got": len(got)}
+
+
+def _coin_option(scan, agent_id, pack_count):
+    """From a scan, the COIN option for `agent_id` whose multiple_count == pack_count.
+    Returns {coin_price, count, buy_type} or None (pack gone / no such size / can't pay coin)."""
+    for a in scan.get("all", []):
+        if a.get("agent_id") == agent_id:
+            for o in a.get("coin_options") or []:
+                if (o.get("count") or 1) == pack_count:
+                    return o
+            return None
+    return None
+
+
+def draw_paid(client, uid, sid, agent_id, pack_count, max_pulls, coins, _stop=None, log=None):
+    """Draw ONE pack `agent_id` with coins, `pack_count` cards per pull (1 or 10).
+    Re-reads the live price before every pull, so a first-time discount (e.g. 500) and
+    the normal price it flips to afterwards (e.g. 900) are both charged correctly by the
+    server. Stops at max_pulls (<=0 = until coins can't afford the next pull), on stop,
+    or when the pack/price is gone. Returns {drawn, coins_left, spent, pulls}."""
+    drawn = []
+    spent = 0
+    pulls = 0
+    while (max_pulls <= 0 or pulls < max_pulls) and not (_stop and _stop()):
+        opt = _coin_option(scan_agents(client, uid, sid), agent_id, pack_count)
+        if not opt:
+            break
+        price = opt.get("coin_price") or 0
+        if price <= 0 or coins < price:
+            break
+        res = use_agent(client, uid, sid, agent_id, pack_count, opt.get("buy_type") or "BUY_BY_COIN")
+        if res.get("result") != "NOERR":
+            break   # gate rejected (price mismatch / quota / out of coins)
+        got = res.get("players") or []
+        drawn += got
+        coins -= price
+        spent += price
+        pulls += 1
+        if log:
+            log(f"  เปิด x{pack_count} ครั้งที่ {pulls}: -{price} coin (ได้ {len(got)} ใบ · เหลือ {coins})")
+    return {"drawn": drawn, "coins_left": coins, "spent": spent, "pulls": pulls}
 
 
 # --- efootbase enrichment (public player data: name / overall / art image) ---
@@ -1282,6 +1328,8 @@ def _gacha_scan(params, log):
         p["free"] = p["buyable"]
         p["coin"] = s.get("coin")
         p["gp"] = s.get("gp")
+        p["coin_options"] = s.get("coin_options") or []   # [{coin_price,count,buy_type}] x1/x10
+        p["remaining"] = s.get("remaining")
         p["reason"] = "" if p["buyable"] else _why(s)
         if not p["buyable"]:
             log(f"  ข้ามแพ็ค {p.get('title') or p['agent_id']}: {p['reason']}")
@@ -1312,6 +1360,12 @@ def _gacha(params, log):
     pay_coin = bool((params or {}).get("pay_coin"))
     spin_agents = [int(x) for x in (params or {}).get("spin_agents", []) if str(x).strip()]
     spinning = bool(wanted_set and (target_mode or pay_coin))   # spin-to-target mode
+    # paid bulk draw (x1/x10 with the account's own coins, no target hunt). Requires a
+    # chosen pack (`only`). pay_pulls per account; 0 = draw until coins can't afford more.
+    pay_mode = (params or {}).get("pay_mode") or ""     # "" | "x1" | "x10"
+    pack_count = 10 if pay_mode == "x10" else 1
+    pay_pulls = int((params or {}).get("pay_pulls", 1) or 0)
+    paying = pay_mode in ("x1", "x10") and bool(only)
     # split hits into their own folder: accounts that satisfy the target get moved to a
     # separate folder (custom hit_dir, or auto = <src>/<wanted names joined by +>).
     split_hits = bool((params or {}).get("split_hits", True)) and bool(wanted_set)
@@ -1376,7 +1430,14 @@ def _gacha(params, log):
                     continue
                 if _stopped():
                     return
-                if spinning:
+                if paying:
+                    coins0 = account_status(c, int(a["user_id"]), sid)["coins"]
+                    sp = draw_paid(c, int(a["user_id"]), sid, only, pack_count, pay_pulls,
+                                   coins0, _stop=_stopped, log=lambda m, _u=uc: log(f"{_u}{m}"))
+                    drawn = sp["drawn"]
+                    with lock:
+                        log(f"{uc}: เปิด x{pack_count} {sp['pulls']} ครั้ง · ใช้ {sp['spent']} coin · ได้ {len(drawn)} ใบ")
+                elif spinning:
                     scan = scan_agents(c, int(a["user_id"]), sid)
                     coins0 = account_status(c, int(a["user_id"]), sid)["coins"]
                     need = 1 if target_mode == "any" else (2 if target_mode == "two" else len(wanted_set))
@@ -1458,8 +1519,9 @@ def _gacha(params, log):
     if _stopped():
         log("** หยุดโดยผู้ใช้ **")
     log(f"governor: ok={gov.ok} throttled={gov.throttled} final_delay={gov.delay:.2f}s")
-    _summary(log, "GACHA", [f"บัญชีที่ได้นักเตะเป้าหมาย {cnt['hit']}/{total}  "
-                            f"(พลาด {cnt['fail']})", f"โฟลเดอร์: {src}"])
+    _head = (f"เปิดกาชาสำเร็จ {cnt['hit']}/{total}" if paying
+             else f"บัญชีที่ได้นักเตะเป้าหมาย {cnt['hit']}/{total}")
+    _summary(log, "GACHA", [f"{_head}  (พลาด {cnt['fail']})", f"โฟลเดอร์: {src}"])
     return {"module": "gacha", "results": results,
             "summary": {"hit_accounts": cnt["hit"], "total": total}}
 
