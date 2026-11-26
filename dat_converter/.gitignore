@@ -1,0 +1,8 @@
+# built exe (7MB, rebuild from convert.py) — track it manually if you want to ship it
+efootball_dat_converter.exe
+# pyinstaller work dir
+build_tmp/
+# runtime io
+output/
+input/*
+!input/_วางไฟล์ที่นี่.md
